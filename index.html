@@ -1422,6 +1422,19 @@ details.overdue-box[open]{
         <button id="btnCreate" class="secondary">Crear nuevo</button>
         <button id="btnSaveAs" class="secondary">Guardar como…</button>
       </div>
+      <div class="card" style="margin:12px 0 0;padding:12px;border-color:var(--accent)">
+        <div class="section-title" style="font-size:13px;margin:0 0 6px">☁️ Firebase (nube)</div>
+        <p class="hint" id="fbStatus" style="margin:0 0 8px">Sin sesión</p>
+        <div class="actions" style="margin-top:6px">
+          <button type="button" id="btnCloudSave" class="success">☁️ Guardar en Firebase</button>
+          <button type="button" id="btnCloudLoad" class="secondary">☁️ Cargar desde Firebase</button>
+        </div>
+        <div class="actions" style="margin-top:6px">
+          <button type="button" id="btnJsonToCloud" class="secondary">⬆️ JSON → Firebase</button>
+          <button type="button" id="btnCloudToJson" class="secondary">⬇️ Firebase → JSON</button>
+        </div>
+        <p class="hint" style="margin-top:8px">Sube tu JSON una vez. Luego usa Guardar/Cargar nube en cada dispositivo.</p>
+      </div>
       <div class="actions" style="margin-top:8px">
         <button type="button" id="btnRepairJson" class="secondary">🔧 Reparar JSON dañado</button>
         <button type="button" id="btnRepairImport" class="secondary">🔧 Importar y reparar…</button>
