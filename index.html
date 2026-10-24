@@ -1779,10 +1779,20 @@ async function signOutFirebase() {
     toast('Error al cerrar sesión');
   }
 }
-async function saveToFirebase() {
-  if (!fbUser) return toast('Inicia sesión primero');
+let _fbSaveTimer = null;
+let _fbSaving = false;
+async function saveToFirebase(silent) {
+  if (!fbUser) {
+    if (!silent) toast('Inicia sesión primero');
+    return false;
+  }
   const ref = cloudDocRef();
-  if (!ref) return toast('Firebase no listo');
+  if (!ref) {
+    if (!silent) toast('Firebase no listo');
+    return false;
+  }
+  if (_fbSaving) return false;
+  _fbSaving = true;
   try {
     const data = payload();
     await ref.set({
@@ -1791,12 +1801,26 @@ async function saveToFirebase() {
       _uid: fbUser.uid,
       _email: fbUser.email || ''
     }, { merge: false });
-    setFbStatus('<span class="ok">Guardado en Firebase</span> · ' + new Date().toLocaleString());
-    toast('☁️ Guardado en Firebase');
+    setFbStatus('<span class="ok">☁️ Auto-guardado</span> · ' + new Date().toLocaleTimeString());
+    if (!silent) toast('☁️ Guardado en Firebase');
+    return true;
   } catch (e) {
     console.error(e);
-    toast('Error al guardar en Firebase: ' + (e.message || e));
+    setFbStatus('<span class="warn">Error nube:</span> ' + (e.message || e));
+    if (!silent) toast('Error al guardar en Firebase: ' + (e.message || e));
+    return false;
+  } finally {
+    _fbSaving = false;
   }
+}
+/** Programa guardado en Firebase (evita muchas escrituras seguidas) */
+function scheduleFirebaseSave() {
+  if (!fbUser || !fbReady) return;
+  if (_fbSaveTimer) clearTimeout(_fbSaveTimer);
+  _fbSaveTimer = setTimeout(() => {
+    _fbSaveTimer = null;
+    saveToFirebase(true);
+  }, 1200);
 }
 async function loadFromFirebase(silent) {
   if (!fbUser) {
@@ -2890,8 +2914,15 @@ async function saveAs() {
 async function autoSave() {
   dirty = true; updateBanner();
   if (fileHandle) {
-    try { await writeToHandle(); toast('Guardado en archivo'); }
-    catch (e) { toast('Cambio en memoria (no se pudo escribir)'); }
+    try { await writeToHandle(); /* local OK */ }
+    catch (e) { /* sigue en memoria */ }
+  }
+  // Con sesión Firebase: auto-guarda en la nube (como el JSON antes)
+  scheduleFirebaseSave();
+  if (fbUser) {
+    setFbStatus('<span class="warn">☁️ Guardando…</span>');
+  } else if (fileHandle) {
+    toast('Guardado en archivo');
   }
 }
 function downloadJson() {
