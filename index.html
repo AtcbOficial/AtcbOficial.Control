@@ -44,6 +44,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>AtcbOficial</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --bg:#0b0f14;--card:#121922;--card2:#18222e;--text:#edf3f8;--muted:#91a0af;
@@ -67,6 +70,16 @@ header{
   border-bottom:1px solid var(--border);
 }
 h1{font-size:15px;margin:0;font-weight:750;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.auth-gate{position:fixed;inset:0;z-index:1000;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+.auth-gate.hidden{display:none!important}
+.auth-card{width:100%;max-width:360px;background:linear-gradient(180deg,#1a2430 0%,#121922 100%);border:1px solid #2e3d4f;border-radius:16px;padding:28px 22px;text-align:center;box-shadow:0 6px 0 #0a0e14,0 16px 40px rgba(0,0,0,.55)}
+.auth-card h2{margin:0 0 6px;font-size:20px}
+.auth-card .auth-sub{color:var(--muted);font-size:13px;margin:0 0 20px;line-height:1.4}
+.auth-card button{width:100%;margin-top:8px}
+.auth-err{color:var(--red);font-size:12px;margin-top:12px;min-height:1.2em}
+.auth-user{font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.auth-locked header,body.auth-locked main,body.auth-locked nav{visibility:hidden;pointer-events:none}
+
 .sub{color:var(--muted);font-size:11px;margin-top:2px}
 #headerSub{display:none}
 header .hdr-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -653,15 +666,28 @@ details.overdue-box[open]{
 
 </style>
 </head>
-<body>
+<body class="auth-locked">
+<div id="authGate" class="auth-gate">
+  <div class="auth-card">
+    <h2>🧾 AtcbOficial</h2>
+    <p class="auth-sub">Inicia sesión con Google para acceder a tus datos (Firebase).</p>
+    <button type="button" id="btnGoogleLogin">🔐 Continuar con Google</button>
+    <p class="auth-err" id="authError"></p>
+    <p class="hint" style="margin-top:16px">Hosting público · datos solo en tu cuenta Firebase</p>
+  </div>
+</div>
 <header>
   <div class="hdr-row">
     <h1 id="appTitle">🧾 AtcbOficial</h1>
-    <div class="sub" id="headerSub" hidden>Luis J. Bonilla P. · NIT 700326444-6 · No responsable IVA</div>
-    <select id="empresaSelect" title="Empresa activa">
-      <option value="atcb">🧊 AtcbOficial</option>
-      <option value="perfumes">🧴 Perfumes L&amp;R</option>
-    </select>
+    <div class="sub" id="headerSub" hidden></div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <span class="auth-user" id="authUserLabel" title=""></span>
+      <select id="empresaSelect" title="Empresa activa">
+        <option value="atcb">🧊 AtcbOficial</option>
+        <option value="perfumes">🧴 Perfumes L&amp;R</option>
+      </select>
+      <button type="button" class="sm secondary" id="btnLogout" title="Cerrar sesión" style="display:none;padding:5px 8px">⎋</button>
+    </div>
   </div>
 </header>
 
@@ -6547,7 +6573,7 @@ function printArchivedYear(year) {
     '</td><td>' + escapeHtml(x.type || '') + '</td><td style="text-align:right">' + money(x.amount) + '</td></tr>'
   ).join('');
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>Resumen ' + y.year +
-    '</title><style>body{font-family:system-ui,sans-serif;padding:24px;color:#111} table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px} th,td{border-bottom:1px solid #ddd;padding:6px 4px;text-align:left} h1{font-size:18px} .m{margin:4px 0}</style></head><body>' +
+    '</title><style>body{font-family:system-ui,sans-serif;padding:24px;color:#111} table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px} th,td{border-bottom:1px solid #ddd;padding:6px 4px;text-align:left} h1{font-size:18px} .m{margin:4px 0}</style></head><body class="auth-locked">' +
     '<h1>Resumen contable ' + y.year + '</h1>' +
     '<p class="m">Ingresos: <strong>' + money(y.ingresos) + '</strong></p>' +
     '<p class="m">Egresos: <strong>' + money(y.egresos) + '</strong></p>' +
