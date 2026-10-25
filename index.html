@@ -228,6 +228,11 @@ nav button.active{color:var(--accent)}
 }
 .total-box .big{font-size:20px;font-weight:800;color:var(--accent)}
 .hint{font-size:10px;color:var(--muted);margin-top:2px}
+.tot-detail{font-size:10px;line-height:1.35;color:var(--muted);margin-top:6px;text-align:left}
+.tot-detail .td-row{display:flex;justify-content:space-between;gap:6px;margin:2px 0}
+.tot-detail .td-row strong{color:var(--text);font-weight:650}
+.tot-detail .td-pct{opacity:.85;white-space:nowrap}
+
 .overdue-row{background:rgba(255,92,108,.12);border-color:rgba(255,92,108,.35)!important}
 /* Solo botones fijos al scroll (el título se va con el contenido) */
 .sticky-bar{
@@ -732,9 +737,9 @@ details.overdue-box[open]{
       <summary>📊 Análisis del año</summary>
       <div class="body">
         <div class="cont-grid" style="margin-bottom:14px">
-          <div class="card" style="margin:0;padding:12px"><div class="label">Ingresos</div><div id="homeIncome" class="stat income">$ 0,00</div></div>
-          <div class="card" style="margin:0;padding:12px"><div class="label">Egresos</div><div id="homeExpense" class="stat expense">$ 0,00</div></div>
-          <div class="card" style="margin:0;padding:12px"><div class="label">Resultado</div><div id="homeBalance" class="stat balance">$ 0,00</div></div>
+          <div class="card" style="margin:0;padding:10px"><div class="label">Ingresos</div><div id="homeIncome" class="stat income">$ 0,00</div><div id="homeIncomeDetail" class="tot-detail"></div></div>
+          <div class="card" style="margin:0;padding:10px"><div class="label">Egresos</div><div id="homeExpense" class="stat expense">$ 0,00</div><div id="homeExpenseDetail" class="tot-detail"></div></div>
+          <div class="card" style="margin:0;padding:10px"><div class="label">Resultado</div><div id="homeBalance" class="stat balance">$ 0,00</div><div id="homeBalanceDetail" class="tot-detail"></div></div>
         </div>
         <div class="section-title" style="font-size:13px;margin-bottom:6px">Ingresos vs. egresos</div>
         <div class="chartbox"><canvas id="homeChart"></canvas></div>
@@ -1391,9 +1396,9 @@ details.overdue-box[open]{
       <summary>📊 Análisis del año</summary>
       <div class="body">
         <div class="cont-grid" style="margin-bottom:14px">
-          <div class="card" style="margin:0;padding:12px"><div class="label">Ingresos</div><div id="contIncome" class="stat income">$0</div></div>
-          <div class="card" style="margin:0;padding:12px"><div class="label">Egresos</div><div id="contExpense" class="stat expense">$0</div></div>
-          <div class="card" style="margin:0;padding:12px"><div class="label">Resultado</div><div id="contBalance" class="stat balance">$0</div></div>
+          <div class="card" style="margin:0;padding:10px"><div class="label">Ingresos</div><div id="contIncome" class="stat income">$0</div><div id="contIncomeDetail" class="tot-detail"></div></div>
+          <div class="card" style="margin:0;padding:10px"><div class="label">Egresos</div><div id="contExpense" class="stat expense">$0</div><div id="contExpenseDetail" class="tot-detail"></div></div>
+          <div class="card" style="margin:0;padding:10px"><div class="label">Resultado</div><div id="contBalance" class="stat balance">$0</div><div id="contBalanceDetail" class="tot-detail"></div></div>
         </div>
         <div class="section-title" style="font-size:13px;margin-bottom:6px">Por mes</div>
         <div id="contMonths" style="margin-bottom:14px"></div>
@@ -3082,6 +3087,7 @@ function renderHomeContabilidad() {
     elB.textContent = money(b);
     elB.className = 'stat ' + (b >= 0 ? 'balance' : 'expense');
   }
+  try { fillContBreakdownUI('home', yearData); } catch (err) {}
   // Cajas resumen — diferencia vs resultado ACUMULADO
   const ce = parseMoney(typeof contCajas !== 'undefined' && contCajas.electronica) || 0;
   const cf = parseMoney(typeof contCajas !== 'undefined' && contCajas.fisica) || 0;
@@ -6349,6 +6355,73 @@ clearProyForm();
 
 /* ========== CONTABILIDAD PERSONAL (manual) ========== */
 function contMonthKey(d) { return (d || '').slice(0, 7); }
+
+/** Desglose visual del libro (no altera montos): por empresa + manuales + % */
+function contMovBucket(x) {
+  const locked = !!(x.locked || x.source);
+  if (!locked) return 'manual';
+  const lab = (typeof contEmpLabel === 'function' ? contEmpLabel(x) : '') || '';
+  if (/perfume/i.test(lab)) return 'perfumes';
+  if (/atcb/i.test(lab)) return 'atcb';
+  // locked sin empresa resuelta
+  return 'otro';
+}
+function contBreakdown(data) {
+  const z = () => ({ atcb: 0, perfumes: 0, manual: 0, otro: 0, total: 0 });
+  const inc = z(), exp = z();
+  (data || []).forEach(x => {
+    const a = Math.round((parseMoney(x.amount) || 0) * 100) / 100;
+    if (!a) return;
+    const b = contMovBucket(x);
+    const t = String(x.type || '').toLowerCase();
+    const bag = (t === 'ingreso') ? inc : exp;
+    bag[b] = Math.round((bag[b] + a) * 100) / 100;
+    bag.total = Math.round((bag.total + a) * 100) / 100;
+  });
+  const res = {
+    atcb: Math.round((inc.atcb - exp.atcb) * 100) / 100,
+    perfumes: Math.round((inc.perfumes - exp.perfumes) * 100) / 100,
+    manual: Math.round((inc.manual - exp.manual) * 100) / 100,
+    otro: Math.round((inc.otro - exp.otro) * 100) / 100,
+    total: Math.round((inc.total - exp.total) * 100) / 100
+  };
+  return { inc, exp, res };
+}
+function contPct(part, total) {
+  if (!total) return '0%';
+  return (Math.round((part / total) * 1000) / 10) + '%';
+}
+function formatContBreakdownHtml(kind, br) {
+  // kind: 'inc' | 'exp' | 'res'
+  const bag = br[kind];
+  const total = bag.total;
+  const rows = [];
+  const push = (label, val) => {
+    if (Math.abs(val) < 0.005 && kind !== 'res') return;
+    // en resultado sí mostrar si hay algo en total global o valor no cero
+    if (kind === 'res' && Math.abs(val) < 0.005) return;
+    rows.push(`<div class="td-row"><span>${label}</span><span><strong>${money(val)}</strong> <span class="td-pct">(${contPct(val, total)})</span></span></div>`);
+  };
+  push('🧊 Atcb', bag.atcb);
+  push('🧴 Perfumes', bag.perfumes);
+  push('✍️ Manual', bag.manual);
+  push('📦 Fact/Proy s/emp', bag.otro);
+  if (!rows.length) return '<div class="td-row"><span style="opacity:.7">Sin desglose</span></div>';
+  return rows.join('');
+}
+function fillContBreakdownUI(prefix, yearData) {
+  const br = contBreakdown(yearData);
+  const map = [
+    [prefix + 'IncomeDetail', 'inc'],
+    [prefix + 'ExpenseDetail', 'exp'],
+    [prefix + 'BalanceDetail', 'res']
+  ];
+  map.forEach(([id, kind]) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = formatContBreakdownHtml(kind, br);
+  });
+}
+
 function contTotals(data) {
   let inc = 0, exp = 0;
   (data || []).forEach(x => {
@@ -6765,6 +6838,7 @@ function refreshContabilidad() {
     elB.textContent = money(b);
     elB.className = 'stat ' + (b >= 0 ? 'balance' : 'expense');
   }
+  try { fillContBreakdownUI('cont', yearData); } catch (err) {}
   syncContCajasInputs();
   updateContCajasUI(allRes);
   renderContMonths();
