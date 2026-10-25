@@ -52,7 +52,7 @@
   --bg:#0b0f14;--card:#121922;--card2:#18222e;--text:#edf3f8;--muted:#91a0af;
   --accent:#4da3ff;--green:#35d07f;--red:#ff5c6c;--orange:#ffb84d;--border:#253241;--hdr:#1a3a5c;--purple:#a78bfa;
   --safe-b:env(safe-area-inset-bottom,0px);
-  --nav-h:62px;
+  --nav-h:48px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{
@@ -135,10 +135,10 @@ textarea{min-height:72px;resize:vertical}
 .row-actions{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;align-items:center}
 nav{
   position:fixed;bottom:0;left:0;right:0;z-index:30;background:#101720;
-  border-top:1px solid var(--border);display:flex;justify-content:space-around;
-  height:calc(var(--nav-h) + var(--safe-b));padding:6px 2px var(--safe-b);box-sizing:border-box;
+  border-top:1px solid var(--border);display:flex;justify-content:space-around;align-items:center;
+  height:calc(var(--nav-h) + var(--safe-b));padding:2px 1px var(--safe-b);box-sizing:border-box;
 }
-nav button{background:transparent;color:var(--muted);padding:6px 4px;font-size:10px;line-height:1.2;flex:1}
+nav button{background:transparent;color:var(--muted);padding:2px 2px;font-size:9px;line-height:1.15;flex:1}
 nav button.active{color:var(--accent)}
 .view{display:none}.view.active{display:block}
 .bottom-spacer{height:24px}
@@ -241,7 +241,7 @@ nav button.active{color:var(--accent)}
   margin:0 0 8px 8px;
 }
 .edit-panel{
-  display:none;position:sticky;top:0;z-index:12;
+  display:none;position:relative;z-index:12;
   background:linear-gradient(180deg,#1e2a38 0%,#18222e 100%);
   border:1px solid var(--accent);border-radius:12px;padding:12px;margin-bottom:12px;
   box-shadow:
@@ -249,7 +249,35 @@ nav button.active{color:var(--accent)}
     0 8px 24px rgba(0,0,0,.4),
     inset 0 1px 0 rgba(77,163,255,.15);
 }
-.edit-panel.open{display:block}
+.edit-panel.open{
+  display:block;
+  position:sticky;
+  top:2px;
+  max-height:calc(100dvh - 44px - var(--nav-h) - var(--safe-b) - 10px);
+  overflow-x:hidden;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+.edit-panel .edit-actions{
+  position:sticky;
+  top:0;
+  z-index:5;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin:0 0 10px;
+  padding:6px 0 10px;
+  background:linear-gradient(180deg,#1e2a38 0%,#1a2430 80%,rgba(26,36,48,0));
+  border-bottom:1px solid rgba(77,163,255,.28);
+}
+.edit-panel .section-title{margin-top:0}
+.fact-top-row{
+  position:sticky;top:2px;z-index:8;
+  background:linear-gradient(180deg,var(--card2) 75%,rgba(24,34,46,0));
+  padding-bottom:8px;margin-bottom:4px;
+}
+
 .abono-box{
   margin-top:10px;padding:10px;font-size:13px;
   background:linear-gradient(180deg,#1e2a38 0%,#18222e 100%);
@@ -518,8 +546,8 @@ nav button.active{color:var(--accent)}
 
 /* Nav más legible en pantallas grandes */
 @media (min-width: 900px) {
-  nav button{font-size:11px;padding:8px 6px}
-  nav{height:calc(var(--nav-h) + 4px + var(--safe-b))}
+  nav button{font-size:9px;padding:2px 3px}
+  nav{height:calc(var(--nav-h) + var(--safe-b))}
 }
 
 /* Muy anchos: 3 columnas en inicio/contab/archivo si cabe */
@@ -1112,6 +1140,10 @@ details.overdue-box[open]{
   <section id="stock" class="view">
     <div id="prodForm" class="edit-panel">
       <div class="section-title" id="prodFormTitle">Nuevo producto</div>
+      <div class="edit-actions actions">
+        <button type="button" id="btnSaveProd">Guardar</button>
+        <button type="button" id="btnCancelProd" class="secondary">Cancelar</button>
+      </div>
       <input id="pName" placeholder="Nombre del producto" style="margin-bottom:6px">
       <div class="grid2" style="margin-bottom:6px">
         <input id="pCompra" type="number" min="0" step="1" placeholder="P. Compra">
@@ -1136,10 +1168,7 @@ details.overdue-box[open]{
         <button type="button" class="sm secondary" id="btnPLabAddI" style="width:100%;margin:6px 0">+ Implemento</button>
         <p class="hint" id="pLabHint" style="margin:4px 0 0">Edita insumos; al guardar se actualiza el costo de compra si hay fórmula.</p>
       </div>
-      <div class="actions" style="margin-top:8px">
-        <button type="button" id="btnSaveProd">Guardar</button>
-        <button type="button" id="btnCancelProd" class="secondary">Cancelar</button>
-      </div>
+
     </div>
     <div class="card">
       <div class="sticky-btns">
@@ -1156,6 +1185,10 @@ details.overdue-box[open]{
   <section id="insumos" class="view">
     <div id="insForm" class="edit-panel">
       <div class="section-title" id="insFormTitle">Nuevo insumo</div>
+      <div class="edit-actions actions">
+        <button type="button" id="btnSaveIns">Guardar</button>
+        <button type="button" id="btnCancelIns" class="secondary">Cancelar</button>
+      </div>
       <select id="insCat" style="margin-bottom:6px">
         <option value="quimico">Químico (gramos)</option>
         <option value="implemento">Implemento (unidades)</option>
@@ -1178,10 +1211,7 @@ details.overdue-box[open]{
         <button type="button" class="sm secondary" id="btnAddInsProv" style="width:100%;margin-top:6px">+ Agregar proveedor</button>
         <p class="hint" style="margin:6px 0 0">Proveedores de la empresa activa (pestaña Proveed.). Puedes comparar precios.</p>
       </div>
-      <div class="actions">
-        <button type="button" id="btnSaveIns">Guardar</button>
-        <button type="button" id="btnCancelIns" class="secondary">Cancelar</button>
-      </div>
+
     </div>
     <div class="card">
       <div class="sticky-btns">
@@ -1202,9 +1232,13 @@ details.overdue-box[open]{
   <!-- LABORATORIO (Perfumes L&R) -->
   <section id="laboratorio" class="view">
     <!-- Resultado arriba -->
-    <details class="collapse" id="labResultado">
+    <details class="collapse" id="labResultado" open>
       <summary>Resultado · Costo / PVP</summary>
       <div class="body">
+        <div class="edit-actions actions" style="position:sticky;top:0;z-index:5;margin-bottom:10px">
+          <button type="button" id="btnLabSaveStock">💾 Guardar en stock</button>
+          <button type="button" id="btnLabClear" class="secondary">Limpiar</button>
+        </div>
         <div class="grid2">
           <div class="card" style="margin:0;padding:12px"><div class="label">Costo fabricación</div><div id="labCosto" class="stat expense">$ 0,00</div></div>
           <div class="card" style="margin:0;padding:12px"><div class="label">Margen %</div><input id="labMargen" type="number" min="0" step="1" value="50"></div>
@@ -1214,10 +1248,6 @@ details.overdue-box[open]{
           <div class="card" style="margin:0;padding:12px"><div class="label">Precio venta (PVP)</div><div id="labPVP" class="stat balance">$ 0,00</div></div>
         </div>
         <div id="labDetalle" class="hint" style="margin-top:10px"></div>
-        <div class="actions" style="margin-top:12px">
-          <button type="button" id="btnLabSaveStock">💾 Guardar en stock</button>
-          <button type="button" id="btnLabClear" class="secondary">Limpiar</button>
-        </div>
       </div>
     </details>
     <!-- Fórmula -->
@@ -1256,6 +1286,10 @@ details.overdue-box[open]{
   <section id="clientes" class="view">
     <div id="cliForm" class="edit-panel">
       <div class="section-title" id="cliFormTitle">Nuevo cliente</div>
+      <div class="edit-actions actions">
+        <button type="button" id="btnSaveCli">Guardar</button>
+        <button type="button" id="btnCancelCli" class="secondary">Cancelar</button>
+      </div>
       <input id="cNombre" placeholder="Nombre y apellido / Razón social" style="margin-bottom:6px">
       <input id="cDoc" placeholder="Documento / NIT" style="margin-bottom:6px">
       <input id="cDir" placeholder="Dirección" style="margin-bottom:6px">
@@ -1263,10 +1297,7 @@ details.overdue-box[open]{
       <input id="cEmail" placeholder="Correo electrónico" style="margin-bottom:6px">
       <input id="cFecha" type="date" style="margin-bottom:6px">
       <textarea id="cObs" placeholder="Observaciones (notas libres...)" style="margin-bottom:6px;min-height:64px"></textarea>
-      <div class="actions">
-        <button type="button" id="btnSaveCli">Guardar</button>
-        <button type="button" id="btnCancelCli" class="secondary">Cancelar</button>
-      </div>
+
     </div>
     <div class="card">
       <div class="sticky-btns">
@@ -1283,6 +1314,10 @@ details.overdue-box[open]{
   <section id="proveedores" class="view">
     <div id="provForm" class="edit-panel">
       <div class="section-title" id="provFormTitle">Nuevo proveedor</div>
+      <div class="edit-actions actions">
+        <button type="button" id="btnSaveProv">Guardar</button>
+        <button type="button" id="btnCancelProv" class="secondary">Cancelar</button>
+      </div>
       <input id="vNombre" placeholder="Nombre / Razón social" style="margin-bottom:6px">
       <input id="vDoc" placeholder="Documento / NIT" style="margin-bottom:6px">
       <input id="vDir" placeholder="Dirección" style="margin-bottom:6px">
@@ -1291,10 +1326,7 @@ details.overdue-box[open]{
       <input id="vWeb" placeholder="Dirección web (https://...)" style="margin-bottom:6px">
       <input id="vFecha" type="date" style="margin-bottom:6px">
       <textarea id="vObs" placeholder="Observaciones (notas libres...)" style="margin-bottom:6px;min-height:64px"></textarea>
-      <div class="actions">
-        <button type="button" id="btnSaveProv">Guardar</button>
-        <button type="button" id="btnCancelProv" class="secondary">Cancelar</button>
-      </div>
+
     </div>
     <div class="card">
       <div class="sticky-btns">
