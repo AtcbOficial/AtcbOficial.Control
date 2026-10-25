@@ -3878,6 +3878,42 @@ cliSearch.oninput = () => renderClients();
 
 /* Proveedores */
 let editingProvId = null;
+
+function viewProvDetail(id) {
+  const v = (proveedores || []).find(x => +x.id === +id);
+  if (!v) return;
+  const modal = document.getElementById('invDetailModal');
+  const title = document.getElementById('invDetailTitle');
+  const body = document.getElementById('invDetailBody');
+  if (!modal || !body) return;
+  if (title) title.textContent = '👀 ' + (v.nombre || 'Proveedor');
+  let web = (v.web || '').trim();
+  if (web && !/^https?:\/\//i.test(web)) web = 'https://' + web;
+  let html = '';
+  html += `<div class="d-row"><strong>Nombre:</strong> ${escapeHtml(v.nombre || '')}</div>`;
+  html += `<div class="d-row"><strong>Documento / NIT:</strong> ${escapeHtml(v.documento || '—')}</div>`;
+  html += `<div class="d-row"><strong>Teléfono:</strong> ${escapeHtml(v.telefono || '—')}</div>`;
+  html += `<div class="d-row"><strong>Dirección:</strong> ${escapeHtml(v.direccion || '—')}</div>`;
+  html += `<div class="d-row"><strong>Email:</strong> ${escapeHtml(v.email || '—')}</div>`;
+  if (web) html += `<div class="d-row"><strong>Web:</strong> <a href="${escapeHtml(web)}" target="_blank" rel="noopener" style="color:var(--accent)">${escapeHtml(v.web || web)}</a></div>`;
+  html += `<div class="d-row"><strong>Fecha:</strong> ${fmtDate(v.fecha)} (${daysAgo(v.fecha)} d)</div>`;
+  html += `<div class="d-row"><strong>Empresa:</strong> ${escapeHtml((v.empresa === 'perfumes') ? 'Perfumes L&R' : 'AtcbOficial')}</div>`;
+  if (v.obs) html += `<div class="d-row"><strong>Observaciones:</strong><br>${escapeHtml(v.obs).replace(/\n/g, '<br>')}</div>`;
+  // Insumos que ofrece este proveedor
+  const offers = (insumos || []).filter(ins => (ins.proveedores || []).some(pv => +pv.id === +v.id));
+  if (offers.length) {
+    html += `<div class="section-title" style="margin:12px 0 6px;font-size:13px">Insumos que ofrece (${offers.length})</div>`;
+    offers.forEach(ins => {
+      const und = ins.cat === 'quimico' ? 'g' : 'ud';
+      const pv = (ins.proveedores || []).find(x => +x.id === +v.id);
+      const precio = pv ? money(pv.precio) : '—';
+      html += `<div class="d-row">🧪 <strong>${escapeHtml(ins.producto || '')}</strong> · ${precio} / ${und}</div>`;
+    });
+  }
+  body.innerHTML = html;
+  modal.classList.add('open');
+}
+
 function renderProveedores() {
   const q = ((document.getElementById('provSearch') || {}).value || '').toLowerCase().trim();
   const list = document.getElementById('provList');
@@ -3901,6 +3937,7 @@ function renderProveedores() {
           ${web ? `<div class="line">🔗 <a href="${escapeHtml(web)}" target="_blank" rel="noopener" style="color:var(--accent)">${escapeHtml(v.web)}</a></div>` : ''}
           ${v.obs ? `<div class="line" style="white-space:pre-wrap">📝 ${escapeHtml(v.obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
+            <button type="button" class="sm secondary" onclick="viewProvDetail(${v.id})" title="Ver detalles">👀</button>
             ${wa ? `<a class="sm success" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 10px;border-radius:8px;font-weight:650">📲</a>` : ''}
             <button type="button" class="sm secondary" onclick="editProv(${v.id})">✏️</button>
             <button type="button" class="sm danger" onclick="delProv(${v.id})">🗑️</button>
@@ -6860,6 +6897,48 @@ function addInsProvOffer() {
   if (precEl) precEl.value = '';
   renderInsProvOffers();
 }
+
+function viewInsDetail(id) {
+  const i = (insumos || []).find(x => +x.id === +id);
+  if (!i) return;
+  const modal = document.getElementById('invDetailModal');
+  const title = document.getElementById('invDetailTitle');
+  const body = document.getElementById('invDetailBody');
+  if (!modal || !body) return;
+  const und = i.cat === 'quimico' ? 'g' : 'ud';
+  const catLabel = i.cat === 'quimico' ? 'Químico (gramos)' : 'Implemento (unidades)';
+  if (title) title.textContent = '👀 ' + (i.producto || 'Insumo');
+  let html = '';
+  html += `<div class="d-row"><strong>Nombre:</strong> ${escapeHtml(i.producto || '')}</div>`;
+  html += `<div class="d-row"><strong>Categoría:</strong> ${escapeHtml(catLabel)}</div>`;
+  html += `<div class="d-row"><strong>Precio base:</strong> $ ${formatMoneyInput(i.precio)} / ${und}</div>`;
+  html += `<div class="d-row"><strong>Stock:</strong> ${i.stock ?? 0} ${und}</div>`;
+  if (i.obs) html += `<div class="d-row"><strong>Observaciones:</strong><br>${escapeHtml(i.obs).replace(/\n/g, '<br>')}</div>`;
+  const provs = i.proveedores || [];
+  if (provs.length) {
+    html += `<div class="section-title" style="margin:12px 0 6px;font-size:13px">Proveedores</div>`;
+    provs.forEach(pv => {
+      const p = (proveedores || []).find(x => +x.id === +pv.id);
+      const name = (p && p.nombre) || pv.nombre || ('#' + pv.id);
+      html += `<div class="d-row">🏭 <strong>${escapeHtml(name)}</strong> · ${money(pv.precio)} / ${und}</div>`;
+    });
+  } else {
+    html += `<div class="d-row" style="color:var(--muted)">Sin proveedores vinculados</div>`;
+  }
+  body.innerHTML = html;
+  modal.classList.add('open');
+}
+function waInsObs(id) {
+  const i = (insumos || []).find(x => +x.id === +id);
+  if (!i) return;
+  const obs = (i.obs || '').trim();
+  if (!obs) return toast('Sin observaciones para enviar');
+  const und = i.cat === 'quimico' ? 'g' : 'ud';
+  const name = i.producto || 'Insumo';
+  const text = encodeURIComponent('*' + name + '* (' + und + ')\nPrecio base: $ ' + formatMoneyInput(i.precio) + ' / ' + und + '\n\n' + obs);
+  window.open('https://wa.me/?text=' + text, '_blank');
+}
+
 function renderInsumos() {
   const q = ((document.getElementById('insSearch') || {}).value || '').toLowerCase();
   const cat = (document.getElementById('insFilterCat') || {}).value || '';
@@ -6890,7 +6969,9 @@ function renderInsumos() {
           <div class="line">Precio base: <strong>$ ${formatMoneyInput(i.precio)}</strong> / ${und} · Stock: <strong>${i.stock || 0}</strong></div>
           ${provLines || '<div class="line" style="color:var(--muted)">🏭 Sin proveedores anotados</div>'}
           ${obs ? `<div class="line">📝 ${escapeHtml(obs)}</div>` : ''}
-          <div class="row-actions" style="margin-top:8px">
+          <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
+            <button type="button" class="sm secondary" onclick="viewInsDetail(${i.id})" title="Ver detalles">👀</button>
+            <button type="button" class="sm success" onclick="waInsObs(${i.id})" title="WhatsApp observaciones">📲</button>
             <button type="button" class="sm secondary" onclick="editInsumo(${i.id})">✏️</button>
             <button type="button" class="sm danger" onclick="delInsumo(${i.id})">🗑️</button>
           </div>
