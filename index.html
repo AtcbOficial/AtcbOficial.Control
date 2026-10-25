@@ -3800,6 +3800,47 @@ function matchContactQuery(obj, q) {
   const qDig = q.replace(/\D/g, '');
   return nombre.includes(q) || doc.includes(q) || tel.includes(q) || (qDig.length >= 3 && telDig.includes(qDig));
 }
+
+function viewCliDetail(id) {
+  const c = (clients || []).find(x => +x.id === +id);
+  if (!c) return;
+  const modal = document.getElementById('invDetailModal');
+  const title = document.getElementById('invDetailTitle');
+  const body = document.getElementById('invDetailBody');
+  if (!modal || !body) return;
+  if (title) title.textContent = '👀 ' + (c.nombre || 'Cliente');
+  let html = '';
+  html += `<div class="d-row"><strong>Nombre:</strong> ${escapeHtml(c.nombre || '')}</div>`;
+  html += `<div class="d-row"><strong>Documento / NIT:</strong> ${escapeHtml(c.documento || '—')}</div>`;
+  html += `<div class="d-row"><strong>Teléfono:</strong> ${escapeHtml(c.telefono || '—')}</div>`;
+  html += `<div class="d-row"><strong>Dirección:</strong> ${escapeHtml(c.direccion || '—')}</div>`;
+  html += `<div class="d-row"><strong>Email:</strong> ${escapeHtml(c.email || '—')}</div>`;
+  html += `<div class="d-row"><strong>Fecha:</strong> ${fmtDate(c.fecha)} (${daysAgo(c.fecha)} d)</div>`;
+  if (c.obs) html += `<div class="d-row"><strong>Observaciones:</strong><br>${escapeHtml(c.obs).replace(/\n/g, '<br>')}</div>`;
+  const related = (invoices || []).filter(inv => {
+    const n = (inv.cliente || '').toLowerCase().trim();
+    const cn = (c.nombre || '').toLowerCase().trim();
+    if (n && cn && n === cn) return true;
+    if (c.documento && inv.doc && String(c.documento).trim() === String(inv.doc).trim()) return true;
+    if (c.telefono && inv.tel && telDigits(c.telefono) === telDigits(inv.tel)) return true;
+    return false;
+  }).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  if (related.length) {
+    html += `<div class="section-title" style="margin:12px 0 6px;font-size:13px">Facturas / proyectos (${related.length})</div>`;
+    related.slice(0, 30).forEach(inv => {
+      const emp = (inv.empresa === 'perfumes') ? '🧴' : '🧊';
+      const st = inv.tipo || 'pendiente';
+      const tot = typeof invTotal === 'function' ? invTotal(inv) : (inv.total || 0);
+      html += `<div class="d-row">${emp} <strong>#${inv.numero || inv.id}</strong> · ${fmtDate(inv.fecha)} · ${escapeHtml(st)} · ${money(tot)}</div>`;
+    });
+    if (related.length > 30) html += `<div class="d-row" style="color:var(--muted)">… y ${related.length - 30} más</div>`;
+  } else {
+    html += `<div class="d-row" style="color:var(--muted)">Sin facturas vinculadas por nombre/doc/tel</div>`;
+  }
+  body.innerHTML = html;
+  modal.classList.add('open');
+}
+
 function renderClients() {
   const q = (cliSearch.value || '').toLowerCase().trim();
   const rows = clients
@@ -3817,6 +3858,7 @@ function renderClients() {
           ${c.email ? `<div class="line">✉️ ${escapeHtml(c.email)}</div>` : ''}
           ${c.obs ? `<div class="line" style="white-space:pre-wrap">📝 ${escapeHtml(c.obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
+            <button type="button" class="sm secondary" onclick="viewCliDetail(${c.id})" title="Ver detalles">👀</button>
             ${wa ? `<a class="sm success" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 10px;border-radius:8px;font-weight:650">📲</a>` : ''}
             <button type="button" class="sm secondary" onclick="editCli(${c.id})">✏️</button>
             <button type="button" class="sm danger" onclick="delCli(${c.id})">🗑️</button>
