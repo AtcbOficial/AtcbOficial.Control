@@ -3597,11 +3597,8 @@ function renderProducts() {
         const obs = (p.obs || '').trim();
         const titleName = (activeEmpresa === EMPRESA_PERFUMES) ? (basePerfumeName(p.name) || p.name) : p.name;
         const cod = (p.codigo || '').trim();
-        const thumb = (p.img && String(p.img).indexOf('data:image') === 0)
-          ? `<img class="thumb" src="${p.img}" alt="">`
-          : '';
         return `<div class="list-card ${isOld ? 'overdue-row' : ''}">
-          <div class="title">${thumb}${escapeHtml(titleName)}${(p.lab || hasMulti) ? ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">Lab</span>' : ''}${isOld ? ' <span class="chip overdue">+'+lim+'d revisar precio</span>' : ''}</div>
+          <div class="title">${escapeHtml(titleName)}${(p.lab || hasMulti) ? ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">Lab</span>' : ''}${isOld ? ' <span class="chip overdue">+'+lim+'d revisar precio</span>' : ''}</div>
           ${cod ? `<div class="line">🪪 <strong>${escapeHtml(cod)}</strong></div>` : ''}
           <div class="line">📅 ${fmtDate(p.fecha)} (${dias} día(s))</div>
           <div class="line">📦 Stock: <strong>${p.stock ?? 0}</strong></div>
