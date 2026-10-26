@@ -1216,7 +1216,17 @@ details.overdue-box[open]{
         <button type="button" id="btnNewProd" class="sm success">➕ Nuevo</button>
       </div>
       <div class="section-title" style="margin:0 0 12px">📦 Stock de productos</div>
-      <input id="stockSearch" placeholder="Filtrar por nombre..." style="margin-bottom:10px">
+      <input id="stockSearch" placeholder="Filtrar por nombre o código..." style="margin-bottom:8px">
+      <div class="card" style="margin:0 0 10px;padding:10px;border-color:var(--accent)">
+        <div class="section-title" style="font-size:13px;margin:0 0 6px">📤 Exportar a catálogo</div>
+        <p class="hint" style="margin:0 0 8px">Solo <strong>código id</strong>, <strong>nombre</strong> y <strong>foto</strong> de la empresa activa. Elige productos y descarga un JSON para importar en el catálogo.</p>
+        <div class="actions" style="margin-bottom:6px">
+          <button type="button" id="btnStockSelAll" class="sm secondary">☑️ Todos (visibles)</button>
+          <button type="button" id="btnStockSelNone" class="sm secondary">⬜ Ninguno</button>
+        </div>
+        <button type="button" id="btnExportCatalog" class="success" style="width:100%">📤 Exportar seleccionados</button>
+        <p class="hint" id="stockExportHint" style="margin-top:6px">0 seleccionados</p>
+      </div>
       <div id="prodList"></div>
     </div>
     <div class="bottom-spacer"></div>
@@ -3101,6 +3111,7 @@ if (_empSel) {
   _empSel.onchange = () => {
     activeEmpresa = _empSel.value === EMPRESA_PERFUMES ? EMPRESA_PERFUMES : EMPRESA_ATCB;
     applyEmpresaUI();
+    try { stockExportSel.clear(); stockExportUpdateHint(); } catch (e) {}
     try { renderProducts(); } catch (e) {}
     try { renderInvoices(); } catch (e) {}
     try { renderClients(); } catch (e) {}
@@ -3573,6 +3584,87 @@ function bindProdImageInputs() {
   });
 }
 
+
+/** Selección para export catálogo (ids de producto) */
+const stockExportSel = new Set();
+function stockExportUpdateHint() {
+  const el = document.getElementById('stockExportHint');
+  if (!el) return;
+  const n = stockExportSel.size;
+  el.textContent = n + ' seleccionado' + (n === 1 ? '' : 's');
+}
+function toggleStockExportSel(id, checked) {
+  id = +id;
+  if (checked) stockExportSel.add(id);
+  else stockExportSel.delete(id);
+  stockExportUpdateHint();
+}
+function stockExportSelectVisible(all) {
+  const q = ((document.getElementById('stockSearch') || {}).value || '').toLowerCase();
+  const rows = products
+    .filter(p => (p.empresa || EMPRESA_ATCB) === activeEmpresa)
+    .filter(p => {
+      if (!q) return true;
+      const code = (p.codigo || '').toLowerCase();
+      return (p.name || '').toLowerCase().includes(q) || basePerfumeName(p.name).toLowerCase().includes(q) || code.includes(q);
+    });
+  rows.forEach(p => {
+    if (all) stockExportSel.add(+p.id);
+    else stockExportSel.delete(+p.id);
+  });
+  try { renderProducts(); } catch (e) {}
+  stockExportUpdateHint();
+}
+/** Genera JSON catálogo: solo codigo, nombre, foto */
+function exportCatalogSelection() {
+  const ids = [...stockExportSel];
+  if (!ids.length) return toast('Selecciona al menos un producto');
+  const items = [];
+  const skipped = [];
+  ids.forEach(id => {
+    const p = products.find(x => +x.id === +id);
+    if (!p) return;
+    if ((p.empresa || EMPRESA_ATCB) !== activeEmpresa) return;
+    const codigo = String(p.codigo || '').trim();
+    if (!codigo) {
+      skipped.push(p.name || ('#' + id));
+      return;
+    }
+    const nombre = (activeEmpresa === EMPRESA_PERFUMES)
+      ? (basePerfumeName(p.name) || p.name || '')
+      : (p.name || '');
+    const img = (typeof p.img === 'string' && p.img.indexOf('data:image') === 0) ? p.img : '';
+    items.push({
+      codigo,
+      nombre: String(nombre || '').trim(),
+      img
+    });
+  });
+  if (!items.length) {
+    return toast(skipped.length
+      ? 'Ninguno tiene código id. Asigna código antes de exportar.'
+      : 'Nada para exportar');
+  }
+  const emp = activeEmpresa === EMPRESA_PERFUMES ? 'perfumes' : 'atcb';
+  const payload = {
+    version: 1,
+    source: 'AtcbOficial.Control',
+    empresa: emp,
+    exportedAt: new Date().toISOString(),
+    count: items.length,
+    items
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'catalogo-' + emp + '-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  let msg = 'Exportados ' + items.length + ' producto(s)';
+  if (skipped.length) msg += ' · omitidos sin código: ' + skipped.length;
+  toast(msg);
+}
+
 function renderProducts() {
   const q = (stockSearch.value || '').toLowerCase();
   const rows = products
@@ -3597,9 +3689,13 @@ function renderProducts() {
         const obs = (p.obs || '').trim();
         const titleName = (activeEmpresa === EMPRESA_PERFUMES) ? (basePerfumeName(p.name) || p.name) : p.name;
         const cod = (p.codigo || '').trim();
+        const sel = stockExportSel.has(+p.id);
         return `<div class="list-card ${isOld ? 'overdue-row' : ''}">
-          <div class="title">${escapeHtml(titleName)}${(p.lab || hasMulti) ? ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">Lab</span>' : ''}${isOld ? ' <span class="chip overdue">+'+lim+'d revisar precio</span>' : ''}</div>
-          ${cod ? `<div class="line">🪪 <strong>${escapeHtml(cod)}</strong></div>` : ''}
+          <div class="title" style="display:flex;align-items:flex-start;gap:8px">
+            <input type="checkbox" style="width:auto;margin-top:3px;flex-shrink:0" ${sel ? 'checked' : ''} onchange="toggleStockExportSel(${p.id}, this.checked)" title="Exportar a catálogo">
+            <span style="flex:1">${escapeHtml(titleName)}${(p.lab || hasMulti) ? ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">Lab</span>' : ''}${isOld ? ' <span class="chip overdue">+'+lim+'d revisar precio</span>' : ''}</span>
+          </div>
+          ${cod ? `<div class="line">🪪 <strong>${escapeHtml(cod)}</strong></div>` : '<div class="line" style="color:var(--orange)">🪪 Sin código id (no exportable)</div>'}
           <div class="line">📅 ${fmtDate(p.fecha)} (${dias} día(s))</div>
           <div class="line">📦 Stock: <strong>${p.stock ?? 0}</strong></div>
           <div class="line">🏷️ ${escapeHtml(priceTxt)}</div>
@@ -3948,6 +4044,15 @@ function viewProdDetail(id) {
   modal.classList.add('open');
 }
 stockSearch.oninput = () => renderProducts();
+(function bindStockExport() {
+  const a = document.getElementById('btnStockSelAll');
+  const n = document.getElementById('btnStockSelNone');
+  const x = document.getElementById('btnExportCatalog');
+  if (a) a.onclick = () => stockExportSelectVisible(true);
+  if (n) n.onclick = () => stockExportSelectVisible(false);
+  if (x) x.onclick = () => exportCatalogSelection();
+  stockExportUpdateHint();
+})();
 
 /* ---------- CLIENTES / PROVEEDORES ---------- */
 /** Solo dígitos para wa.me (incluir indicativo país) */
