@@ -3504,17 +3504,18 @@ function showProdLabBox(show) {
   box.style.display = show ? 'block' : 'none';
 }
 
-/** Comprime imagen a JPEG dataURL (máx ~480px) para no inflar el JSON */
+/** Redimensiona imagen conservando calidad y transparencia (PNG/WebP → PNG; foto → JPEG alto) */
 function compressImageFile(file, maxSide, quality) {
   return new Promise((resolve, reject) => {
     if (!file || !file.type || file.type.indexOf('image/') !== 0) return reject(new Error('Archivo no es imagen'));
+    const preferPng = /image\/(png|webp)/i.test(file.type || '') || /\.png$/i.test(file.name || '');
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
     reader.onload = () => {
       const img = new Image();
       img.onerror = () => reject(new Error('Imagen inválida'));
       img.onload = () => {
-        const maxS = maxSide || 480;
+        const maxS = maxSide || 1000;
         let w = img.width, h = img.height;
         if (w > maxS || h > maxS) {
           if (w >= h) { h = Math.round(h * (maxS / w)); w = maxS; }
@@ -3523,9 +3524,15 @@ function compressImageFile(file, maxSide, quality) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d');
+        // Sin relleno oscuro: mantiene transparencia en PNG
+        ctx.clearRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
         try {
-          resolve(canvas.toDataURL('image/jpeg', quality != null ? quality : 0.72));
+          if (preferPng) {
+            resolve(canvas.toDataURL('image/png'));
+          } else {
+            resolve(canvas.toDataURL('image/jpeg', quality != null ? quality : 0.9));
+          }
         } catch (e) { reject(e); }
       };
       img.src = reader.result;
@@ -3566,7 +3573,7 @@ function bindProdImageInputs() {
         const file = f.files && f.files[0];
         if (!file) return;
         try {
-          const url = await compressImageFile(file, 480, 0.72);
+          const url = await compressImageFile(file, 1000, 0.9);
           setProdImgPreview(prev, url);
           toast('Imagen lista');
         } catch (e) {
