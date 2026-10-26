@@ -116,14 +116,26 @@ main::-webkit-scrollbar{width:0;height:0;display:none} /* Chrome/Safari: sin bar
 .income{color:var(--green)}.expense{color:var(--red)}.balance{color:var(--accent)}.warn{color:var(--orange)}
 button,input,select,textarea{font:inherit}
 button{
-  border:0;border-radius:10px;padding:8px 11px;background:var(--accent);color:#fff;
+  border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 11px;background:var(--accent);color:#fff;
   font-weight:650;cursor:pointer;font-size:13px;
+  box-shadow:0 3px 0 rgba(0,0,0,.4),0 5px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.12);
+  transition:transform .1s ease,box-shadow .1s ease,filter .1s ease;
 }
-button.secondary{background:var(--card2);color:var(--text)}
-button.danger{background:#4b2027;color:#ff9aa4}
-button.success{background:#1a3d2e;color:var(--green)}
-button:disabled{opacity:.45;cursor:not-allowed}
+button:hover{filter:brightness(1.06)}
+button:active{
+  transform:translateY(2px);
+  box-shadow:0 1px 0 rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.25),inset 0 2px 4px rgba(0,0,0,.2);
+}
+button.secondary{background:linear-gradient(180deg,#243040 0%,#18222e 100%);color:var(--text);border-color:#2e3d4f}
+button.danger{background:linear-gradient(180deg,#5a2830 0%,#3a1a20 100%);color:#ff9aa4;border-color:#6a3038}
+button.success{background:linear-gradient(180deg,#1f4a36 0%,#163528 100%);color:var(--green);border-color:#2a5a42}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
 button.sm{padding:5px 8px;font-size:11px;border-radius:7px}
+nav button{
+  box-shadow:none!important;border:0!important;background:transparent!important;
+  transform:none!important;filter:none!important;
+}
+nav button:active{transform:none!important;box-shadow:none!important}
 input,select,textarea{
   width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--border);
   background:#0e151d;color:var(--text);outline:none;font-size:14px;
@@ -761,7 +773,7 @@ details.overdue-box[open]{
           <div style="text-align:center"><div class="label">Resultado</div><div id="homeCajaRes" class="stat balance" style="font-size:16px">$ 0,00</div></div>
           <div style="text-align:right"><div class="label">Diferencia vs resultado</div><div id="homeCajaDiff" class="stat" style="font-size:16px">$ 0,00</div></div>
         </div>
-        <button type="button" id="homeGoContab" style="width:100%">📒 Ir a Contab. — registrar movimiento</button>
+        <button type="button" id="homeGoContab" class="sm secondary" style="width:auto">📒 Ir a Contab.</button>
       </div>
     </details>
 
@@ -829,8 +841,8 @@ details.overdue-box[open]{
             </div>
           </div>
           <div class="fact-btns">
-            <button type="button" id="btnSaveFact" class="sm">💾 Guardar</button>
-            <button type="button" id="btnClearFact" class="sm danger">Limpiar</button>
+            <button type="button" id="btnSaveFact" class="sm success" title="Guardar">💾</button>
+            <button type="button" id="btnClearFact" class="sm danger" title="Limpiar">🧹</button>
           </div>
         </div>
         <div class="form-row" style="margin-top:8px">
@@ -860,8 +872,8 @@ details.overdue-box[open]{
     <details class="collapse" id="proyHead">
       <summary><span id="proyTitle">Nuevo proyecto</span>
         <span class="row-actions" style="margin-left:auto;gap:6px" onclick="event.preventDefault();event.stopPropagation()">
-          <button type="button" id="pBtnSave" class="sm">💾 Guardar</button>
-          <button type="button" id="pBtnClear" class="sm danger">Limpiar</button>
+          <button type="button" id="pBtnSave" class="sm success" title="Guardar">💾</button>
+          <button type="button" id="pBtnClear" class="sm danger" title="Limpiar">🧹</button>
         </span>
       </summary>
       <div class="body">
@@ -1177,7 +1189,7 @@ details.overdue-box[open]{
     </div>
     <div class="card">
       <div class="sticky-btns">
-        <button type="button" id="btnNewProd" class="sm">+ Nuevo</button>
+        <button type="button" id="btnNewProd" class="sm success">➕ Nuevo</button>
       </div>
       <div class="section-title" style="margin:0 0 12px">📦 Stock de productos</div>
       <input id="stockSearch" placeholder="Filtrar por nombre..." style="margin-bottom:10px">
@@ -1220,7 +1232,7 @@ details.overdue-box[open]{
     </div>
     <div class="card">
       <div class="sticky-btns">
-        <button type="button" id="btnNewIns" class="sm">+ Nuevo</button>
+        <button type="button" id="btnNewIns" class="sm success">➕ Nuevo</button>
       </div>
       <div class="section-title" style="margin:0 0 12px">🧪 Insumos / Implementos</div>
       <input id="insSearch" placeholder="Buscar..." style="margin-bottom:8px">
@@ -1241,8 +1253,8 @@ details.overdue-box[open]{
       <summary>Resultado · Costo / PVP</summary>
       <div class="body">
         <div class="edit-actions actions" style="position:sticky;top:0;z-index:5;margin-bottom:10px">
-          <button type="button" id="btnLabSaveStock">💾 Guardar en stock</button>
-          <button type="button" id="btnLabClear" class="secondary">Limpiar</button>
+          <button type="button" id="btnLabSaveStock" class="success">💾 Guardar en stock</button>
+          <button type="button" id="btnLabClear" class="danger">🧹 Limpiar</button>
         </div>
         <div class="grid2">
           <div class="card" style="margin:0;padding:12px"><div class="label">Costo fabricación</div><div id="labCosto" class="stat expense">$ 0,00</div></div>
@@ -1306,7 +1318,7 @@ details.overdue-box[open]{
     </div>
     <div class="card">
       <div class="sticky-btns">
-        <button type="button" id="btnNewCli" class="sm">+ Nuevo</button>
+        <button type="button" id="btnNewCli" class="sm success">➕ Nuevo</button>
       </div>
       <div class="section-title" style="margin:0 0 12px">👥 Clientes</div>
       <input id="cliSearch" placeholder="Filtrar por nombre, documento o teléfono..." style="margin-bottom:10px">
@@ -1335,7 +1347,7 @@ details.overdue-box[open]{
     </div>
     <div class="card">
       <div class="sticky-btns">
-        <button type="button" id="btnNewProv" class="sm">+ Nuevo</button>
+        <button type="button" id="btnNewProv" class="sm success">➕ Nuevo</button>
       </div>
       <div class="section-title" style="margin:0 0 12px">🏭 Proveedores</div>
       <input id="provSearch" placeholder="Filtrar por nombre, documento o teléfono..." style="margin-bottom:10px">
@@ -1362,8 +1374,8 @@ details.overdue-box[open]{
           <div class="form-row"><label class="label">Monto</label><input id="contAmount" type="text" inputmode="decimal" placeholder="0,00" data-money="1"></div>
           <input type="hidden" id="contType" value="Ingreso">
           <div class="actions" style="margin-bottom:4px">
-            <button type="button" id="contBtnSave">💾 Guardar</button>
-            <button type="button" id="contBtnCancel" class="secondary">Cancelar</button>
+            <button type="button" id="contBtnSave" class="success" title="Guardar">💾 Guardar</button>
+            <button type="button" id="contBtnCancel" class="secondary" title="Cancelar">✖️ Cancelar</button>
           </div>
         </div>
         <div class="cont-reg-cajas">
@@ -1402,7 +1414,13 @@ details.overdue-box[open]{
         </div>
         <div class="section-title" style="font-size:13px;margin-bottom:6px">Por mes</div>
         <div id="contMonths" style="margin-bottom:14px"></div>
-        <div class="section-title" style="font-size:13px;margin-bottom:6px">Ingresos vs. egresos</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <label class="label" style="margin:0">Gráfica</label>
+          <select id="contChartMode" style="flex:1;min-width:160px;max-width:280px;padding:6px 8px;font-size:12px">
+            <option value="ing_egr">📊 Ingresos vs. egresos</option>
+            <option value="emp_manual">🏢 Empresa y manual (ingresos)</option>
+          </select>
+        </div>
         <div class="chartbox"><canvas id="contChart"></canvas></div>
       </div>
     </details>
