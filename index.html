@@ -240,6 +240,18 @@ nav button.active{color:var(--accent)}
 }
 .total-box .big{font-size:20px;font-weight:800;color:var(--accent)}
 .hint{font-size:10px;color:var(--muted);margin-top:2px}
+
+.prod-img-box{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap}
+.prod-img-preview{
+  width:72px;height:72px;border-radius:10px;border:1px solid var(--border);
+  background:#0e151d;object-fit:cover;display:none;
+}
+.prod-img-preview.show{display:block}
+.prod-img-actions{display:flex;flex-direction:column;gap:6px;flex:1;min-width:140px}
+.list-card .thumb{
+  width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid var(--border);
+  vertical-align:middle;margin-right:6px;float:left;
+}
 .tot-detail{font-size:10px;line-height:1.35;color:var(--muted);margin-top:6px;text-align:left}
 .tot-detail .td-row{display:flex;justify-content:space-between;gap:6px;margin:2px 0}
 .tot-detail .td-row strong{color:var(--text);font-weight:650}
@@ -1162,6 +1174,10 @@ details.overdue-box[open]{
         <button type="button" id="btnCancelProd" class="secondary">Cancelar</button>
       </div>
       <input id="pName" placeholder="Nombre del producto" style="margin-bottom:6px">
+      <div class="form-row" style="margin:0 0 6px">
+        <label class="label">Código id</label>
+        <input id="pCodigo" placeholder="Ej. SKU / cédula del producto" autocomplete="off">
+      </div>
       <div class="grid2" style="margin-bottom:6px">
         <input id="pCompra" type="number" min="0" step="1" placeholder="P. Compra">
         <input id="pVenta" type="number" min="0" step="1" placeholder="P. Venta">
@@ -1169,6 +1185,14 @@ details.overdue-box[open]{
       <div class="grid2" style="margin-bottom:6px">
         <input id="pStock" type="number" min="0" step="1" placeholder="Stock">
         <input id="prodFecha" type="date" title="Fecha producto">
+      </div>
+      <div class="prod-img-box">
+        <img id="pImgPreview" class="prod-img-preview" alt="Foto producto">
+        <div class="prod-img-actions">
+          <label class="label">Imagen del producto</label>
+          <input type="file" id="pImgFile" accept="image/*" style="font-size:12px">
+          <button type="button" class="sm secondary" id="pImgClear">🗑️ Quitar imagen</button>
+        </div>
       </div>
       <textarea id="pObs" placeholder="Observaciones (notas libres...)" style="margin-bottom:6px;min-height:56px"></textarea>
       <div id="prodLabBox" style="display:none;margin:8px 0;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--card2)">
@@ -1271,14 +1295,26 @@ details.overdue-box[open]{
     <details class="collapse" id="labFormula">
       <summary>🔬 Laboratorio — Fórmula</summary>
       <div class="body">
-        <div class="grid2" style="margin-bottom:10px">
-          <div class="form-row" style="margin:0">
-            <label class="label">Nombre del producto</label>
-            <input id="labNombre" placeholder="Ej. perfume floral 50ml">
-          </div>
+        <div class="form-row" style="margin:0 0 8px">
+          <label class="label">Nombre del producto</label>
+          <input id="labNombre" placeholder="Ej. perfume floral 50ml">
+        </div>
+        <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;margin-bottom:8px">
           <div class="form-row" style="margin:0">
             <label class="label">Capacidad (ml)</label>
             <select id="labML"><option value="30">30 ml</option><option value="60" selected>60 ml</option><option value="120">120 ml</option></select>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="label">Código id</label>
+            <input id="labCodigo" placeholder="Ej. 001-AFN-9PM" autocomplete="off">
+          </div>
+        </div>
+        <div class="prod-img-box">
+          <img id="labImgPreview" class="prod-img-preview" alt="Foto producto">
+          <div class="prod-img-actions">
+            <label class="label">Imagen del producto</label>
+            <input type="file" id="labImgFile" accept="image/*" style="font-size:12px">
+            <button type="button" class="sm secondary" id="labImgClear">🗑️ Quitar imagen</button>
           </div>
         </div>
         <div class="form-row" style="margin-bottom:10px">
@@ -2603,6 +2639,8 @@ function loadFromObj(obj) {
       stock: p.stock != null ? +p.stock : 0,
       fecha: p.fecha || today(),
       obs: p.obs || '',
+      codigo: (p.codigo != null ? String(p.codigo) : (p.codeId != null ? String(p.codeId) : '')),
+      img: (typeof p.img === 'string' && p.img.indexOf('data:image') === 0) ? p.img : '',
       empresa: (p.empresa === EMPRESA_PERFUMES || p.empresa === 'perfumes') ? EMPRESA_PERFUMES : EMPRESA_ATCB
     };
     if (p.lab && typeof p.lab === 'object') {
@@ -3454,11 +3492,95 @@ function showProdLabBox(show) {
   if (!box) return;
   box.style.display = show ? 'block' : 'none';
 }
+
+/** Comprime imagen a JPEG dataURL (máx ~480px) para no inflar el JSON */
+function compressImageFile(file, maxSide, quality) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type || file.type.indexOf('image/') !== 0) return reject(new Error('Archivo no es imagen'));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Imagen inválida'));
+      img.onload = () => {
+        const maxS = maxSide || 480;
+        let w = img.width, h = img.height;
+        if (w > maxS || h > maxS) {
+          if (w >= h) { h = Math.round(h * (maxS / w)); w = maxS; }
+          else { w = Math.round(w * (maxS / h)); h = maxS; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          resolve(canvas.toDataURL('image/jpeg', quality != null ? quality : 0.72));
+        } catch (e) { reject(e); }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function setProdImgPreview(imgEl, dataUrl) {
+  if (!imgEl) return;
+  if (dataUrl) {
+    imgEl.src = dataUrl;
+    imgEl.classList.add('show');
+  } else {
+    imgEl.removeAttribute('src');
+    imgEl.classList.remove('show');
+  }
+}
+function getProdImgFromUI(prefix) {
+  // prefix: 'p' | 'lab'
+  const prev = document.getElementById(prefix === 'lab' ? 'labImgPreview' : 'pImgPreview');
+  if (prev && prev.classList.contains('show') && prev.src && prev.src.indexOf('data:image') === 0) return prev.src;
+  return '';
+}
+function clearProdImgUI(prefix) {
+  const file = document.getElementById(prefix === 'lab' ? 'labImgFile' : 'pImgFile');
+  const prev = document.getElementById(prefix === 'lab' ? 'labImgPreview' : 'pImgPreview');
+  if (file) file.value = '';
+  setProdImgPreview(prev, '');
+}
+function bindProdImageInputs() {
+  [['pImgFile', 'pImgPreview', 'pImgClear'], ['labImgFile', 'labImgPreview', 'labImgClear']].forEach(([fid, pid, cid]) => {
+    const f = document.getElementById(fid);
+    const prev = document.getElementById(pid);
+    const clr = document.getElementById(cid);
+    if (f && !f._boundImg) {
+      f._boundImg = true;
+      f.onchange = async () => {
+        const file = f.files && f.files[0];
+        if (!file) return;
+        try {
+          const url = await compressImageFile(file, 480, 0.72);
+          setProdImgPreview(prev, url);
+          toast('Imagen lista');
+        } catch (e) {
+          toast('No se pudo cargar la imagen');
+        }
+      };
+    }
+    if (clr && !clr._boundImg) {
+      clr._boundImg = true;
+      clr.onclick = () => {
+        if (f) f.value = '';
+        setProdImgPreview(prev, '');
+      };
+    }
+  });
+}
+
 function renderProducts() {
   const q = (stockSearch.value || '').toLowerCase();
   const rows = products
     .filter(p => (p.empresa || EMPRESA_ATCB) === activeEmpresa)
-    .filter(p => (p.name || '').toLowerCase().includes(q) || basePerfumeName(p.name).toLowerCase().includes(q))
+    .filter(p => {
+      const code = (p.codigo || '').toLowerCase();
+      return (p.name || '').toLowerCase().includes(q) || basePerfumeName(p.name).toLowerCase().includes(q) || code.includes(q);
+    })
     .sort((a,b) => (a.name || '').localeCompare(b.name || ''));
   prodList.innerHTML = rows.length
     ? rows.map(p => {
@@ -3474,8 +3596,13 @@ function renderProducts() {
           : ('Precio ' + money(p.venta) + ' · Compra ' + money(p.compra));
         const obs = (p.obs || '').trim();
         const titleName = (activeEmpresa === EMPRESA_PERFUMES) ? (basePerfumeName(p.name) || p.name) : p.name;
+        const cod = (p.codigo || '').trim();
+        const thumb = (p.img && String(p.img).indexOf('data:image') === 0)
+          ? `<img class="thumb" src="${p.img}" alt="">`
+          : '';
         return `<div class="list-card ${isOld ? 'overdue-row' : ''}">
-          <div class="title">${escapeHtml(titleName)}${(p.lab || hasMulti) ? ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">Lab</span>' : ''}${isOld ? ' <span class="chip overdue">+'+lim+'d revisar precio</span>' : ''}</div>
+          <div class="title">${thumb}${escapeHtml(titleName)}${(p.lab || hasMulti) ? ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">Lab</span>' : ''}${isOld ? ' <span class="chip overdue">+'+lim+'d revisar precio</span>' : ''}</div>
+          ${cod ? `<div class="line">🪪 <strong>${escapeHtml(cod)}</strong></div>` : ''}
           <div class="line">📅 ${fmtDate(p.fecha)} (${dias} día(s))</div>
           <div class="line">📦 Stock: <strong>${p.stock ?? 0}</strong></div>
           <div class="line">🏷️ ${escapeHtml(priceTxt)}</div>
@@ -3520,6 +3647,10 @@ function startLabNewCap(id) {
   show('laboratorio');
   const ln = document.getElementById('labNombre');
   if (ln) ln.value = name;
+  const lc = document.getElementById('labCodigo');
+  if (lc) lc.value = p.codigo || '';
+  setProdImgPreview(document.getElementById('labImgPreview'), p.img || '');
+  const lf = document.getElementById('labImgFile'); if (lf) lf.value = '';
   const lo = document.getElementById('labObs');
   if (lo) lo.value = p.obs || '';
   const ml = available[0];
@@ -3587,6 +3718,10 @@ async function editProd(id) {
   pName.value = baseName;
   pStock.value = p.stock ?? 0;
   prodFecha.value = p.fecha || today();
+  const pCod = document.getElementById('pCodigo');
+  if (pCod) pCod.value = p.codigo || '';
+  setProdImgPreview(document.getElementById('pImgPreview'), p.img || '');
+  const pFile = document.getElementById('pImgFile'); if (pFile) pFile.value = '';
   const pObsEl = document.getElementById('pObs');
   if (pObsEl) pObsEl.value = p.obs || '';
 
@@ -3630,6 +3765,8 @@ btnNewProd.onclick = () => {
   editingCapMl = null;
   pName.value = ''; pCompra.value = ''; pVenta.value = '';
   pStock.value = ''; prodFecha.value = today();
+  const pCod = document.getElementById('pCodigo'); if (pCod) pCod.value = '';
+  clearProdImgUI('p');
   const pObsEl = document.getElementById('pObs'); if (pObsEl) pObsEl.value = '';
   prodLabQ = []; prodLabI = [];
   showProdLabBox(false);
@@ -3663,6 +3800,8 @@ btnSaveProd.onclick = async () => {
     fecha = today();
   }
   const obs = ((document.getElementById('pObs') || {}).value || '').trim();
+  const codigo = ((document.getElementById('pCodigo') || {}).value || '').trim();
+  const img = getProdImgFromUI('p');
   const labBox = document.getElementById('prodLabBox');
   const labOpen = labBox && labBox.style.display !== 'none';
   let lab = null;
@@ -3703,6 +3842,8 @@ btnSaveProd.onclick = async () => {
     prev.stock = +pStock.value || 0;
     prev.fecha = fecha;
     prev.obs = obs;
+    prev.codigo = codigo;
+    prev.img = img || '';
     products[i] = prev;
     const sel = document.getElementById('pLabML');
     if (sel) sel.disabled = false;
@@ -3725,6 +3866,8 @@ btnSaveProd.onclick = async () => {
     stock: +pStock.value || 0,
     fecha,
     obs,
+    codigo,
+    img: img || '',
     empresa: activeEmpresa
   };
   if (lab) data.lab = lab;
@@ -3776,7 +3919,11 @@ function viewProdDetail(id) {
   const caps = getProductCaps(p);
   const keys = Object.keys(caps).sort((a,b)=>+a-+b);
   let html = '';
+  if (p.img && String(p.img).indexOf('data:image') === 0) {
+    html += `<div style="margin-bottom:10px"><img src="${p.img}" alt="" style="max-width:100%;max-height:180px;border-radius:10px;border:1px solid var(--border)"></div>`;
+  }
   html += `<div class="d-row"><strong>Nombre:</strong> ${escapeHtml(base)}</div>`;
+  if (p.codigo) html += `<div class="d-row"><strong>🪪 Código id:</strong> ${escapeHtml(p.codigo)}</div>`;
   html += `<div class="d-row"><strong>Stock:</strong> ${p.stock ?? 0}</div>`;
   html += `<div class="d-row"><strong>Fecha:</strong> ${fmtDate(p.fecha)} (${daysAgo(p.fecha)} d)</div>`;
   if (p.obs) html += `<div class="d-row"><strong>Obs:</strong> ${escapeHtml(p.obs)}</div>`;
@@ -7428,6 +7575,8 @@ async function guardarStockLab() {
   const compra = Math.round(r.costo * 100) / 100;
   const venta = Math.round(r.pvp * 100) / 100;
   const obs = ((document.getElementById('labObs') || {}).value || '').trim();
+  const codigo = ((document.getElementById('labCodigo') || {}).value || '').trim();
+  const img = getProdImgFromUI('lab');
   const lab = {
     ml,
     margen: r.margen || parseFloat((document.getElementById('labMargen') || {}).value) || 0,
@@ -7446,6 +7595,8 @@ async function guardarStockLab() {
     p.lab = lab;
     p.name = nombre;
     if (obs) p.obs = obs;
+    p.codigo = codigo;
+    p.img = img || p.img || '';
     p.fecha = today();
     toast(nombre + ' · ' + ml + ' ml actualizado en stock');
   } else {
@@ -7459,6 +7610,8 @@ async function guardarStockLab() {
       stock: 0,
       fecha: today(),
       obs,
+      codigo: codigo || '',
+      img: img || '',
       lab,
       caps,
       empresa: EMPRESA_PERFUMES
@@ -7489,6 +7642,8 @@ function clearLab() {
   document.getElementById('labNombre').value = '';
   document.getElementById('labML').value = String(getLabCaps()[0] || 30);
   document.getElementById('labMargen').value = '50';
+  const lc = document.getElementById('labCodigo'); if (lc) lc.value = '';
+  clearProdImgUI('lab');
   const lo = document.getElementById('labObs'); if (lo) lo.value = '';
   labQ = [{ prod: '', g: 0, precio: 0 }];
   labI = [{ prod: '', u: 0, precio: 0 }];
@@ -7544,6 +7699,7 @@ try {
   if (bCap) bCap.onclick = () => addLabCap();
   renderCapsUI();
 } catch (e) {}
+try { bindProdImageInputs(); } catch (e) {}
 try {
   document.body.classList.add('auth-locked');
   startFirebaseAuth();
