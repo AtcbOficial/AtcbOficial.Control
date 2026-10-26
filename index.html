@@ -848,7 +848,7 @@ details.overdue-box[open]{
           <input id="fPrecio" type="number" min="0" step="1" placeholder="Venta unit." title="Precio de venta al cliente">
         </div>
         <p class="hint" style="margin:0 0 8px">Costo = lo que te cuesta · Venta = lo que facturas. En PDF/WA solo venta.</p>
-        <button type="button" id="btnAddLine" class="secondary" style="width:100%">+ Agregar línea</button>
+        <button type="button" id="btnAddLine" class="secondary" style="width:100%">➕ Agregar línea</button>
         <div id="lineItems" style="margin-top:12px"></div>
       </div>
     </details>
@@ -1107,7 +1107,7 @@ details.overdue-box[open]{
           <input id="pResCant" type="number" min="0.01" step="0.01" value="" placeholder="Cant.">
           <input id="pResCosto" type="number" min="0" step="1" placeholder="Costo unit.">
         </div>
-        <button type="button" id="pBtnAddRes" class="purple" style="width:100%;margin-bottom:8px">+ Agregar a resulta</button>
+        <button type="button" id="pBtnAddRes" class="purple" style="width:100%;margin-bottom:8px">➕ Agregar a resulta</button>
         <div id="pResList"></div>
         <div class="pay-box" style="margin-top:8px">
           <div class="pay-row"><span>Costo total resulta</span><span id="pResCostoTot" class="expense">$0</span></div>
@@ -1213,7 +1213,7 @@ details.overdue-box[open]{
           </select>
           <input id="insProvPrecio" type="number" min="0" step="0.0001" placeholder="Precio de ese proveedor">
         </div>
-        <button type="button" class="sm secondary" id="btnAddInsProv" style="width:100%;margin-top:6px">+ Agregar proveedor</button>
+        <button type="button" class="sm secondary" id="btnAddInsProv" style="width:100%;margin-top:6px">➕ Agregar proveedor</button>
         <p class="hint" style="margin:6px 0 0">Proveedores de la empresa activa (pestaña Proveed.). Puedes comparar precios.</p>
       </div>
 
@@ -1597,7 +1597,7 @@ details.overdue-box[open]{
         <div id="capsList" style="margin-bottom:10px"></div>
         <div class="grid2" style="gap:8px;margin-bottom:8px">
           <input id="capNewMl" type="number" min="1" step="1" placeholder="Nueva capacidad ml">
-          <button type="button" id="btnAddCap" class="secondary">+ Agregar</button>
+          <button type="button" id="btnAddCap" class="secondary">➕ Agregar</button>
         </div>
         <p class="hint" id="capsHint">Por defecto: 30 · 60 · 120</p>
       </div>
@@ -6490,41 +6490,55 @@ function updateContCajasUI(resultadoTotal) {
 function renderContMonths() {
   const y = new Date().getFullYear();
   const labels = [], inc = [], exp = [];
+  const atcbI = [], perfI = [], manI = [];
   let html = '<div class="monthrow head"><span>Mes</span><span>Ingresos</span><span>Egresos</span><span>Resultado</span></div>';
   for (let n = 0; n < 12; n++) {
     const d = new Date(y, n, 1);
     const k = y + '-' + String(n + 1).padStart(2, '0');
     const m = contMovimientos.filter(x => contMonthKey(x.date) === k);
     const [i, e, b] = contTotals(m);
+    const br = contBreakdown(m);
     const name = d.toLocaleDateString('es-CO', { month: 'short' });
     labels.push(name); inc.push(i); exp.push(e);
+    atcbI.push(br.inc.atcb); perfI.push(br.inc.perfumes); manI.push(br.inc.manual);
     html += `<div class="monthrow"><span>${name}</span><span class="income">${money(i)}</span><span class="expense">${money(e)}</span><span class="${b < 0 ? 'expense' : 'balance'}">${money(b)}</span></div>`;
   }
   const el = document.getElementById('contMonths');
   if (el) el.innerHTML = html;
+  renderContYearChart(labels, inc, exp, atcbI, perfI, manI);
+}
+function renderContYearChart(labels, inc, exp, atcbI, perfI, manI) {
   if (contChart) { try { contChart.destroy(); } catch (e) {} contChart = null; }
   const canvas = document.getElementById('contChart');
-  if (canvas && typeof Chart !== 'undefined') {
-    contChart = new Chart(canvas, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Ingresos', data: inc, backgroundColor: 'rgba(53,208,127,0.75)' },
-          { label: 'Egresos', data: exp, backgroundColor: 'rgba(255,92,108,0.75)' }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#91a0af' } } },
-        scales: {
-          x: { ticks: { color: '#91a0af' }, grid: { color: '#253241' } },
-          y: { beginAtZero: true, ticks: { color: '#91a0af', callback: v => money(v) }, grid: { color: '#253241' } }
-        }
-      }
-    });
+  if (!canvas || typeof Chart === 'undefined') return;
+  const modeEl = document.getElementById('contChartMode');
+  const mode = (modeEl && modeEl.value) || 'ing_egr';
+  let datasets;
+  if (mode === 'emp_manual') {
+    datasets = [
+      { label: '🧊 Atcb', data: atcbI || [], backgroundColor: 'rgba(77,163,255,0.8)' },
+      { label: '🧴 Perfumes', data: perfI || [], backgroundColor: 'rgba(255,184,77,0.8)' },
+      { label: '✍️ Manual', data: manI || [], backgroundColor: 'rgba(167,139,250,0.8)' }
+    ];
+  } else {
+    datasets = [
+      { label: 'Ingresos', data: inc || [], backgroundColor: 'rgba(53,208,127,0.75)' },
+      { label: 'Egresos', data: exp || [], backgroundColor: 'rgba(255,92,108,0.75)' }
+    ];
   }
+  contChart = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#91a0af' } } },
+      scales: {
+        x: { ticks: { color: '#91a0af' }, grid: { color: '#253241' } },
+        y: { beginAtZero: true, ticks: { color: '#91a0af', callback: v => money(v) }, grid: { color: '#253241' } }
+      }
+    }
+  });
 }
 /** Etiqueta de empresa para un movimiento de contab (si viene de factura) */
 function contEmpLabel(x) {
@@ -6819,6 +6833,14 @@ function printArchivedYear(year) {
   const bArch = document.getElementById('btnArchiveYear');
   if (bGo) bGo.onclick = () => goToArchiveYear();
   if (bArch) bArch.onclick = () => archivePreviousYear();
+})();
+
+
+(function bindContChartMode() {
+  const sel = document.getElementById('contChartMode');
+  if (!sel || sel._bound) return;
+  sel._bound = true;
+  sel.onchange = () => { try { renderContMonths(); } catch (e) {} };
 })();
 
 function refreshContabilidad() {
@@ -7212,7 +7234,7 @@ function renderLabQuim() {
       </div>
       <div style="display:flex;gap:6px;margin-top:2px">
         <button type="button" class="sm danger" style="flex:1" onclick="labQ.splice(${i},1);if(!labQ.length)labQ=[{prod:'',g:0,precio:0}];renderLabQuim();calcLab()">✕ Quitar</button>
-        <button type="button" class="sm secondary" style="flex:1" onclick="labQ.splice(${i+1},0,{prod:'',g:0,precio:0});renderLabQuim();calcLab()">+ Agregar</button>
+        <button type="button" class="sm success" style="flex:1" onclick="labQ.splice(${i+1},0,{prod:'',g:0,precio:0});renderLabQuim();calcLab()">➕ Agregar</button>
       </div>
     </div>`;
   }).join('') || '<div class="empty" style="padding:8px">Sin químicos</div>';
@@ -7239,7 +7261,7 @@ function renderLabImp() {
       </div>
       <div style="display:flex;gap:6px;margin-top:2px">
         <button type="button" class="sm danger" style="flex:1" onclick="labI.splice(${i},1);if(!labI.length)labI=[{prod:'',u:0,precio:0}];renderLabImp();calcLab()">✕ Quitar</button>
-        <button type="button" class="sm secondary" style="flex:1" onclick="labI.splice(${i+1},0,{prod:'',u:0,precio:0});renderLabImp();calcLab()">+ Agregar</button>
+        <button type="button" class="sm success" style="flex:1" onclick="labI.splice(${i+1},0,{prod:'',u:0,precio:0});renderLabImp();calcLab()">➕ Agregar</button>
       </div>
     </div>`;
   }).join('') || '<div class="empty" style="padding:8px">Sin implementos</div>';
@@ -7320,7 +7342,7 @@ function renderCapsUI() {
   el.innerHTML = caps.map(ml =>
     `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
       <strong>${ml} ml</strong>
-      <button type="button" class="sm danger" onclick="removeLabCap(${ml})">Quitar</button>
+      <button type="button" class="sm danger" onclick="removeLabCap(${ml})">✕ Quitar</button>
     </div>`
   ).join('') || '<div class="hint">Sin capacidades</div>';
   const hint = document.getElementById('capsHint');
