@@ -47,7 +47,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <style>
 :root{
   --bg:#0b0f14;--card:#121922;--card2:#18222e;--text:#edf3f8;--muted:#91a0af;
@@ -1526,7 +1525,7 @@ details.overdue-box[open]{
           <button type="button" id="btnJsonToCloud" class="secondary">⬆️ JSON → Firebase</button>
           <button type="button" id="btnCloudToJson" class="secondary">⬇️ Firebase → JSON</button>
         </div>
-        <p class="hint" style="margin-top:8px">Fotos grandes van a Storage al guardar. Firestore solo guarda datos + URLs (límite 1 MB). Storage Rules: allow read, write: if request.auth != null;</p>
+        <p class="hint" style="margin-top:8px">Sube tu JSON una vez. Luego usa Guardar/Cargar nube en cada dispositivo.</p>
       </div>
       <div class="actions" style="margin-top:8px">
         <button type="button" id="btnRepairJson" class="secondary">🔧 Reparar JSON dañado</button>
@@ -1792,7 +1791,7 @@ const firebaseConfig = {
 /** Opcional: solo estas cuentas pueden entrar (vacío = cualquier Google autenticado). Ej: ['tu@gmail.com'] */
 const FIREBASE_ALLOWED_EMAILS = [];
 
-let fbApp = null, fbAuth = null, fbDb = null, fbStorage = null, fbUser = null;
+let fbApp = null, fbAuth = null, fbDb = null, fbUser = null;
 let fbCloudEnabled = false;
 let fbReady = false;
 
@@ -1805,7 +1804,6 @@ function initFirebase() {
     fbApp = firebase.initializeApp(firebaseConfig);
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
-    try { fbStorage = firebase.storage(); } catch (e) { console.warn('Storage', e); fbStorage = null; }
     fbReady = true;
     return true;
   } catch (e) {
@@ -1894,182 +1892,6 @@ async function signOutFirebase() {
 }
 let _fbSaveTimer = null;
 let _fbSaving = false;
-
-
-function withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout ' + (label || '') + ' ' + ms + 'ms')), ms))
-  ]);
-}
-/** Sube dataURL a Storage; timeout para no colgar la UI */
-async function uploadDataUrlToStorage(dataUrl, path) {
-  if (!fbStorage || !dataUrl || dataUrl.indexOf('data:') !== 0) return '';
-  if (dataUrl.indexOf('https://') === 0) return dataUrl;
-  const work = (async () => {
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-    const ref = fbStorage.ref(path);
-    await ref.put(blob);
-    return await ref.getDownloadURL();
-  })();
-  return withTimeout(work, 15000, path);
-}
-/**
- * Fotos base64 → Storage (URL). Si Storage no responde, quita la foto del doc
- * para poder guardar el resto en Firestore.
- */
-async function materializeImagesForCloud(data, uid) {
-  if (!data || !uid) return data;
-  const out = data;
-  const products = Array.isArray(out.products) ? out.products : [];
-  const need = products.filter(p => p && typeof p.img === 'string' && p.img.indexOf('data:image') === 0);
-  if (!fbStorage) {
-    console.warn('Storage no disponible: se omiten fotos en la nube');
-    products.forEach(p => {
-      if (p && typeof p.img === 'string' && p.img.indexOf('data:') === 0) p.img = '';
-    });
-  } else {
-    let done = 0;
-    for (let i = 0; i < products.length; i++) {
-      const p = products[i];
-      if (!p || typeof p.img !== 'string') continue;
-      if (p.img.indexOf('data:image') !== 0) continue;
-      done++;
-      try {
-        setFbStatus('☁️ Foto ' + done + '/' + need.length + ' (Storage)…');
-        await new Promise(r => setTimeout(r, 0)); // cede UI
-        const ext = p.img.indexOf('image/png') >= 0 ? 'png' : 'jpg';
-        const path = 'users/' + uid + '/products/' + (p.id != null ? p.id : i) + '.' + ext;
-        const url = await uploadDataUrlToStorage(p.img, path);
-        p.img = (url && url.indexOf('http') === 0) ? url : '';
-      } catch (e) {
-        console.warn('img producto', p.id, e);
-        p.img = '';
-      }
-    }
-  }
-  out.products = products;
-  const empresas = (out.settings && out.settings.empresas) || {};
-  for (const key of Object.keys(empresas)) {
-    const e = empresas[key];
-    if (!e || typeof e.pdfBanner !== 'string') continue;
-    if (e.pdfBanner.indexOf('data:image') !== 0) continue;
-    try {
-      setFbStatus('☁️ Banner ' + key + '…');
-      const ext = e.pdfBanner.indexOf('image/png') >= 0 ? 'png' : 'jpg';
-      const url = await uploadDataUrlToStorage(e.pdfBanner, 'users/' + uid + '/banners/' + key + '.' + ext);
-      e.pdfBanner = (url && url.indexOf('http') === 0) ? url : e.pdfBanner.slice(0, 0);
-      if (!e.pdfBanner) e.pdfBanner = '';
-    } catch (err) {
-      console.warn('banner', key, err);
-      e.pdfBanner = '';
-    }
-  }
-  return out;
-}
-function approxJsonBytes(obj) {
-  try { return new Blob([JSON.stringify(obj)]).size; } catch (e) {
-    try { return JSON.stringify(obj).length; } catch (e2) { return 0; }
-  }
-}
-
-/** Firestore no admite arrays anidados ni `undefined`. Limpia el payload antes de subir. */
-function sanitizeForFirestore(value) {
-  if (value === undefined) return null;
-  if (value === null) return null;
-  const t = typeof value;
-  if (t === 'string' || t === 'boolean') return value;
-  if (t === 'number') return Number.isFinite(value) ? value : 0;
-  if (t === 'function') return null;
-  if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) {
-    return value.map((item) => {
-      // Array dentro de array → objeto indexado (Firestore lo rechaza si queda como matriz anidada)
-      if (Array.isArray(item)) {
-        const o = {};
-        item.forEach((v, j) => {
-          const sv = sanitizeForFirestore(v);
-          if (sv !== undefined) o[String(j)] = sv;
-        });
-        return o;
-      }
-      return sanitizeForFirestore(item);
-    });
-  }
-  if (t === 'object') {
-    const out = {};
-    Object.keys(value).forEach((k) => {
-      if (value[k] === undefined) return;
-      // Claves inválidas en Firestore
-      const key = String(k).replace(/[.~*/[\]]/g, '_');
-      if (!key) return;
-      const sv = sanitizeForFirestore(value[k]);
-      if (sv !== undefined) out[key] = sv;
-    });
-    return out;
-  }
-  return null;
-}
-
-function stripHeavyDataUrls(value, maxLen) {
-  const max = maxLen != null ? maxLen : 500;
-  if (typeof value === 'string') {
-    if (value.indexOf('data:') === 0 && value.length > max) return '';
-    return value;
-  }
-  if (Array.isArray(value)) return value.map(v => stripHeavyDataUrls(v, max));
-  if (value && typeof value === 'object') {
-    const o = {};
-    Object.keys(value).forEach(k => { o[k] = stripHeavyDataUrls(value[k], max); });
-    return o;
-  }
-  return value;
-}
-async function saveProductsSubcollection(appRef, productList) {
-  const col = appRef.collection('products');
-  const list = Array.isArray(productList) ? productList : [];
-  const keep = new Set(list.filter(p => p && p.id != null).map(p => String(p.id)));
-  const existing = await col.get();
-  let batch = fbDb.batch();
-  let n = 0;
-  async function flush() {
-    if (!n) return;
-    await batch.commit();
-    batch = fbDb.batch();
-    n = 0;
-  }
-  for (const d of existing.docs) {
-    if (!keep.has(d.id)) {
-      batch.delete(d.ref);
-      n++;
-      if (n >= 400) await flush();
-    }
-  }
-  await flush();
-  for (const p of list) {
-    if (!p || p.id == null) continue;
-    const row = stripHeavyDataUrls(sanitizeForFirestore({ ...p }));
-    batch.set(col.doc(String(p.id)), row, { merge: false });
-    n++;
-    if (n >= 400) await flush();
-  }
-  await flush();
-}
-async function loadProductsSubcollection(appRef) {
-  try {
-    const snap = await appRef.collection('products').get();
-    if (!snap || snap.empty) return null;
-    return snap.docs.map(d => {
-      const x = d.data() || {};
-      if (x.id == null) x.id = isNaN(+d.id) ? d.id : +d.id;
-      return x;
-    });
-  } catch (e) {
-    console.warn('load products sub', e);
-    return null;
-  }
-}
 async function saveToFirebase(silent) {
   if (!fbUser) {
     if (!silent) toast('Inicia sesión primero');
@@ -2083,52 +1905,20 @@ async function saveToFirebase(silent) {
   if (_fbSaving) return false;
   _fbSaving = true;
   try {
-    if (!silent) setFbStatus('☁️ Preparando datos / fotos…');
-    let data = payload();
-    try {
-      data = await materializeImagesForCloud(data, fbUser.uid);
-    } catch (e) {
-      console.warn('materialize', e);
-    }
-    if (Array.isArray(data.products)) products = data.products;
-    if (data.settings && data.settings.empresas) {
-      settings.empresas = data.settings.empresas;
-    }
-    const productList = Array.isArray(data.products) ? data.products.slice() : [];
-    const main = Object.assign({}, data);
-    delete main.products;
-    main._productsInSub = true;
-    main._productsCount = productList.length;
-    let clean = sanitizeForFirestore({
-      ...main,
+    const data = payload();
+    await ref.set({
+      ...data,
       _cloudSavedAt: new Date().toISOString(),
       _uid: fbUser.uid,
       _email: fbUser.email || ''
-    });
-    clean = stripHeavyDataUrls(clean);
-    clean = sanitizeForFirestore(clean);
-    const bytes = approxJsonBytes(clean);
-    if (bytes > 950000) {
-      const msg = 'Documento principal aún grande (~' + Math.round(bytes / 1024) + ' KB). Límite ~1 MB.';
-      setFbStatus('<span class="warn">Error nube:</span> ' + msg);
-      if (!silent) toast(msg);
-      return false;
-    }
-    if (!silent) setFbStatus('☁️ Guardando documento principal…');
-    await ref.set(clean, { merge: false });
-    if (!silent) setFbStatus('☁️ Guardando ' + productList.length + ' productos…');
-    await saveProductsSubcollection(ref, productList);
-    setFbStatus('<span class="ok">☁️ Guardado</span> · ' + productList.length + ' prod. · ' + new Date().toLocaleTimeString());
-    if (!silent) toast('☁️ Guardado en Firebase (' + productList.length + ' productos)');
+    }, { merge: false });
+    setFbStatus('<span class="ok">☁️ Auto-guardado</span> · ' + new Date().toLocaleTimeString());
+    if (!silent) toast('☁️ Guardado en Firebase');
     return true;
   } catch (e) {
     console.error(e);
-    let msg = e.message || String(e);
-    if (/nested|anidad/i.test(msg)) msg = 'Estructura no válida para Firestore. ' + msg;
-    if (/size|too large|excede|maximum|1048576/i.test(msg)) msg = 'Documento > 1 MB. ' + msg;
-    if (/permission|unauthorized/i.test(msg)) msg = 'Sin permiso Firestore/Storage. Rules con request.auth != null. ' + msg;
-    setFbStatus('<span class="warn">Error nube:</span> ' + msg);
-    if (!silent) toast('Error al guardar en Firebase: ' + msg);
+    setFbStatus('<span class="warn">Error nube:</span> ' + (e.message || e));
+    if (!silent) toast('Error al guardar en Firebase: ' + (e.message || e));
     return false;
   } finally {
     _fbSaving = false;
@@ -2157,20 +1947,14 @@ async function loadFromFirebase(silent) {
       setFbStatus('<span class="warn">Sin datos en la nube</span> · puedes subir tu JSON');
       return false;
     }
-    const obj = snap.data() || {};
-    // Productos en subcolección (versión nueva) o embebidos (versión vieja)
-    if (obj._productsInSub || !Array.isArray(obj.products) || !obj.products.length) {
-      const sub = await loadProductsSubcollection(ref);
-      if (sub && sub.length) obj.products = sub;
-    }
+    const obj = snap.data();
     loadFromObj(obj);
     dirty = false;
     updateBanner();
     refreshAll();
     try { renderArchivedYearsUI(); updateYearCloseBanner(); } catch (e) {}
     const when = obj._cloudSavedAt || '';
-    const nProd = (products || []).length;
-    setFbStatus('<span class="ok">Cargado de Firebase</span>' + (when ? ' · ' + when : '') + ' · ' + nProd + ' prod.');
+    setFbStatus('<span class="ok">Cargado de Firebase</span>' + (when ? ' · ' + when : ''));
     if (!silent) toast('☁️ Datos cargados desde Firebase');
     return true;
   } catch (e) {
