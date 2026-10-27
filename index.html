@@ -2497,9 +2497,20 @@ function syncSettingsUI() {
   setWaCxc.value = e.waCxc || DEFAULT_WA_CXC;
   setWaMotivar.value = e.waMotivar || DEFAULT_WA_MOTIVAR;
   const swp = document.getElementById('setWaProy'); if (swp) swp.value = e.waProy || DEFAULT_WA_PROY;
-  pdfBannerPreview.src = e.pdfBanner || DEFAULT_PDF_BANNER;
+  const ban = normImgUrl(e.pdfBanner || '') || '';
+  if (pdfBannerPreview) {
+    if (ban) {
+      pdfBannerPreview.src = ban;
+      pdfBannerPreview.style.display = '';
+    } else {
+      pdfBannerPreview.removeAttribute('src');
+      pdfBannerPreview.style.display = 'none';
+    }
+  }
   const pbu = document.getElementById('pdfBannerUrl');
-  if (pbu) pbu.value = normImgUrl(e.pdfBanner || '') || '';
+  if (pbu) pbu.value = ban;
+  const banHint = document.getElementById('pdfBannerEmpHint');
+  if (banHint) banHint.textContent = 'Empresa: ' + (e.label || activeEmpresa) + ' — cada empresa tiene su propio encabezado.';
   const st = document.getElementById('setProyTiempo'); if (st) st.value = e.proyTiempo || '';
   const sv = document.getElementById('setProyValidez'); if (sv) sv.value = e.proyValidez || '';
   const sfp = document.getElementById('setProyFormaPago'); if (sfp) sfp.value = e.proyFormaPago || '';
@@ -3135,6 +3146,7 @@ if (_empSel) {
   _empSel.onchange = () => {
     activeEmpresa = _empSel.value === EMPRESA_PERFUMES ? EMPRESA_PERFUMES : EMPRESA_ATCB;
     applyEmpresaUI();
+    try { syncSettingsUI(); } catch (e) {}
     try { stockExportSel.clear(); stockExportUpdateHint(); } catch (e) {}
     try { renderProducts(); } catch (e) {}
     try { renderInvoices(); } catch (e) {}
@@ -5995,14 +6007,16 @@ btnSaveWa.onclick = async () => {
   await autoSave();
   toast('Mensajes WA de ' + (e.label || e.name) + ' guardados');
 };
-btnRestoreBanner.onclick = () => {
+btnRestoreBanner.onclick = async () => {
   const e = empCfg();
-  e.pdfBanner = DEFAULT_PDF_BANNER;
+  e.pdfBanner = '';
+  settings.empresas = settings.empresas || {};
   settings.empresas[activeEmpresa] = e;
+  if (activeEmpresa === EMPRESA_ATCB) settings.pdfBanner = '';
   syncFlatSettingsFromEmp();
-  settings.pdfBanner = DEFAULT_PDF_BANNER;
-  pdfBannerPreview.src = DEFAULT_PDF_BANNER;
-  toast('Banner restaurado (guarda para aplicar)');
+  try { syncSettingsUI(); } catch (err) {}
+  toast('Banner de ' + (e.label || activeEmpresa) + ' quitado. Pega un link https propio.');
+  await autoSave();
 };
 (function bindBannerUrl() {
   const urlEl = document.getElementById('pdfBannerUrl');
@@ -6012,19 +6026,28 @@ btnRestoreBanner.onclick = () => {
     if (!url) return toast('Pega un link https de la imagen');
     const e = empCfg();
     e.pdfBanner = url;
-    settings.pdfBanner = url;
-    if (pdfBannerPreview) pdfBannerPreview.src = url;
-    if (urlEl) urlEl.value = url;
-    toast('Banner por link aplicado');
+    settings.empresas = settings.empresas || {};
+    settings.empresas[activeEmpresa] = e;
+    // settings.pdfBanner plano solo refleja Atcb (compatibilidad vieja)
+    if (activeEmpresa === EMPRESA_ATCB) settings.pdfBanner = url;
+    syncFlatSettingsFromEmp();
+    try { syncSettingsUI(); } catch (err) {}
+    toast('Banner de ' + (e.label || activeEmpresa) + ' aplicado');
     await autoSave();
   };
   if (btn) btn.onclick = apply;
-  if (urlEl) {
-    urlEl.value = normImgUrl((empCfg() || {}).pdfBanner) || '';
-  }
 })();
 btnSaveBanner.onclick = async () => {
-  await autoSave(); toast('Banner PDF de ' + (empCfg().label || '') + ' guardado');
+  const e = empCfg();
+  const url = normImgUrl((document.getElementById('pdfBannerUrl') || {}).value);
+  e.pdfBanner = url;
+  settings.empresas = settings.empresas || {};
+  settings.empresas[activeEmpresa] = e;
+  if (activeEmpresa === EMPRESA_ATCB) settings.pdfBanner = url;
+  syncFlatSettingsFromEmp();
+  try { syncSettingsUI(); } catch (err) {}
+  await autoSave();
+  toast('Banner PDF de ' + (e.label || activeEmpresa) + ' guardado');
 };
 
 function refreshAll() {
