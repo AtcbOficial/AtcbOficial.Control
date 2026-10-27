@@ -47,6 +47,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <style>
 :root{
   --bg:#0b0f14;--card:#121922;--card2:#18222e;--text:#edf3f8;--muted:#91a0af;
@@ -1525,7 +1526,7 @@ details.overdue-box[open]{
           <button type="button" id="btnJsonToCloud" class="secondary">⬆️ JSON → Firebase</button>
           <button type="button" id="btnCloudToJson" class="secondary">⬇️ Firebase → JSON</button>
         </div>
-        <p class="hint" style="margin-top:8px">Sube tu JSON una vez. Luego usa Guardar/Cargar nube en cada dispositivo.</p>
+        <p class="hint" style="margin-top:8px">Fotos grandes van a Storage al guardar. Firestore solo guarda datos + URLs (límite 1 MB). Storage Rules: allow read, write: if request.auth != null;</p>
       </div>
       <div class="actions" style="margin-top:8px">
         <button type="button" id="btnRepairJson" class="secondary">🔧 Reparar JSON dañado</button>
@@ -1791,7 +1792,7 @@ const firebaseConfig = {
 /** Opcional: solo estas cuentas pueden entrar (vacío = cualquier Google autenticado). Ej: ['tu@gmail.com'] */
 const FIREBASE_ALLOWED_EMAILS = [];
 
-let fbApp = null, fbAuth = null, fbDb = null, fbUser = null;
+let fbApp = null, fbAuth = null, fbDb = null, fbStorage = null, fbUser = null;
 let fbCloudEnabled = false;
 let fbReady = false;
 
@@ -1804,6 +1805,7 @@ function initFirebase() {
     fbApp = firebase.initializeApp(firebaseConfig);
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
+    try { fbStorage = firebase.storage(); } catch (e) { console.warn('Storage', e); fbStorage = null; }
     fbReady = true;
     return true;
   } catch (e) {
@@ -1893,6 +1895,60 @@ async function signOutFirebase() {
 let _fbSaveTimer = null;
 let _fbSaving = false;
 
+
+/** Sube dataURL a Storage y devuelve URL https (para no reventar el límite de 1 MB de Firestore) */
+async function uploadDataUrlToStorage(dataUrl, path) {
+  if (!fbStorage || !dataUrl || dataUrl.indexOf('data:') !== 0) return dataUrl;
+  if (dataUrl.indexOf('https://') === 0) return dataUrl;
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const ref = fbStorage.ref(path);
+  await ref.put(blob);
+  return await ref.getDownloadURL();
+}
+/**
+ * Mueve fotos base64 (productos + banners PDF) a Storage.
+ * Firestore solo guarda URLs → documento cabe en < 1 MB.
+ */
+async function materializeImagesForCloud(data, uid) {
+  if (!data || !uid) return data;
+  const out = data;
+  const products = Array.isArray(out.products) ? out.products : [];
+  for (let i = 0; i < products.length; i++) {
+    const p = products[i];
+    if (!p || typeof p.img !== 'string') continue;
+    if (p.img.indexOf('data:image') !== 0) continue;
+    try {
+      const ext = p.img.indexOf('image/png') >= 0 ? 'png' : 'jpg';
+      const path = 'users/' + uid + '/products/' + (p.id != null ? p.id : i) + '.' + ext;
+      p.img = await uploadDataUrlToStorage(p.img, path);
+    } catch (e) {
+      console.warn('img producto', p.id, e);
+      // Si falla Storage, quitar base64 para no tumbar el guardado del resto
+      p.img = '';
+    }
+  }
+  out.products = products;
+  const empresas = (out.settings && out.settings.empresas) || {};
+  for (const key of Object.keys(empresas)) {
+    const e = empresas[key];
+    if (!e || typeof e.pdfBanner !== 'string') continue;
+    if (e.pdfBanner.indexOf('data:image') !== 0) continue;
+    try {
+      const ext = e.pdfBanner.indexOf('image/png') >= 0 ? 'png' : 'jpg';
+      e.pdfBanner = await uploadDataUrlToStorage(e.pdfBanner, 'users/' + uid + '/banners/' + key + '.' + ext);
+    } catch (err) {
+      console.warn('banner', key, err);
+    }
+  }
+  return out;
+}
+function approxJsonBytes(obj) {
+  try { return new Blob([JSON.stringify(obj)]).size; } catch (e) {
+    try { return JSON.stringify(obj).length; } catch (e2) { return 0; }
+  }
+}
+
 /** Firestore no admite arrays anidados ni `undefined`. Limpia el payload antes de subir. */
 function sanitizeForFirestore(value) {
   if (value === undefined) return null;
@@ -1931,6 +1987,64 @@ function sanitizeForFirestore(value) {
   return null;
 }
 
+function stripHeavyDataUrls(value, maxLen) {
+  const max = maxLen != null ? maxLen : 500;
+  if (typeof value === 'string') {
+    if (value.indexOf('data:') === 0 && value.length > max) return '';
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(v => stripHeavyDataUrls(v, max));
+  if (value && typeof value === 'object') {
+    const o = {};
+    Object.keys(value).forEach(k => { o[k] = stripHeavyDataUrls(value[k], max); });
+    return o;
+  }
+  return value;
+}
+async function saveProductsSubcollection(appRef, productList) {
+  const col = appRef.collection('products');
+  const list = Array.isArray(productList) ? productList : [];
+  const keep = new Set(list.filter(p => p && p.id != null).map(p => String(p.id)));
+  const existing = await col.get();
+  let batch = fbDb.batch();
+  let n = 0;
+  async function flush() {
+    if (!n) return;
+    await batch.commit();
+    batch = fbDb.batch();
+    n = 0;
+  }
+  for (const d of existing.docs) {
+    if (!keep.has(d.id)) {
+      batch.delete(d.ref);
+      n++;
+      if (n >= 400) await flush();
+    }
+  }
+  await flush();
+  for (const p of list) {
+    if (!p || p.id == null) continue;
+    const row = stripHeavyDataUrls(sanitizeForFirestore({ ...p }));
+    batch.set(col.doc(String(p.id)), row, { merge: false });
+    n++;
+    if (n >= 400) await flush();
+  }
+  await flush();
+}
+async function loadProductsSubcollection(appRef) {
+  try {
+    const snap = await appRef.collection('products').get();
+    if (!snap || snap.empty) return null;
+    return snap.docs.map(d => {
+      const x = d.data() || {};
+      if (x.id == null) x.id = isNaN(+d.id) ? d.id : +d.id;
+      return x;
+    });
+  } catch (e) {
+    console.warn('load products sub', e);
+    return null;
+  }
+}
 async function saveToFirebase(silent) {
   if (!fbUser) {
     if (!silent) toast('Inicia sesión primero');
@@ -1944,26 +2058,50 @@ async function saveToFirebase(silent) {
   if (_fbSaving) return false;
   _fbSaving = true;
   try {
-    const data = payload();
-    const clean = sanitizeForFirestore({
-      ...data,
+    if (!silent) setFbStatus('☁️ Preparando datos / fotos…');
+    let data = payload();
+    try {
+      data = await materializeImagesForCloud(data, fbUser.uid);
+    } catch (e) {
+      console.warn('materialize', e);
+    }
+    if (Array.isArray(data.products)) products = data.products;
+    if (data.settings && data.settings.empresas) {
+      settings.empresas = data.settings.empresas;
+    }
+    const productList = Array.isArray(data.products) ? data.products.slice() : [];
+    const main = Object.assign({}, data);
+    delete main.products;
+    main._productsInSub = true;
+    main._productsCount = productList.length;
+    let clean = sanitizeForFirestore({
+      ...main,
       _cloudSavedAt: new Date().toISOString(),
       _uid: fbUser.uid,
       _email: fbUser.email || ''
     });
+    clean = stripHeavyDataUrls(clean);
+    clean = sanitizeForFirestore(clean);
+    const bytes = approxJsonBytes(clean);
+    if (bytes > 950000) {
+      const msg = 'Documento principal aún grande (~' + Math.round(bytes / 1024) + ' KB). Límite ~1 MB.';
+      setFbStatus('<span class="warn">Error nube:</span> ' + msg);
+      if (!silent) toast(msg);
+      return false;
+    }
+    if (!silent) setFbStatus('☁️ Guardando documento principal…');
     await ref.set(clean, { merge: false });
-    setFbStatus('<span class="ok">☁️ Auto-guardado</span> · ' + new Date().toLocaleTimeString());
-    if (!silent) toast('☁️ Guardado en Firebase');
+    if (!silent) setFbStatus('☁️ Guardando ' + productList.length + ' productos…');
+    await saveProductsSubcollection(ref, productList);
+    setFbStatus('<span class="ok">☁️ Guardado</span> · ' + productList.length + ' prod. · ' + new Date().toLocaleTimeString());
+    if (!silent) toast('☁️ Guardado en Firebase (' + productList.length + ' productos)');
     return true;
   } catch (e) {
     console.error(e);
     let msg = e.message || String(e);
-    if (/nested|anidad/i.test(msg)) {
-      msg = 'Datos con estructura no válida para Firestore (se intentó limpiar). Revisa productos/facturas con datos raros. ' + msg;
-    }
-    if (/size|too large|excede|maximum/i.test(msg)) {
-      msg = 'Documento demasiado grande (fotos en base64 suman mucho). Reduce imágenes o exporta JSON. ' + msg;
-    }
+    if (/nested|anidad/i.test(msg)) msg = 'Estructura no válida para Firestore. ' + msg;
+    if (/size|too large|excede|maximum|1048576/i.test(msg)) msg = 'Documento > 1 MB. ' + msg;
+    if (/permission|unauthorized/i.test(msg)) msg = 'Sin permiso Firestore/Storage. Rules con request.auth != null. ' + msg;
     setFbStatus('<span class="warn">Error nube:</span> ' + msg);
     if (!silent) toast('Error al guardar en Firebase: ' + msg);
     return false;
@@ -1994,14 +2132,20 @@ async function loadFromFirebase(silent) {
       setFbStatus('<span class="warn">Sin datos en la nube</span> · puedes subir tu JSON');
       return false;
     }
-    const obj = snap.data();
+    const obj = snap.data() || {};
+    // Productos en subcolección (versión nueva) o embebidos (versión vieja)
+    if (obj._productsInSub || !Array.isArray(obj.products) || !obj.products.length) {
+      const sub = await loadProductsSubcollection(ref);
+      if (sub && sub.length) obj.products = sub;
+    }
     loadFromObj(obj);
     dirty = false;
     updateBanner();
     refreshAll();
     try { renderArchivedYearsUI(); updateYearCloseBanner(); } catch (e) {}
     const when = obj._cloudSavedAt || '';
-    setFbStatus('<span class="ok">Cargado de Firebase</span>' + (when ? ' · ' + when : ''));
+    const nProd = (products || []).length;
+    setFbStatus('<span class="ok">Cargado de Firebase</span>' + (when ? ' · ' + when : '') + ' · ' + nProd + ' prod.');
     if (!silent) toast('☁️ Datos cargados desde Firebase');
     return true;
   } catch (e) {
