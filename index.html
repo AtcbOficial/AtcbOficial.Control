@@ -1892,6 +1892,45 @@ async function signOutFirebase() {
 }
 let _fbSaveTimer = null;
 let _fbSaving = false;
+
+/** Firestore no admite arrays anidados ni `undefined`. Limpia el payload antes de subir. */
+function sanitizeForFirestore(value) {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  const t = typeof value;
+  if (t === 'string' || t === 'boolean') return value;
+  if (t === 'number') return Number.isFinite(value) ? value : 0;
+  if (t === 'function') return null;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      // Array dentro de array → objeto indexado (Firestore lo rechaza si queda como matriz anidada)
+      if (Array.isArray(item)) {
+        const o = {};
+        item.forEach((v, j) => {
+          const sv = sanitizeForFirestore(v);
+          if (sv !== undefined) o[String(j)] = sv;
+        });
+        return o;
+      }
+      return sanitizeForFirestore(item);
+    });
+  }
+  if (t === 'object') {
+    const out = {};
+    Object.keys(value).forEach((k) => {
+      if (value[k] === undefined) return;
+      // Claves inválidas en Firestore
+      const key = String(k).replace(/[.~*/[\]]/g, '_');
+      if (!key) return;
+      const sv = sanitizeForFirestore(value[k]);
+      if (sv !== undefined) out[key] = sv;
+    });
+    return out;
+  }
+  return null;
+}
+
 async function saveToFirebase(silent) {
   if (!fbUser) {
     if (!silent) toast('Inicia sesión primero');
@@ -1906,19 +1945,27 @@ async function saveToFirebase(silent) {
   _fbSaving = true;
   try {
     const data = payload();
-    await ref.set({
+    const clean = sanitizeForFirestore({
       ...data,
       _cloudSavedAt: new Date().toISOString(),
       _uid: fbUser.uid,
       _email: fbUser.email || ''
-    }, { merge: false });
+    });
+    await ref.set(clean, { merge: false });
     setFbStatus('<span class="ok">☁️ Auto-guardado</span> · ' + new Date().toLocaleTimeString());
     if (!silent) toast('☁️ Guardado en Firebase');
     return true;
   } catch (e) {
     console.error(e);
-    setFbStatus('<span class="warn">Error nube:</span> ' + (e.message || e));
-    if (!silent) toast('Error al guardar en Firebase: ' + (e.message || e));
+    let msg = e.message || String(e);
+    if (/nested|anidad/i.test(msg)) {
+      msg = 'Datos con estructura no válida para Firestore (se intentó limpiar). Revisa productos/facturas con datos raros. ' + msg;
+    }
+    if (/size|too large|excede|maximum/i.test(msg)) {
+      msg = 'Documento demasiado grande (fotos en base64 suman mucho). Reduce imágenes o exporta JSON. ' + msg;
+    }
+    setFbStatus('<span class="warn">Error nube:</span> ' + msg);
+    if (!silent) toast('Error al guardar en Firebase: ' + msg);
     return false;
   } finally {
     _fbSaving = false;
