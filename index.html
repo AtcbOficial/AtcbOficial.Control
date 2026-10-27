@@ -162,6 +162,24 @@ nav button.active{color:var(--accent)}
 }
 .banner strong{color:var(--text)}
 .banner .ok{color:var(--green)}.banner .warn{color:var(--orange)}
+
+#fileBanner{
+  position:sticky;top:0;z-index:18;
+  display:flex;flex-direction:column;gap:2px;
+  padding:6px 10px;margin:0 0 8px;
+  font-size:11px;line-height:1.25;
+  background:linear-gradient(180deg,#1e2a38 0%,#18222e 100%);
+}
+#fileBanner .fb-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:16px}
+#fileBanner .fb-line strong{font-weight:700;color:var(--text)}
+#fileBanner .fb-sep{opacity:.35}
+.sticky-search{
+  position:sticky;top:42px;z-index:14;
+  background:linear-gradient(180deg,#121922 0%,#121922 85%,rgba(18,25,34,0));
+  padding:4px 0 8px;margin:0 0 4px;
+}
+.sticky-search .actions{margin-bottom:0!important}
+
 .toast{
   position:fixed;left:50%;bottom:calc(var(--nav-h) + var(--safe-b) + 16px);transform:translateX(-50%);
   background:#eaf2f8;color:#101820;padding:10px 16px;border-radius:10px;
@@ -750,8 +768,14 @@ details.overdue-box[open]{
 
 <main>
   <div id="fileBanner" class="banner no-print">
-    <strong>Archivo de datos:</strong>
-    <span id="fileStatus" class="warn"> Ninguno abierto — abre o crea un archivo JSON</span>
+    <div class="fb-line">
+      <strong>📁 Archivo:</strong>
+      <span id="fileStatus" class="warn">sin archivo</span>
+    </div>
+    <div class="fb-line">
+      <strong>☁️ Firebase:</strong>
+      <span id="cloudStatusLine" class="warn">sin sesión</span>
+    </div>
   </div>
 
   <!-- INICIO -->
@@ -1149,16 +1173,18 @@ details.overdue-box[open]{
   <section id="guardadas" class="view">
     <div class="card">
       <div class="section-title">📋 Facturas guardadas</div>
-      <div class="actions" style="margin-bottom:10px">
-        <input id="factSearch" placeholder="Buscar cliente, nº, documento o teléfono...">
-        <select id="factFilter">
-          <option value="todos">Todas</option>
-          <option value="pendiente">En ejecución</option>
-          <option value="cotizacion">En aprobación</option>
-          <option value="cobrada">Finalizadas</option>
-          <option value="proyectos" data-emp="atcb">Proyectos</option>
-          <option value="overdue">Vencidas > 7d</option>
-        </select>
+      <div class="sticky-search">
+        <div class="actions">
+          <input id="factSearch" placeholder="Buscar cliente, nº, doc, tel...">
+          <select id="factFilter">
+            <option value="todos">Todas</option>
+            <option value="pendiente">En ejecución</option>
+            <option value="cotizacion">En aprobación</option>
+            <option value="cobrada">Finalizadas</option>
+            <option value="proyectos" data-emp="atcb">Proyectos</option>
+            <option value="overdue">Vencidas > 7d</option>
+          </select>
+        </div>
       </div>
       <div id="factList"></div>
     </div>
@@ -1217,8 +1243,10 @@ details.overdue-box[open]{
         <button type="button" id="btnExportCatalogOpen" class="sm secondary" title="Exportar a catálogo">📤</button>
         <button type="button" id="btnNewProd" class="sm success">➕ Nuevo</button>
       </div>
-      <div class="section-title" style="margin:0 0 12px">📦 Stock de productos</div>
-      <input id="stockSearch" placeholder="Filtrar por nombre o código..." style="margin-bottom:8px">
+      <div class="section-title" style="margin:0 0 8px">📦 Stock de productos</div>
+      <div class="sticky-search">
+        <input id="stockSearch" placeholder="Filtrar nombre o código...">
+      </div>
       <div id="prodList"></div>
     </div>
     <div class="bottom-spacer"></div>
@@ -1260,13 +1288,15 @@ details.overdue-box[open]{
       <div class="sticky-btns">
         <button type="button" id="btnNewIns" class="sm success">➕ Nuevo</button>
       </div>
-      <div class="section-title" style="margin:0 0 12px">🧪 Insumos / Implementos</div>
-      <input id="insSearch" placeholder="Buscar..." style="margin-bottom:8px">
-      <select id="insFilterCat" style="margin-bottom:10px">
-        <option value="">Todas las categorías</option>
-        <option value="quimico">Químico (g)</option>
-        <option value="implemento">Implemento (ud)</option>
-      </select>
+      <div class="section-title" style="margin:0 0 8px">🧪 Insumos / Implementos</div>
+      <div class="sticky-search">
+        <input id="insSearch" placeholder="Buscar..." style="margin-bottom:6px">
+        <select id="insFilterCat">
+          <option value="">Todas las categorías</option>
+          <option value="quimico">Químico (g)</option>
+          <option value="implemento">Implemento (ud)</option>
+        </select>
+      </div>
       <div id="insList"></div>
     </div>
     <div class="bottom-spacer"></div>
@@ -1360,7 +1390,9 @@ details.overdue-box[open]{
         <button type="button" id="btnNewCli" class="sm success">➕ Nuevo</button>
       </div>
       <div class="section-title" style="margin:0 0 12px">👥 Clientes</div>
-      <input id="cliSearch" placeholder="Filtrar por nombre, documento o teléfono..." style="margin-bottom:10px">
+      <div class="sticky-search">
+        <input id="cliSearch" placeholder="Filtrar nombre, doc o tel...">
+      </div>
       <div id="cliList"></div>
     </div>
     <div class="bottom-spacer"></div>
@@ -1389,7 +1421,9 @@ details.overdue-box[open]{
         <button type="button" id="btnNewProv" class="sm success">➕ Nuevo</button>
       </div>
       <div class="section-title" style="margin:0 0 12px">🏭 Proveedores</div>
-      <input id="provSearch" placeholder="Filtrar por nombre, documento o teléfono..." style="margin-bottom:10px">
+      <div class="sticky-search">
+        <input id="provSearch" placeholder="Filtrar nombre, doc o tel...">
+      </div>
       <div id="provList"></div>
     </div>
     <div class="bottom-spacer"></div>
@@ -1829,6 +1863,29 @@ function setAuthError(msg) {
 function setFbStatus(msg) {
   const el = document.getElementById('fbStatus');
   if (el) el.innerHTML = msg;
+  // versión corta en banner superior
+  let short = msg || '';
+  try {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = msg || '';
+    const t = (tmp.textContent || '').trim();
+    if (/Auto-guardado|Guardado|guardado/i.test(t)) {
+      short = '<span class="ok">guardado</span> · ' + new Date().toLocaleTimeString();
+    } else if (/Cargado/i.test(t)) {
+      short = '<span class="ok">cargado</span>';
+    } else if (/Error|warn/i.test(t)) {
+      short = '<span class="warn">error</span>';
+    } else if (/Sin sesión|sin sesión/i.test(t)) {
+      short = '<span class="warn">sin sesión</span>';
+    } else if (/Preparando|Subiendo|Foto|Guardando/i.test(t)) {
+      short = '<span class="warn">guardando…</span>';
+    } else if (t) {
+      short = t.length > 42 ? t.slice(0, 40) + '…' : t;
+    } else {
+      short = '<span class="warn">—</span>';
+    }
+  } catch (e) {}
+  updateCloudBanner(short);
 }
 function updateAuthUI() {
   const gate = document.getElementById('authGate');
@@ -2543,13 +2600,18 @@ function syncSettingsUI() {
 
 function updateBanner() {
   const st = document.getElementById('fileStatus');
+  if (!st) return;
   if (fileHandle) {
-    st.innerHTML = ` <span class="ok">“${fileHandle.name}”</span>${dirty ? ' · cambios sin guardar' : ' · al día'}`;
+    st.innerHTML = `<span class="ok">${escapeHtml(fileHandle.name)}</span>${dirty ? ' · sin guardar' : ' · al día'}`;
   } else if (products.length || clients.length || invoices.length || dirty) {
-    st.innerHTML = ` <span class="warn">Solo en memoria</span> — usa “Guardar como…” o “Descargar JSON”`;
+    st.innerHTML = `<span class="warn">solo memoria</span>`;
   } else {
-    st.innerHTML = ` <span class="warn">Ninguno abierto</span> — abre o crea un archivo JSON`;
+    st.innerHTML = `<span class="warn">sin archivo</span>`;
   }
+}
+function updateCloudBanner(msgHtml) {
+  const el = document.getElementById('cloudStatusLine');
+  if (el && msgHtml != null) el.innerHTML = msgHtml;
 }
 
 /* ========== SERIALIZACIÓN JSON ==========
