@@ -3698,6 +3698,32 @@ function closeExportCatalogModal() {
   if (m) m.classList.remove('open');
 }
 /** Genera JSON catálogo: solo codigo, nombre, foto */
+
+/** Normaliza código id (único por empresa en el ecosistema) */
+function normCodigoId(c) {
+  return String(c || '').trim().toUpperCase();
+}
+/** ¿Ya existe este código en otra producto de la empresa? */
+function isCodigoTaken(codigo, excludeId, empresa) {
+  const n = normCodigoId(codigo);
+  if (!n) return false;
+  const emp = empresa || activeEmpresa;
+  return (products || []).some(p => {
+    if (excludeId != null && +p.id === +excludeId) return false;
+    if ((p.empresa || EMPRESA_ATCB) !== emp) return false;
+    return normCodigoId(p.codigo) === n;
+  });
+}
+function assertCodigoLibre(codigo, excludeId, empresa) {
+  const n = normCodigoId(codigo);
+  if (!n) return true; // vacío permitido (no exportable)
+  if (isCodigoTaken(n, excludeId, empresa)) {
+    toast('Código id "' + n + '" ya existe en otro producto de esta empresa');
+    return false;
+  }
+  return true;
+}
+
 function exportCatalogSelection() {
   const ids = [...stockExportSel];
   if (!ids.length) return toast('Selecciona al menos un producto');
@@ -3707,7 +3733,7 @@ function exportCatalogSelection() {
     const p = products.find(x => +x.id === +id);
     if (!p) return;
     if ((p.empresa || EMPRESA_ATCB) !== activeEmpresa) return;
-    const codigo = String(p.codigo || '').trim();
+    const codigo = normCodigoId(p.codigo);
     if (!codigo) {
       skipped.push(p.name || ('#' + id));
       return;
@@ -3971,7 +3997,9 @@ btnSaveProd.onclick = async () => {
     fecha = today();
   }
   const obs = ((document.getElementById('pObs') || {}).value || '').trim();
-  const codigo = ((document.getElementById('pCodigo') || {}).value || '').trim();
+  const codigo = normCodigoId((document.getElementById('pCodigo') || {}).value || '');
+  if (!assertCodigoLibre(codigo, editingProdId, activeEmpresa)) return;
+  const pCodEl = document.getElementById('pCodigo'); if (pCodEl) pCodEl.value = codigo;
   const img = getProdImgFromUI('p');
   const labBox = document.getElementById('prodLabBox');
   const labOpen = labBox && labBox.style.display !== 'none';
@@ -7789,7 +7817,7 @@ async function guardarStockLab() {
   const compra = Math.round(r.costo * 100) / 100;
   const venta = Math.round(r.pvp * 100) / 100;
   const obs = ((document.getElementById('labObs') || {}).value || '').trim();
-  const codigo = ((document.getElementById('labCodigo') || {}).value || '').trim();
+  const codigo = normCodigoId((document.getElementById('labCodigo') || {}).value || '');
   const img = getProdImgFromUI('lab');
   const lab = {
     ml,
@@ -7801,6 +7829,8 @@ async function guardarStockLab() {
     (x.empresa || EMPRESA_PERFUMES) === EMPRESA_PERFUMES &&
     basePerfumeName(x.name).toLowerCase() === nombre.toLowerCase()
   );
+  if (!assertCodigoLibre(codigo, p ? p.id : null, EMPRESA_PERFUMES)) return;
+  const labCodEl = document.getElementById('labCodigo'); if (labCodEl) labCodEl.value = codigo;
   if (p) {
     if (!p.caps) p.caps = getProductCaps(p);
     p.caps[String(ml)] = { compra, venta, lab };
