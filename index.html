@@ -791,7 +791,7 @@ details.overdue-box[open]{
 
     <!-- 4) Facturas/proyectos en ejecución (cerrado; resalta si hay +7 días) -->
     <details class="collapse" id="homePend">
-      <summary id="homePendTitle">⏳ Facturas y proyectos en ejecución (0 / $ 0,00)</summary>
+      <summary id="homePendTitle">⏳ Facturas y proyectos en ejecución (0: $ 0,00 / $ 0,00 / $ 0,00)</summary>
       <div class="body">
         <p class="hint" style="margin-top:0;margin-bottom:8px">Más días arriba · +7 días resaltadas</p>
         <div id="pendClients" class="empty">Ninguno</div>
@@ -800,7 +800,7 @@ details.overdue-box[open]{
 
     <!-- 5) Facturas/proyectos en aprobación (cerrado; resalta si hay +7 días) -->
     <details class="collapse" id="homeCot">
-      <summary id="homeCotTitle">📋 Facturas y proyectos en aprobación (0 / $ 0,00)</summary>
+      <summary id="homeCotTitle">📋 Facturas y proyectos en aprobación (0: $ 0,00 / $ 0,00 / $ 0,00)</summary>
       <div class="body">
         <div id="cotizClients" class="empty">Ninguno</div>
       </div>
@@ -3226,6 +3226,8 @@ function renderHomeContabilidad() {
 /* ========== INICIO: listas CxC (pendiente / cotización) por empresa ========== */
 function renderStats() {
   let pend = 0, cobr = 0, cot = 0, pendCount = 0, cobrCount = 0, cotCount = 0;
+  let pendCosto = 0, pendVenta = 0, pendRent = 0;
+  let cotCosto = 0, cotVenta = 0, cotRent = 0;
   let pendOverdue = false, cotOverdue = false;
   // Solo empresa activa (como Stock / Guardadas)
   const invsEmp = invoices.filter(inv => (inv.empresa || EMPRESA_ATCB) === activeEmpresa);
@@ -3236,19 +3238,35 @@ function renderStats() {
     if (inv.tipo === 'pendiente') {
       pend += saldo; pendCount++;
       if (isOverduePend(inv)) pendOverdue = true;
+      const r = invHomeRestantes(inv);
+      pendCosto += r.costo;
+      pendVenta += r.venta;
+      pendRent += r.rent;
     }
     if (inv.tipo === 'cobrada') { cobr += inv.total || 0; cobrCount++; }
     if (inv.tipo === 'cotizacion') {
       cot += inv.total || 0; cotCount++;
       if (isOverdueCot(inv)) cotOverdue = true;
+      const r = invHomeRestantes(inv);
+      cotCosto += r.costo;
+      cotVenta += r.venta;
+      cotRent += r.rent;
     }
   });
+  pendCosto = Math.round(pendCosto * 100) / 100;
+  pendVenta = Math.round(pendVenta * 100) / 100;
+  pendRent = Math.round(pendRent * 100) / 100;
+  cotCosto = Math.round(cotCosto * 100) / 100;
+  cotVenta = Math.round(cotVenta * 100) / 100;
+  cotRent = Math.round(cotRent * 100) / 100;
 
   const elPendTitle = document.getElementById('homePendTitle');
   if (elPendTitle) {
+    const sum = fmtHomeInvSummary(pendCount, pendCosto, pendVenta, pendRent);
     elPendTitle.textContent = isAtcb
-      ? `⏳ Facturas y proyectos en ejecución (${pendCount} / ${money(pend)})`
-      : `⏳ Facturas en ejecución (${pendCount} / ${money(pend)})`;
+      ? `⏳ Facturas y proyectos en ejecución ${sum}`
+      : `⏳ Facturas en ejecución ${sum}`;
+    elPendTitle.title = 'cantidad: costo / venta / rentabilidad pendientes';
     elPendTitle.classList.toggle('overdue-sec', pendOverdue);
   }
   const elPendBox = document.getElementById('homePend');
@@ -3256,9 +3274,11 @@ function renderStats() {
 
   const elCotTitle = document.getElementById('homeCotTitle');
   if (elCotTitle) {
+    const sum = fmtHomeInvSummary(cotCount, cotCosto, cotVenta, cotRent);
     elCotTitle.textContent = isAtcb
-      ? `📋 Facturas y proyectos en aprobación (${cotCount} / ${money(cot)})`
-      : `📋 Facturas en aprobación (${cotCount} / ${money(cot)})`;
+      ? `📋 Facturas y proyectos en aprobación ${sum}`
+      : `📋 Facturas en aprobación ${sum}`;
+    elCotTitle.title = 'cantidad: costo / venta / rentabilidad';
     elCotTitle.classList.toggle('overdue-sec', cotOverdue);
   }
   const elCotBox = document.getElementById('homeCot');
@@ -4484,6 +4504,32 @@ function invContabAmount(inv) {
   if (full <= 0) return 0; // si el negocio da pérdida, solo al finalizar
   return partial;
 }
+
+/** Restos para resumen Inicio: costo / venta / rentabilidad aún por cubrir (según abonos) */
+function invHomeRestantes(inv) {
+  if (!inv) return { costo: 0, venta: 0, rent: 0 };
+  const C = invCostoTotal(inv);
+  const V = parseMoney(inv.total) || 0;
+  const R = Math.round((V - C) * 100) / 100;
+  if (inv.tipo === 'cotizacion') {
+    return { costo: C, venta: V, rent: R };
+  }
+  // pendiente / cobrada: restar lo ya abonado
+  const A = totalAbonado(inv);
+  const costoRest = Math.max(0, Math.round((C - A) * 100) / 100);
+  const ventaRest = Math.max(0, Math.round((V - A) * 100) / 100);
+  // Rentabilidad ya reconocida por abonos por encima del costo
+  const rentCobrado = Math.max(0, Math.round((A - C) * 100) / 100);
+  let rentRest = Math.round((R - rentCobrado) * 100) / 100;
+  if (rentRest < 0) rentRest = 0;
+  // Si R negativa (pérdida), al pendiente mostrar R completa hasta finalizar
+  if (R < 0 && inv.tipo === 'pendiente') rentRest = R;
+  return { costo: costoRest, venta: ventaRest, rent: rentRest };
+}
+function fmtHomeInvSummary(count, costo, venta, rent) {
+  return '(' + count + ': ' + money(costo) + ' / ' + money(venta) + ' / ' + money(rent) + ')';
+}
+
 function contSourceKey(inv) {
   if (!inv || inv.id == null) return '';
   return (inv.isProyecto ? 'proy:' : 'fact:') + inv.id;
