@@ -1896,36 +1896,57 @@ let _fbSaveTimer = null;
 let _fbSaving = false;
 
 
-/** Sube dataURL a Storage y devuelve URL https (para no reventar el límite de 1 MB de Firestore) */
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout ' + (label || '') + ' ' + ms + 'ms')), ms))
+  ]);
+}
+/** Sube dataURL a Storage; timeout para no colgar la UI */
 async function uploadDataUrlToStorage(dataUrl, path) {
-  if (!fbStorage || !dataUrl || dataUrl.indexOf('data:') !== 0) return dataUrl;
+  if (!fbStorage || !dataUrl || dataUrl.indexOf('data:') !== 0) return '';
   if (dataUrl.indexOf('https://') === 0) return dataUrl;
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  const ref = fbStorage.ref(path);
-  await ref.put(blob);
-  return await ref.getDownloadURL();
+  const work = (async () => {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const ref = fbStorage.ref(path);
+    await ref.put(blob);
+    return await ref.getDownloadURL();
+  })();
+  return withTimeout(work, 15000, path);
 }
 /**
- * Mueve fotos base64 (productos + banners PDF) a Storage.
- * Firestore solo guarda URLs → documento cabe en < 1 MB.
+ * Fotos base64 → Storage (URL). Si Storage no responde, quita la foto del doc
+ * para poder guardar el resto en Firestore.
  */
 async function materializeImagesForCloud(data, uid) {
   if (!data || !uid) return data;
   const out = data;
   const products = Array.isArray(out.products) ? out.products : [];
-  for (let i = 0; i < products.length; i++) {
-    const p = products[i];
-    if (!p || typeof p.img !== 'string') continue;
-    if (p.img.indexOf('data:image') !== 0) continue;
-    try {
-      const ext = p.img.indexOf('image/png') >= 0 ? 'png' : 'jpg';
-      const path = 'users/' + uid + '/products/' + (p.id != null ? p.id : i) + '.' + ext;
-      p.img = await uploadDataUrlToStorage(p.img, path);
-    } catch (e) {
-      console.warn('img producto', p.id, e);
-      // Si falla Storage, quitar base64 para no tumbar el guardado del resto
-      p.img = '';
+  const need = products.filter(p => p && typeof p.img === 'string' && p.img.indexOf('data:image') === 0);
+  if (!fbStorage) {
+    console.warn('Storage no disponible: se omiten fotos en la nube');
+    products.forEach(p => {
+      if (p && typeof p.img === 'string' && p.img.indexOf('data:') === 0) p.img = '';
+    });
+  } else {
+    let done = 0;
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i];
+      if (!p || typeof p.img !== 'string') continue;
+      if (p.img.indexOf('data:image') !== 0) continue;
+      done++;
+      try {
+        setFbStatus('☁️ Foto ' + done + '/' + need.length + ' (Storage)…');
+        await new Promise(r => setTimeout(r, 0)); // cede UI
+        const ext = p.img.indexOf('image/png') >= 0 ? 'png' : 'jpg';
+        const path = 'users/' + uid + '/products/' + (p.id != null ? p.id : i) + '.' + ext;
+        const url = await uploadDataUrlToStorage(p.img, path);
+        p.img = (url && url.indexOf('http') === 0) ? url : '';
+      } catch (e) {
+        console.warn('img producto', p.id, e);
+        p.img = '';
+      }
     }
   }
   out.products = products;
@@ -1935,10 +1956,14 @@ async function materializeImagesForCloud(data, uid) {
     if (!e || typeof e.pdfBanner !== 'string') continue;
     if (e.pdfBanner.indexOf('data:image') !== 0) continue;
     try {
+      setFbStatus('☁️ Banner ' + key + '…');
       const ext = e.pdfBanner.indexOf('image/png') >= 0 ? 'png' : 'jpg';
-      e.pdfBanner = await uploadDataUrlToStorage(e.pdfBanner, 'users/' + uid + '/banners/' + key + '.' + ext);
+      const url = await uploadDataUrlToStorage(e.pdfBanner, 'users/' + uid + '/banners/' + key + '.' + ext);
+      e.pdfBanner = (url && url.indexOf('http') === 0) ? url : e.pdfBanner.slice(0, 0);
+      if (!e.pdfBanner) e.pdfBanner = '';
     } catch (err) {
       console.warn('banner', key, err);
+      e.pdfBanner = '';
     }
   }
   return out;
