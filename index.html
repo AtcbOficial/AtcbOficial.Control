@@ -1189,9 +1189,10 @@ details.overdue-box[open]{
       <div class="prod-img-box">
         <img id="pImgPreview" class="prod-img-preview" alt="Foto producto">
         <div class="prod-img-actions">
-          <label class="label">Imagen del producto</label>
-          <input type="file" id="pImgFile" accept="image/*" style="font-size:12px">
+          <label class="label">Link imagen del producto</label>
+          <input type="url" id="pImgUrl" placeholder="https://… (Drive, OneDrive, web)" autocomplete="off">
           <button type="button" class="sm secondary" id="pImgClear">🗑️ Quitar imagen</button>
+          <p class="hint">Solo URL pública. No se sube archivo (más liviano en Firebase).</p>
         </div>
       </div>
       <textarea id="pObs" placeholder="Observaciones (notas libres...)" style="margin-bottom:6px;min-height:56px"></textarea>
@@ -1313,9 +1314,10 @@ details.overdue-box[open]{
         <div class="prod-img-box">
           <img id="labImgPreview" class="prod-img-preview" alt="Foto producto">
           <div class="prod-img-actions">
-            <label class="label">Imagen del producto</label>
-            <input type="file" id="labImgFile" accept="image/*" style="font-size:12px">
+            <label class="label">Link imagen del producto</label>
+            <input type="url" id="labImgUrl" placeholder="https://… (Drive, OneDrive, web)" autocomplete="off">
             <button type="button" class="sm secondary" id="labImgClear">🗑️ Quitar imagen</button>
+            <p class="hint">Solo URL pública. No se sube archivo.</p>
           </div>
         </div>
         <div class="form-row" style="margin-bottom:10px">
@@ -1637,8 +1639,11 @@ details.overdue-box[open]{
         <div style="background:#fff;border-radius:8px;padding:6px;margin-bottom:10px">
           <img id="pdfBannerPreview" alt="Banner PDF" style="width:100%;display:block;border-radius:4px">
         </div>
-        <input id="pdfBannerFile" type="file" accept="image/*" style="margin-bottom:8px">
+        <label class="label">Link del banner PDF</label>
+        <input id="pdfBannerUrl" type="url" placeholder="https://… imagen pública del encabezado" style="margin-bottom:8px">
+        <p class="hint" style="margin:0 0 8px">URL pública (Drive/OneDrive/web). No se sube archivo al proyecto.</p>
         <div class="actions">
+          <button type="button" id="btnApplyBannerUrl" class="success">Aplicar link</button>
           <button type="button" id="btnRestoreBanner" class="secondary">Restaurar original</button>
           <button type="button" id="btnSaveBanner">💾 Guardar banner</button>
         </div>
@@ -2491,6 +2496,8 @@ function syncSettingsUI() {
   setWaMotivar.value = e.waMotivar || DEFAULT_WA_MOTIVAR;
   const swp = document.getElementById('setWaProy'); if (swp) swp.value = e.waProy || DEFAULT_WA_PROY;
   pdfBannerPreview.src = e.pdfBanner || DEFAULT_PDF_BANNER;
+  const pbu = document.getElementById('pdfBannerUrl');
+  if (pbu) pbu.value = normImgUrl(e.pdfBanner || '') || '';
   const st = document.getElementById('setProyTiempo'); if (st) st.value = e.proyTiempo || '';
   const sv = document.getElementById('setProyValidez'); if (sv) sv.value = e.proyValidez || '';
   const sfp = document.getElementById('setProyFormaPago'); if (sfp) sfp.value = e.proyFormaPago || '';
@@ -3535,94 +3542,68 @@ function showProdLabBox(show) {
 }
 
 /** Redimensiona imagen conservando calidad y transparencia (PNG/WebP → PNG; foto → JPEG alto) */
-function compressImageFile(file, maxSide, quality) {
-  return new Promise((resolve, reject) => {
-    if (!file || !file.type || file.type.indexOf('image/') !== 0) return reject(new Error('Archivo no es imagen'));
-    const preferPng = /image\/(png|webp)/i.test(file.type || '') || /\.png$/i.test(file.name || '');
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('Imagen inválida'));
-      img.onload = () => {
-        const maxS = maxSide || 1000;
-        let w = img.width, h = img.height;
-        if (w > maxS || h > maxS) {
-          if (w >= h) { h = Math.round(h * (maxS / w)); w = maxS; }
-          else { w = Math.round(w * (maxS / h)); h = maxS; }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        // Sin relleno oscuro: mantiene transparencia en PNG
-        ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        try {
-          if (preferPng) {
-            resolve(canvas.toDataURL('image/png'));
-          } else {
-            resolve(canvas.toDataURL('image/jpeg', quality != null ? quality : 0.9));
-          }
-        } catch (e) { reject(e); }
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
+/** Normaliza URL de imagen (http/https o vacío). No acepta data: base64 para nube liviana. */
+function normImgUrl(u) {
+  u = String(u || '').trim();
+  if (!u) return '';
+  if (u.indexOf('data:') === 0) return ''; // no guardar base64
+  if (/^https?:\/\//i.test(u)) return u;
+  if (u.indexOf('//') === 0) return 'https:' + u;
+  return u;
 }
 function setProdImgPreview(imgEl, dataUrl) {
   if (!imgEl) return;
   if (dataUrl) {
     imgEl.src = dataUrl;
     imgEl.classList.add('show');
+    imgEl.onerror = function() { imgEl.classList.remove('show'); };
   } else {
     imgEl.removeAttribute('src');
     imgEl.classList.remove('show');
   }
 }
 function getProdImgFromUI(prefix) {
-  // prefix: 'p' | 'lab'
-  const prev = document.getElementById(prefix === 'lab' ? 'labImgPreview' : 'pImgPreview');
-  if (prev && prev.classList.contains('show') && prev.src && prev.src.indexOf('data:image') === 0) return prev.src;
-  return '';
+  const id = prefix === 'lab' ? 'labImgUrl' : 'pImgUrl';
+  const el = document.getElementById(id);
+  return normImgUrl(el && el.value);
 }
 function clearProdImgUI(prefix) {
-  const file = document.getElementById(prefix === 'lab' ? 'labImgFile' : 'pImgFile');
+  const id = prefix === 'lab' ? 'labImgUrl' : 'pImgUrl';
   const prev = document.getElementById(prefix === 'lab' ? 'labImgPreview' : 'pImgPreview');
-  if (file) file.value = '';
+  const el = document.getElementById(id);
+  if (el) el.value = '';
   setProdImgPreview(prev, '');
 }
 function bindProdImageInputs() {
-  [['pImgFile', 'pImgPreview', 'pImgClear'], ['labImgFile', 'labImgPreview', 'labImgClear']].forEach(([fid, pid, cid]) => {
-    const f = document.getElementById(fid);
+  [['pImgUrl', 'pImgPreview', 'pImgClear'], ['labImgUrl', 'labImgPreview', 'labImgClear']].forEach(([uid, pid, cid]) => {
+    const u = document.getElementById(uid);
     const prev = document.getElementById(pid);
     const clr = document.getElementById(cid);
-    if (f && !f._boundImg) {
-      f._boundImg = true;
-      f.onchange = async () => {
-        const file = f.files && f.files[0];
-        if (!file) return;
-        try {
-          const url = await compressImageFile(file, 1000, 0.9);
-          setProdImgPreview(prev, url);
-          toast('Imagen lista');
-        } catch (e) {
-          toast('No se pudo cargar la imagen');
-        }
+    if (u && !u._boundImg) {
+      u._boundImg = true;
+      const sync = () => {
+        const url = normImgUrl(u.value);
+        if (url !== u.value) u.value = url;
+        setProdImgPreview(prev, url);
+      };
+      u.onchange = sync;
+      u.onblur = sync;
+      u.oninput = () => {
+        const v = (u.value || '').trim();
+        if (/^https?:\/\//i.test(v)) setProdImgPreview(prev, v);
+        else if (!v) setProdImgPreview(prev, '');
       };
     }
     if (clr && !clr._boundImg) {
       clr._boundImg = true;
       clr.onclick = () => {
-        if (f) f.value = '';
+        if (u) u.value = '';
         setProdImgPreview(prev, '');
       };
     }
   });
 }
 
-
-/** Selección para export catálogo (ids de producto) */
 const stockExportSel = new Set();
 function stockExportUpdateHint() {
   const el = document.getElementById('stockExportHint');
@@ -3846,8 +3827,8 @@ function startLabNewCap(id) {
   if (ln) ln.value = name;
   const lc = document.getElementById('labCodigo');
   if (lc) lc.value = p.codigo || '';
-  setProdImgPreview(document.getElementById('labImgPreview'), p.img || '');
-  const lf = document.getElementById('labImgFile'); if (lf) lf.value = '';
+  const _lu=document.getElementById('labImgUrl'); if(_lu)_lu.value=normImgUrl(p.img||''); setProdImgPreview(document.getElementById('labImgPreview'), normImgUrl(p.img||'')||'');
+  const lu = document.getElementById('labImgUrl'); if (lu) lu.value = '';
   const lo = document.getElementById('labObs');
   if (lo) lo.value = p.obs || '';
   const ml = available[0];
@@ -3917,8 +3898,9 @@ async function editProd(id) {
   prodFecha.value = p.fecha || today();
   const pCod = document.getElementById('pCodigo');
   if (pCod) pCod.value = p.codigo || '';
-  setProdImgPreview(document.getElementById('pImgPreview'), p.img || '');
-  const pFile = document.getElementById('pImgFile'); if (pFile) pFile.value = '';
+  const pUrl = document.getElementById('pImgUrl');
+  if (pUrl) pUrl.value = normImgUrl(p.img || '');
+  setProdImgPreview(document.getElementById('pImgPreview'), normImgUrl(p.img || '') || '');
   const pObsEl = document.getElementById('pObs');
   if (pObsEl) pObsEl.value = p.obs || '';
 
@@ -6009,19 +5991,25 @@ btnRestoreBanner.onclick = () => {
   pdfBannerPreview.src = DEFAULT_PDF_BANNER;
   toast('Banner restaurado (guarda para aplicar)');
 };
-pdfBannerFile.onchange = () => {
-  const f = pdfBannerFile.files[0]; if (!f) return;
-  const reader = new FileReader();
-  reader.onload = () => {
+(function bindBannerUrl() {
+  const urlEl = document.getElementById('pdfBannerUrl');
+  const btn = document.getElementById('btnApplyBannerUrl');
+  const apply = async () => {
+    const url = normImgUrl(urlEl && urlEl.value);
+    if (!url) return toast('Pega un link https de la imagen');
     const e = empCfg();
-    e.pdfBanner = reader.result;
-    settings.empresas[activeEmpresa] = e;
-    syncFlatSettingsFromEmp();
-    pdfBannerPreview.src = reader.result;
-    toast('Banner de ' + (e.label || '') + ' cargado (pulsa Guardar banner)');
+    e.pdfBanner = url;
+    settings.pdfBanner = url;
+    if (pdfBannerPreview) pdfBannerPreview.src = url;
+    if (urlEl) urlEl.value = url;
+    toast('Banner por link aplicado');
+    await autoSave();
   };
-  reader.readAsDataURL(f);
-};
+  if (btn) btn.onclick = apply;
+  if (urlEl) {
+    urlEl.value = normImgUrl((empCfg() || {}).pdfBanner) || '';
+  }
+})();
 btnSaveBanner.onclick = async () => {
   await autoSave(); toast('Banner PDF de ' + (empCfg().label || '') + ' guardado');
 };
