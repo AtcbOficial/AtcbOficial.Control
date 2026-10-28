@@ -1239,7 +1239,13 @@ details.overdue-box[open]{
       </div>
       <div class="section-title" style="margin:0 0 8px">📦 Stock de productos</div>
       <div class="sticky-search">
-        <input id="stockSearch" placeholder="Filtrar nombre o código...">
+        <div class="actions">
+          <input id="stockSearch" placeholder="Filtrar nombre o código...">
+          <select id="stockSort" title="Ordenar">
+            <option value="name">Nombre A–Z</option>
+            <option value="code">Código id ↑</option>
+          </select>
+        </div>
       </div>
       <div id="prodList"></div>
     </div>
@@ -3836,15 +3842,35 @@ function exportCatalogSelection() {
   toast(msg);
 }
 
+function codeSortKey(c) {
+  const s = String(c || '').trim();
+  if (!s) return { empty: 1, n: Infinity, t: '' };
+  // extrae número principal (ej. 1-0011 → 10011 o 11 según dígitos)
+  const digits = s.replace(/\D+/g, '');
+  const n = digits ? parseInt(digits, 10) : NaN;
+  return { empty: 0, n: Number.isFinite(n) ? n : Infinity, t: s.toLowerCase() };
+}
 function renderProducts() {
-  const q = (stockSearch.value || '').toLowerCase();
+  const q = ((stockSearch && stockSearch.value) || '').toLowerCase();
+  const sortMode = ((document.getElementById('stockSort') || {}).value) || 'name';
   const rows = products
     .filter(p => (p.empresa || EMPRESA_ATCB) === activeEmpresa)
     .filter(p => {
       const code = (p.codigo || '').toLowerCase();
       return (p.name || '').toLowerCase().includes(q) || basePerfumeName(p.name).toLowerCase().includes(q) || code.includes(q);
     })
-    .sort((a,b) => (a.name || '').localeCompare(b.name || ''));
+    .sort((a, b) => {
+      if (sortMode === 'code') {
+        const ka = codeSortKey(a.codigo);
+        const kb = codeSortKey(b.codigo);
+        if (ka.empty !== kb.empty) return ka.empty - kb.empty; // con código primero
+        if (ka.n !== kb.n) return ka.n - kb.n;
+        return ka.t.localeCompare(kb.t);
+      }
+      const na = (activeEmpresa === EMPRESA_PERFUMES ? basePerfumeName(a.name) : a.name) || '';
+      const nb = (activeEmpresa === EMPRESA_PERFUMES ? basePerfumeName(b.name) : b.name) || '';
+      return na.localeCompare(nb, 'es', { sensitivity: 'base' });
+    });
   prodList.innerHTML = rows.length
     ? rows.map(p => {
         const dias = daysAgo(p.fecha);
@@ -4218,6 +4244,8 @@ function viewProdDetail(id) {
   modal.classList.add('open');
 }
 stockSearch.oninput = () => renderProducts();
+const _stockSort = document.getElementById('stockSort');
+if (_stockSort) _stockSort.onchange = () => renderProducts();
 (function bindStockExport() {
   const open = document.getElementById('btnExportCatalogOpen');
   const close = document.getElementById('btnExportCatalogClose');
