@@ -4457,7 +4457,6 @@ function viewProvDetail(id) {
       html += `<div class="d-row">🧪 <strong>${escapeHtml(ins.producto || '')}</strong> · ${precio} / ${und}</div>`;
     });
   }
-  html += dObsBlock('Observaciones', v.obs);
   body.innerHTML = html;
   modal.classList.add('open');
 }
