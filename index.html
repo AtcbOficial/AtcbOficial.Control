@@ -223,8 +223,18 @@ nav button.active{color:var(--accent)}
   box-shadow:0 6px 0 #0a0e14,0 16px 40px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.07);
 }
 .detail-modal-box h3{margin:0 0 10px;font-size:16px}
-.detail-modal-box .d-row{font-size:13px;margin:4px 0;line-height:1.4}
+.detail-modal-box .d-row{font-size:13px;margin:6px 0;line-height:1.45}
 .detail-modal-box .d-row strong{color:var(--text)}
+
+.detail-modal-box .d-row{font-size:13px;margin:6px 0;line-height:1.45}
+.detail-modal-box .d-block{
+  font-size:13px;margin:10px 0;padding:10px;border-radius:10px;
+  background:#0e151d;border:1px solid var(--border);line-height:1.5;white-space:pre-wrap;word-break:break-word;
+}
+.detail-modal-box .d-block .d-label{display:block;font-size:10px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;letter-spacing:.03em}
+.detail-modal-box .d-sec{margin-top:14px;padding-top:8px;border-top:1px solid var(--border)}
+.detail-modal-box .d-sec-title{font-size:12px;font-weight:700;color:var(--accent);margin:0 0 8px}
+
 .detail-modal-box table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
 .detail-modal-box th,.detail-modal-box td{border-bottom:1px solid var(--border);padding:6px 4px;text-align:left}
 .detail-modal-box th{color:var(--muted);font-size:11px}
@@ -2448,6 +2458,16 @@ function toast(msg) {
 function escapeHtml(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+/** Texto multilínea seguro para modales 👀 (respeta saltos de línea). */
+function fmtMultiline(s) {
+  return escapeHtml(String(s || '')).replace(/\r\n|\r|\n/g, '<br>');
+}
+function dObsBlock(label, text) {
+  const t = String(text || '').trim();
+  if (!t) return '';
+  return `<div class="d-block"><span class="d-label">${escapeHtml(label)}</span>${fmtMultiline(t)}</div>`;
+}
+
 function daysAgo(dateStr) {
   if (!dateStr) return 0;
   const d = new Date(dateStr + 'T12:00:00');
@@ -3418,6 +3438,7 @@ function renderStats() {
             <div class="line">⚖️ Saldo: <strong class="${saldo > 0 ? 'warn' : 'income'}">${money(saldo)}</strong> · Abonado ${money(abonado)}</div>
           ` : ''}
           <div class="row-actions" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap" onclick="event.stopPropagation()">
+            <button type="button" class="sm secondary" onclick="viewInvDetail(${inv.id})" title="Ver detalle">👀</button>
             <button type="button" class="sm success" onclick="sendCxc(${inv.id})">📲 CxC</button>
             <button type="button" class="sm secondary" onclick="editInv(${inv.id})">✏️</button>
             <button type="button" class="sm" onclick="printInv(${inv.id})">🖨️</button>
@@ -3451,6 +3472,7 @@ function renderStats() {
           return ` · Costo <strong>${money(c)}</strong> · Rent. <strong class="${r>=0?'income':'expense'}">${money(r)}</strong>`;
         })()}</div>
           <div class="row-actions" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap" onclick="event.stopPropagation()">
+            <button type="button" class="sm secondary" onclick="viewInvDetail(${inv.id})" title="Ver detalle">👀</button>
             <button type="button" class="sm success" onclick="motivarCotiz(${inv.id})">💬 Motivar</button>
             <button type="button" class="sm secondary" onclick="editInv(${inv.id})">✏️</button>
             <button type="button" class="sm" onclick="printInv(${inv.id})">🖨️</button>
@@ -4219,7 +4241,7 @@ function viewProdDetail(id) {
   if (p.codigo) html += `<div class="d-row"><strong>🪪 Código id:</strong> ${escapeHtml(p.codigo)}</div>`;
   html += `<div class="d-row"><strong>Stock:</strong> ${p.stock ?? 0}</div>`;
   html += `<div class="d-row"><strong>Fecha:</strong> ${fmtDate(p.fecha)} (${daysAgo(p.fecha)} d)</div>`;
-  if (p.obs) html += `<div class="d-row"><strong>Obs:</strong> ${escapeHtml(p.obs)}</div>`;
+  html += dObsBlock('Observaciones', p.obs);
   if (keys.length) {
     html += `<div class="section-title" style="margin:12px 0 6px;font-size:13px">Capacidades</div>`;
     keys.forEach(k => {
@@ -4296,10 +4318,10 @@ function viewCliDetail(id) {
   html += `<div class="d-row"><strong>Nombre:</strong> ${escapeHtml(c.nombre || '')}</div>`;
   html += `<div class="d-row"><strong>Documento / NIT:</strong> ${escapeHtml(c.documento || '—')}</div>`;
   html += `<div class="d-row"><strong>Teléfono:</strong> ${escapeHtml(c.telefono || '—')}</div>`;
-  html += `<div class="d-row"><strong>Dirección:</strong> ${escapeHtml(c.direccion || '—')}</div>`;
+  html += `<div class="d-row"><strong>Dirección:</strong> ${c.direccion ? fmtMultiline(c.direccion) : '—'}</div>`;
   html += `<div class="d-row"><strong>Email:</strong> ${escapeHtml(c.email || '—')}</div>`;
   html += `<div class="d-row"><strong>Fecha:</strong> ${fmtDate(c.fecha)} (${daysAgo(c.fecha)} d)</div>`;
-  if (c.obs) html += `<div class="d-row"><strong>Observaciones:</strong><br>${escapeHtml(c.obs).replace(/\n/g, '<br>')}</div>`;
+  html += dObsBlock('Observaciones', c.obs);
   const related = (invoices || []).filter(inv => {
     const n = (inv.cliente || '').toLowerCase().trim();
     const cn = (c.nombre || '').toLowerCase().trim();
@@ -4418,12 +4440,12 @@ function viewProvDetail(id) {
   html += `<div class="d-row"><strong>Nombre:</strong> ${escapeHtml(v.nombre || '')}</div>`;
   html += `<div class="d-row"><strong>Documento / NIT:</strong> ${escapeHtml(v.documento || '—')}</div>`;
   html += `<div class="d-row"><strong>Teléfono:</strong> ${escapeHtml(v.telefono || '—')}</div>`;
-  html += `<div class="d-row"><strong>Dirección:</strong> ${escapeHtml(v.direccion || '—')}</div>`;
+  html += `<div class="d-row"><strong>Dirección:</strong> ${v.direccion ? fmtMultiline(v.direccion) : '—'}</div>`;
   html += `<div class="d-row"><strong>Email:</strong> ${escapeHtml(v.email || '—')}</div>`;
   if (web) html += `<div class="d-row"><strong>Web:</strong> <a href="${escapeHtml(web)}" target="_blank" rel="noopener" style="color:var(--accent)">${escapeHtml(v.web || web)}</a></div>`;
   html += `<div class="d-row"><strong>Fecha:</strong> ${fmtDate(v.fecha)} (${daysAgo(v.fecha)} d)</div>`;
   html += `<div class="d-row"><strong>Empresa:</strong> ${escapeHtml((v.empresa === 'perfumes') ? 'Perfumes L&R' : 'AtcbOficial')}</div>`;
-  if (v.obs) html += `<div class="d-row"><strong>Observaciones:</strong><br>${escapeHtml(v.obs).replace(/\n/g, '<br>')}</div>`;
+  html += dObsBlock('Observaciones', v.obs);
   // Insumos que ofrece este proveedor
   const offers = (insumos || []).filter(ins => (ins.proveedores || []).some(pv => +pv.id === +v.id));
   if (offers.length) {
@@ -4435,6 +4457,7 @@ function viewProvDetail(id) {
       html += `<div class="d-row">🧪 <strong>${escapeHtml(ins.producto || '')}</strong> · ${precio} / ${und}</div>`;
     });
   }
+  html += dObsBlock('Observaciones', v.obs);
   body.innerHTML = html;
   modal.classList.add('open');
 }
@@ -5329,27 +5352,42 @@ function viewInvDetail(id) {
   const c = isProy
     ? (inv.resulta || []).reduce((s, r) => s + (parseMoney(r.sub) || 0), 0)
     : linesCostoTotal(inv.items || []);
-  const r = Math.round((parseMoney(inv.total) - c) * 100) / 100;
-  title.textContent = (isProy ? 'Proyecto' : 'Factura') + ' #' + inv.numero;
+  const rent = Math.round((parseMoney(inv.total) - c) * 100) / 100;
+  if (title) title.textContent = '👀 ' + (isProy ? 'Proyecto' : 'Factura') + ' #' + inv.numero;
   let html = '';
-  html += `<div class="d-row"><strong>Estado:</strong> ${tipoLabel(inv.tipo, overdue)}</div>`;
+  html += `<div class="d-row"><strong>Estado:</strong> ${tipoLabel(inv.tipo, overdue)}${inv.isProyecto ? ' · Proyecto' : ''}</div>`;
   html += `<div class="d-row"><strong>Fecha:</strong> ${fmtDate(inv.fecha)} · ${daysAgo(inv.fecha)} día(s)</div>`;
-  html += `<div class="d-row"><strong>Cliente:</strong> ${escapeHtml(inv.cliente || '')}</div>`;
-  if (inv.documento) html += `<div class="d-row"><strong>Doc/NIT:</strong> ${escapeHtml(inv.documento)}</div>`;
-  if (inv.telefono) html += `<div class="d-row"><strong>Tel:</strong> ${escapeHtml(inv.telefono)}</div>`;
-  if (inv.direccion) html += `<div class="d-row"><strong>Dir:</strong> ${escapeHtml(inv.direccion)}</div>`;
+  html += `<div class="d-sec"><div class="d-sec-title">Cliente</div>`;
+  html += `<div class="d-row"><strong>Nombre:</strong> ${escapeHtml(inv.cliente || '—')}</div>`;
+  if (inv.documento) html += `<div class="d-row"><strong>Doc / NIT:</strong> ${escapeHtml(inv.documento)}</div>`;
+  if (inv.telefono) html += `<div class="d-row"><strong>Teléfono:</strong> ${escapeHtml(inv.telefono)}</div>`;
+  if (inv.direccion) html += `<div class="d-row"><strong>Dirección:</strong> ${fmtMultiline(inv.direccion)}</div>`;
   if (inv.email) html += `<div class="d-row"><strong>Email:</strong> ${escapeHtml(inv.email)}</div>`;
+  html += `</div>`;
   if (isProy && inv.proyecto) html += `<div class="d-row"><strong>Proyecto:</strong> ${escapeHtml(inv.proyecto)}</div>`;
-  html += `<div class="d-row" style="margin-top:8px"><strong>Venta:</strong> <span class="balance">${money(inv.total)}</span> · <strong>Costo:</strong> ${money(c)} · <strong>Rent:</strong> <span class="${r>=0?'income':'expense'}">${money(r)}</span></div>`;
+  html += `<div class="d-sec"><div class="d-sec-title">Totales</div>`;
+  html += `<div class="d-row"><strong>Venta:</strong> <span class="balance">${money(inv.total)}</span></div>`;
+  html += `<div class="d-row"><strong>Costo:</strong> ${money(c)}</div>`;
+  html += `<div class="d-row"><strong>Rentabilidad:</strong> <span class="${rent>=0?'income':'expense'}">${money(rent)}</span></div>`;
+  if (inv.tipo === 'pendiente' || abonado > 0) {
+    html += `<div class="d-row"><strong>Abonado:</strong> ${money(abonado)} · <strong>Saldo:</strong> <span class="${saldo>0?'warn':'income'}">${money(saldo)}</span></div>`;
+  }
+  html += `</div>`;
   if (!isProy && (inv.items || []).length) {
-    html += `<table><thead><tr><th>Producto</th><th>Cant</th><th>P.Venta</th><th>Sub</th></tr></thead><tbody>`;
+    html += `<div class="d-sec"><div class="d-sec-title">Productos / servicios</div>`;
+    html += `<table><thead><tr><th>Producto</th><th>Cant</th><th>Costo</th><th>Venta</th><th>Sub</th></tr></thead><tbody>`;
     (inv.items || []).forEach(it => {
-      html += `<tr><td>${escapeHtml(it.name||'')}</td><td>${it.cant||0}</td><td>${money(it.precio||0)}</td><td>${money(it.sub!=null?it.sub:(it.cant||0)*(it.precio||0))}</td></tr>`;
+      const cant = +it.cant || 0;
+      const pv = +it.precio || 0;
+      const pc = +it.costo || 0;
+      const sub = it.sub != null ? it.sub : cant * pv;
+      html += `<tr><td>${escapeHtml(it.name||'')}</td><td>${cant}</td><td>${money(pc)}</td><td>${money(pv)}</td><td>${money(sub)}</td></tr>`;
     });
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
   }
   if (isProy && inv.lines) {
     const labels = {panel:'Panel isotérmico',materiales:'Materiales',puerta:'Puerta',cortina:'Cortina',iluminacion:'Iluminación',evaporador:'Evaporador',condensadora:'Condensadora',accesorios:'Accesorios',gas:'Gas',tablero:'Tablero',flete:'Flete',instalacion:'Instalación'};
+    html += `<div class="d-sec"><div class="d-sec-title">Ítems del proyecto</div>`;
     html += `<table><thead><tr><th>Ítem</th><th>Cant</th><th>Unit</th><th>Total</th></tr></thead><tbody>`;
     Object.keys(inv.lines).forEach(k => {
       const d = inv.lines[k] || {};
@@ -5357,31 +5395,35 @@ function viewInvDetail(id) {
       if (!d.cant && !d.precio) return;
       html += `<tr><td>${escapeHtml(labels[k]||k)}</td><td>${d.cant||0}</td><td>${money(d.precio||0)}</td><td>${money(sub)}</td></tr>`;
     });
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
   }
   if (isProy && (inv.resulta||[]).length) {
-    html += `<div class="d-row" style="margin-top:6px"><strong>Componentes comprados</strong></div><table><thead><tr><th>Nombre</th><th>Cant</th><th>Costo</th><th>Sub</th></tr></thead><tbody>`;
+    html += `<div class="d-sec"><div class="d-sec-title">Componentes (costo)</div>`;
+    html += `<table><thead><tr><th>Nombre</th><th>Cant</th><th>Costo</th><th>Sub</th></tr></thead><tbody>`;
     (inv.resulta||[]).forEach(x => {
       html += `<tr><td>${escapeHtml(x.name||'')}</td><td>${x.cant||0}</td><td>${money(x.costo||0)}</td><td>${money(x.sub||0)}</td></tr>`;
     });
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
   }
   if ((inv.abonos||[]).length) {
-    html += `<div class="d-row" style="margin-top:6px"><strong>Abonos</strong> · Abonado ${money(abonado)} · Saldo <span class="${saldo>0?'warn':'income'}">${money(saldo)}</span></div>`;
+    html += `<div class="d-sec"><div class="d-sec-title">Abonos</div>`;
     html += `<table><thead><tr><th>Fecha</th><th>Nota</th><th>Monto</th></tr></thead><tbody>`;
     (inv.abonos||[]).forEach(a => {
-      html += `<tr><td>${fmtDate(a.fecha)}</td><td>${escapeHtml(a.nota||'')}</td><td>${money(a.monto)}</td></tr>`;
+      html += `<tr><td>${fmtDate(a.fecha)}</td><td style="text-align:left;white-space:pre-wrap">${fmtMultiline(a.nota||'—')}</td><td>${money(a.monto)}</td></tr>`;
     });
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
   } else if (inv.tipo === 'pendiente') {
-    html += `<div class="d-row">Sin abonos · Saldo: ${money(saldo)}</div>`;
+    html += `<div class="d-row">Sin abonos</div>`;
   }
-  if (inv.obs) html += `<div class="d-row" style="margin-top:6px"><strong>Obs:</strong> ${escapeHtml(inv.obs)}</div>`;
+  html += dObsBlock('Observaciones', inv.obs);
   if (isProy) {
-    if (inv.tiempo) html += `<div class="d-row"><strong>Tiempo:</strong> ${escapeHtml(inv.tiempo)}</div>`;
-    if (inv.validez) html += `<div class="d-row"><strong>Validez:</strong> ${escapeHtml(inv.validez)}</div>`;
-    if (inv.formaPago) html += `<div class="d-row"><strong>Forma pago:</strong> ${escapeHtml(inv.formaPago)}</div>`;
-    if (inv.garantia) html += `<div class="d-row"><strong>Garantía:</strong> ${escapeHtml(inv.garantia)}</div>`;
+    html += `<div class="d-sec"><div class="d-sec-title">Condiciones</div>`;
+    if (inv.tiempo) html += `<div class="d-row"><strong>Tiempo:</strong> ${fmtMultiline(inv.tiempo)}</div>`;
+    if (inv.validez) html += `<div class="d-row"><strong>Validez:</strong> ${fmtMultiline(inv.validez)}</div>`;
+    if (inv.formaPago) html += `<div class="d-row"><strong>Forma de pago:</strong> ${fmtMultiline(inv.formaPago)}</div>`;
+    if (inv.garantia) html += `<div class="d-row"><strong>Garantía:</strong> ${fmtMultiline(inv.garantia)}</div>`;
+    if (inv.nota) html += dObsBlock('Nota proyecto', inv.nota);
+    html += `</div>`;
   }
   body.innerHTML = html;
   modal.classList.add('open');
@@ -7572,7 +7614,7 @@ function viewInsDetail(id) {
   html += `<div class="d-row"><strong>Categoría:</strong> ${escapeHtml(catLabel)}</div>`;
   html += `<div class="d-row"><strong>Precio base:</strong> $ ${formatMoneyInput(i.precio)} / ${und}</div>`;
   html += `<div class="d-row"><strong>Stock:</strong> ${i.stock ?? 0} ${und}</div>`;
-  if (i.obs) html += `<div class="d-row"><strong>Observaciones:</strong><br>${escapeHtml(i.obs).replace(/\n/g, '<br>')}</div>`;
+  html += dObsBlock('Observaciones', i.obs);
   const provs = i.proveedores || [];
   if (provs.length) {
     html += `<div class="section-title" style="margin:12px 0 6px;font-size:13px">Proveedores</div>`;
