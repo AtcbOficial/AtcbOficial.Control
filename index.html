@@ -880,7 +880,8 @@ details.overdue-box[open]{
         </div>
         <div class="form-row">
           <div class="search-wrap">
-            <input id="fProdSearch" placeholder="Buscar producto, código id o escribir libre..." autocomplete="off">
+            <input id="fProdSearch" placeholder="Buscar / código · pega: código;cant" autocomplete="off">
+            <p class="hint" style="margin:4px 0 0">Pega varias: Atcb <code>1-0001;5</code> · Perfumes <code>2-0001;30;5</code> (Enter o Agregar)</p>
             <div id="prodDrop" class="dropdown"></div>
           </div>
         </div>
@@ -1196,7 +1197,7 @@ details.overdue-box[open]{
       <input id="pName" placeholder="Nombre del producto" style="margin-bottom:6px">
       <div class="form-row" style="margin:0 0 6px">
         <label class="label">Código id</label>
-        <input id="pCodigo" placeholder="Ej. SKU / cédula del producto" autocomplete="off">
+        <input id="pCodigo" placeholder="Auto: 1-0001 / 2-0001 (editable)" autocomplete="off">
       </div>
       <div class="grid2" style="margin-bottom:6px">
         <input id="pCompra" type="number" min="0" step="1" placeholder="P. Compra">
@@ -1340,7 +1341,7 @@ details.overdue-box[open]{
           </div>
           <div class="form-row" style="margin:0">
             <label class="label">Código id</label>
-            <input id="labCodigo" placeholder="Ej. 001-AFN-9PM" autocomplete="off">
+            <input id="labCodigo" placeholder="Auto: 2-0001 (editable)" autocomplete="off">
           </div>
         </div>
         <div class="prod-img-box">
@@ -3768,11 +3769,37 @@ function closeExportCatalogModal() {
 }
 /** Genera JSON catálogo: solo codigo, nombre, foto */
 
-/** Normaliza código id (único por empresa en el ecosistema) */
-function normCodigoId(c) {
-  return String(c || '').trim().toUpperCase();
+/** Prefijo de código id por empresa: Atcb 1- · Perfumes 2- */
+function empCodigoPrefix(empresa) {
+  return (empresa || activeEmpresa) === EMPRESA_PERFUMES ? '2' : '1';
 }
-/** ¿Ya existe este código en otra producto de la empresa? */
+/** Normaliza código id. Formato preferido: 1-0100 / 2-0100 */
+function normCodigoId(c) {
+  let s = String(c || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (!s) return '';
+  const m = s.match(/^([12])-?(\d{1,6})$/);
+  if (m) return m[1] + '-' + m[2].padStart(4, '0');
+  return s;
+}
+/** Siguiente código libre 1-0001 / 2-0001 … */
+function nextCodigoId(empresa) {
+  const pref = empCodigoPrefix(empresa);
+  const emp = empresa || activeEmpresa;
+  let max = 0;
+  (products || []).forEach(p => {
+    if ((p.empresa || EMPRESA_ATCB) !== emp) return;
+    const n = normCodigoId(p.codigo);
+    const m = n.match(new RegExp('^' + pref + '-(\\d+)$'));
+    if (m) max = Math.max(max, parseInt(m[1], 10) || 0);
+  });
+  return pref + '-' + String(max + 1).padStart(4, '0');
+}
+function suggestCodigoIfEmpty(inputEl, empresa) {
+  if (!inputEl) return;
+  if (String(inputEl.value || '').trim()) return;
+  inputEl.value = nextCodigoId(empresa);
+}
+/** ¿Ya existe este código en otro producto de la empresa? */
 function isCodigoTaken(codigo, excludeId, empresa) {
   const n = normCodigoId(codigo);
   if (!n) return false;
@@ -3785,13 +3812,14 @@ function isCodigoTaken(codigo, excludeId, empresa) {
 }
 function assertCodigoLibre(codigo, excludeId, empresa) {
   const n = normCodigoId(codigo);
-  if (!n) return true; // vacío permitido (no exportable)
+  if (!n) return true;
   if (isCodigoTaken(n, excludeId, empresa)) {
     toast('Código id "' + n + '" ya existe en otro producto de esta empresa');
     return false;
   }
   return true;
 }
+
 
 function exportCatalogSelection() {
   const ids = [...stockExportSel];
@@ -4052,7 +4080,7 @@ btnNewProd.onclick = () => {
   editingCapMl = null;
   pName.value = ''; pCompra.value = ''; pVenta.value = '';
   pStock.value = ''; prodFecha.value = today();
-  const pCod = document.getElementById('pCodigo'); if (pCod) pCod.value = '';
+  const pCod = document.getElementById('pCodigo'); if (pCod) pCod.value = nextCodigoId(activeEmpresa);
   clearProdImgUI('p');
   const pObsEl = document.getElementById('pObs'); if (pObsEl) pObsEl.value = '';
   prodLabQ = []; prodLabI = [];
@@ -4087,7 +4115,8 @@ btnSaveProd.onclick = async () => {
     fecha = today();
   }
   const obs = ((document.getElementById('pObs') || {}).value || '').trim();
-  const codigo = normCodigoId((document.getElementById('pCodigo') || {}).value || '');
+  let codigo = normCodigoId((document.getElementById('pCodigo') || {}).value || '');
+  if (!codigo && !editingProdId) codigo = nextCodigoId(activeEmpresa);
   if (!assertCodigoLibre(codigo, editingProdId, activeEmpresa)) return;
   const pCodEl = document.getElementById('pCodigo'); if (pCodEl) pCodEl.value = codigo;
   const img = getProdImgFromUI('p');
@@ -4885,9 +4914,87 @@ fCliente.oninput = () => {
 };
 fCliente.onblur = () => setTimeout(() => cliDrop.classList.remove('open'), 200);
 
+
+/** Pega masiva: Atcb "1-0001;5" · Perfumes "2-0001;30;5" (una línea por ítem) */
+function parseBulkFactText(text) {
+  const raw = String(text || '').replace(/\r/g, '\n').trim();
+  if (!raw) return null;
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return null;
+  if (!lines.some(l => /[;\t,]/.test(l))) return null;
+  const isPerf = activeEmpresa === EMPRESA_PERFUMES;
+  const rows = [];
+  const errors = [];
+  lines.forEach((line, idx) => {
+    const parts = line.split(/[;\t]/).map(s => s.trim()).filter(s => s !== '');
+    if (!parts.length) return;
+    let code, ml = null, cant = 1;
+    if (isPerf) {
+      if (parts.length < 2) { errors.push('L' + (idx+1) + ': código;ml;cantidad'); return; }
+      code = normCodigoId(parts[0]);
+      if (parts.length === 2) {
+        cant = parseFloat(String(parts[1]).replace(',', '.')) || 1;
+      } else {
+        ml = parseFloat(String(parts[1]).replace(',', '.'));
+        cant = parseFloat(String(parts[2]).replace(',', '.')) || 1;
+      }
+    } else {
+      code = normCodigoId(parts[0]);
+      cant = parts.length > 1 ? (parseFloat(String(parts[1]).replace(',', '.')) || 1) : 1;
+    }
+    if (!code) { errors.push('L' + (idx+1) + ': sin código'); return; }
+    const p = (products || []).find(x =>
+      (x.empresa || EMPRESA_ATCB) === activeEmpresa &&
+      normCodigoId(x.codigo) === code
+    );
+    if (!p) { errors.push(code + ' no en stock'); return; }
+    let name = p.name || code;
+    let costo = +p.compra || 0;
+    let precio = +p.venta || 0;
+    if (isPerf) {
+      const caps = getProductCaps(p);
+      const keys = Object.keys(caps).sort((a,b)=>+a-+b);
+      if (ml == null || !Number.isFinite(ml) || ml <= 0) {
+        if (keys.length === 1) ml = +keys[0];
+        else { errors.push(code + ': indica ml'); return; }
+      }
+      const c = caps[String(Math.round(ml))] || caps[String(ml)];
+      if (!c) { errors.push(code + ': sin fórmula ' + ml + ' ml'); return; }
+      name = (basePerfumeName(p.name) || p.name) + ' ' + Math.round(ml) + 'ml';
+      costo = +c.compra || 0;
+      precio = +c.venta || 0;
+    }
+    const row = { name, cant, costo, precio, sub: 0, codigo: code };
+    row.sub = lineSub(row);
+    rows.push(row);
+  });
+  return { rows, errors };
+}
+function applyBulkFactLines(text) {
+  const parsed = parseBulkFactText(text);
+  if (!parsed) return false;
+  if (!parsed.rows.length) {
+    if (parsed.errors.length) toast(parsed.errors.slice(0, 3).join(' · '));
+    return true;
+  }
+  parsed.rows.forEach(r => currentLines.push(r));
+  renderLines();
+  fProdSearch.value = '';
+  fCant.value = 1;
+  const fc = document.getElementById('fCosto'); if (fc) fc.value = '';
+  fPrecio.value = '';
+  try { prodDrop.classList.remove('open'); } catch (e) {}
+  let msg = '➕ ' + parsed.rows.length + ' línea(s)';
+  if (parsed.errors.length) msg += ' · ' + parsed.errors.length + ' omitida(s)';
+  toast(msg);
+  return true;
+}
+
 fProdSearch.oninput = () => {
-  const q = fProdSearch.value.trim().toLowerCase();
+  const raw = fProdSearch.value || '';
+  const q = raw.trim().toLowerCase();
   const drop = prodDrop;
+  if (raw.indexOf('\n') >= 0) { drop.classList.remove('open'); return; }
   if (q.length < 1) { drop.classList.remove('open'); return; }
   const matches = products
     .filter(p => (p.empresa || EMPRESA_ATCB) === activeEmpresa)
@@ -4911,7 +5018,7 @@ fProdSearch.oninput = () => {
     }
     const label = (activeEmpresa === EMPRESA_PERFUMES) ? (basePerfumeName(p.name) || p.name) : p.name;
     const cod = (p.codigo || '').trim();
-    const codTxt = cod ? ` · 🪪 ${escapeHtml(cod)}` : '';
+    const codTxt = cod ? ' · 🪪 ' + escapeHtml(cod) : '';
     return `<div data-id="${p.id}">${escapeHtml(label)}${codTxt} · ${priceTxt}</div>`;
   }).join('');
   drop.classList.add('open');
@@ -4942,8 +5049,27 @@ fProdSearch.oninput = () => {
   });
 };
 fProdSearch.onblur = () => setTimeout(() => prodDrop.classList.remove('open'), 200);
+fProdSearch.addEventListener('paste', (e) => {
+  const clip = (e.clipboardData || window.clipboardData);
+  const txt = clip ? clip.getData('text') : '';
+  if (!txt) return;
+  if (txt.indexOf('\n') < 0 && txt.indexOf(';') < 0 && txt.indexOf('\t') < 0) return;
+  e.preventDefault();
+  fProdSearch.value = txt.trim();
+  applyBulkFactLines(txt);
+});
+fProdSearch.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const raw = fProdSearch.value || '';
+  if (raw.indexOf(';') >= 0 || raw.indexOf('\n') >= 0) {
+    e.preventDefault();
+    applyBulkFactLines(raw);
+  }
+});
 
 btnAddLine.onclick = () => {
+  const rawBulk = fProdSearch.value || '';
+  if (applyBulkFactLines(rawBulk)) return;
   const name = fProdSearch.value.trim();
   if (!name) return toast('Escribe o elige un producto');
   const cant = parseMoney(fCant.value) || 1;
@@ -7938,7 +8064,8 @@ async function guardarStockLab() {
   const compra = Math.round(r.costo * 100) / 100;
   const venta = Math.round(r.pvp * 100) / 100;
   const obs = ((document.getElementById('labObs') || {}).value || '').trim();
-  const codigo = normCodigoId((document.getElementById('labCodigo') || {}).value || '');
+  let codigo = normCodigoId((document.getElementById('labCodigo') || {}).value || '');
+  if (!codigo) codigo = nextCodigoId(EMPRESA_PERFUMES);
   const img = getProdImgFromUI('lab');
   const lab = {
     ml,
@@ -8007,7 +8134,7 @@ function clearLab() {
   document.getElementById('labNombre').value = '';
   document.getElementById('labML').value = String(getLabCaps()[0] || 30);
   document.getElementById('labMargen').value = '50';
-  const lc = document.getElementById('labCodigo'); if (lc) lc.value = '';
+  const lc = document.getElementById('labCodigo'); if (lc) lc.value = nextCodigoId(EMPRESA_PERFUMES);
   clearProdImgUI('lab');
   const lo = document.getElementById('labObs'); if (lo) lo.value = '';
   labQ = [{ prod: '', g: 0, precio: 0 }];
