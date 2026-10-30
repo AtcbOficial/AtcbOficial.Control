@@ -8057,7 +8057,13 @@ function viewInsDetail(id) {
   const catLabel = i.cat === 'quimico' ? 'Químico (gramos)' : 'Implemento (unidades)';
   if (title) title.textContent = '👀 ' + (i.producto || 'Insumo');
   let html = '';
+  const imgSrc = (i.img && String(i.img).indexOf('http') === 0) ? i.img : '';
+  if (imgSrc) {
+    html += `<div style="margin-bottom:10px;text-align:center"><img src="${imgSrc}" alt="" style="max-width:100%;max-height:200px;object-fit:contain;border-radius:10px;border:1px solid var(--border);background:#0e151d" onerror="this.style.display='none'"></div>`;
+    html += `<div class="d-row" style="font-size:11px;word-break:break-all"><strong>Link:</strong> <a href="${imgSrc}" target="_blank" rel="noopener" style="color:var(--accent)">abrir imagen</a></div>`;
+  }
   html += `<div class="d-row"><strong>Nombre:</strong> ${escapeHtml(i.producto || '')}</div>`;
+  if (i.codigo) html += `<div class="d-row"><strong>🪪 Código id:</strong> ${escapeHtml(i.codigo)}</div>`;
   html += `<div class="d-row"><strong>Categoría:</strong> ${escapeHtml(catLabel)}</div>`;
   html += `<div class="d-row"><strong>Precio base:</strong> $ ${formatMoneyInput(i.precio)} / ${und}</div>`;
   html += `<div class="d-row"><strong>Stock:</strong> ${i.stock ?? 0} ${und}</div>`;
@@ -8132,9 +8138,8 @@ function renderInsumos() {
           return `<div class="line">🏭 <strong>${escapeHtml(name)}</strong> · ${money(pv.precio)} / ${und}</div>`;
         }).join('');
         const icod = (i.codigo || '').trim();
-        const iimg = (i.img && String(i.img).indexOf('http') === 0) ? i.img : '';
         return `<div class="list-card">
-          <div class="title">${iimg ? `<img class="thumb" src="${escapeHtml(iimg)}" alt="" onerror="this.style.display='none'">` : ''}${escapeHtml(i.producto)} <span class="chip" style="background:#1a2a3d;color:var(--accent)">${und}</span></div>
+          <div class="title">${escapeHtml(i.producto)} <span class="chip" style="background:#1a2a3d;color:var(--accent)">${und}</span></div>
           ${icod ? `<div class="line">🪪 <strong>${escapeHtml(icod)}</strong></div>` : ''}
           <div class="line">Precio base: <strong>$ ${formatMoneyInput(i.precio)}</strong> / ${und} · Stock: <strong>${i.stock || 0}</strong></div>
           ${provLines || '<div class="line" style="color:var(--muted)">🏭 Sin proveedores anotados</div>'}
