@@ -46,6 +46,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -1824,11 +1825,18 @@ details.overdue-box[open]{
 
 
 <div class="modal-overlay" id="qrStickerModal">
-  <div class="qr-modal-box" style="text-align:center">
-    <h3 id="qrStickerTitle">QR etiqueta</h3>
-    <canvas id="qrStickerCanvas" style="margin:8px auto;background:#fff;border-radius:8px;max-width:100%"></canvas>
-    <p class="qr-hint" id="qrStickerCode" style="font-size:14px;font-weight:700;color:var(--text)"></p>
-    <p class="qr-hint">Imprime este QR en tu sticker. Al escanear en Factura agrega el producto.</p>
+  <div class="qr-modal-box" style="text-align:center;max-height:90vh;overflow:auto">
+    <h3 id="qrStickerTitle">Etiqueta código</h3>
+    <p class="qr-hint" id="qrStickerCode" style="font-size:15px;font-weight:800;color:var(--text);margin:4px 0 10px"></p>
+    <div style="background:#fff;border-radius:10px;padding:10px;margin:0 0 8px">
+      <div style="font-size:11px;color:#333;font-weight:700;margin-bottom:4px">QR</div>
+      <canvas id="qrStickerCanvas" style="margin:0 auto;max-width:100%;display:block"></canvas>
+    </div>
+    <div style="background:#fff;border-radius:10px;padding:10px;margin:0 0 8px">
+      <div style="font-size:11px;color:#333;font-weight:700;margin-bottom:4px">Código de barras</div>
+      <svg id="qrStickerBarcode" style="width:100%;max-width:320px;height:auto;display:block;margin:0 auto"></svg>
+    </div>
+    <p class="qr-hint">Imprime el que prefieras (QR o barras). Al escanear el valor del código id en Factura o en 📷 consulta se reconoce el producto/insumo.</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
       <button type="button" class="secondary" id="btnQrStickerClose">Cerrar</button>
       <button type="button" class="success" id="btnQrStickerPrint">🖨️ Imprimir</button>
@@ -3957,42 +3965,63 @@ function playScanBeep() {
 async function showQrSticker(code, label) {
   const modal = document.getElementById('qrStickerModal');
   const canvas = document.getElementById('qrStickerCanvas');
+  const barcodeEl = document.getElementById('qrStickerBarcode');
   const title = document.getElementById('qrStickerTitle');
   const codeEl = document.getElementById('qrStickerCode');
-  if (!modal || !canvas) return toast('Modal QR no encontrado');
-  if (title) title.textContent = '📷 QR · ' + (label || code);
-  if (codeEl) codeEl.textContent = code;
-  let ok = false;
-  // 1) Librería qrcode (npm build) si está cargada
+  if (!modal || !canvas) return toast('Modal etiqueta no encontrado');
+  const cod = String(code || '').trim();
+  if (title) title.textContent = '📷 Etiqueta · ' + (label || cod);
+  if (codeEl) codeEl.textContent = cod;
+  let okQr = false;
   try {
     if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
-      await QRCode.toCanvas(canvas, String(code), { width: 280, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#ffffff' } });
-      ok = true;
+      await QRCode.toCanvas(canvas, cod, { width: 240, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#ffffff' } });
+      okQr = true;
     }
   } catch (e) { console.warn('QRCode.toCanvas', e); }
-  // 2) Fallback: imagen pública del código (sin librería)
-  if (!ok) {
+  if (!okQr) {
     try {
-      const url = 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=8&data=' + encodeURIComponent(String(code));
+      const url = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=' + encodeURIComponent(cod);
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = url;
-      });
+      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
       const ctx = canvas.getContext('2d');
-      canvas.width = 280;
-      canvas.height = 280;
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, 280, 280);
-      ctx.drawImage(img, 0, 0, 280, 280);
-      ok = true;
-    } catch (e2) {
-      console.warn('QR fallback img', e2);
+      canvas.width = 240; canvas.height = 240;
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 240, 240);
+      ctx.drawImage(img, 0, 0, 240, 240);
+      okQr = true;
+    } catch (e2) { console.warn('QR fallback', e2); }
+  }
+  let okBar = false;
+  if (barcodeEl) {
+    try {
+      barcodeEl.innerHTML = '';
+      if (typeof JsBarcode !== 'undefined') {
+        JsBarcode(barcodeEl, cod, {
+          format: 'CODE128',
+          width: 2,
+          height: 64,
+          displayValue: true,
+          fontSize: 14,
+          margin: 8,
+          background: '#ffffff',
+          lineColor: '#000000'
+        });
+        okBar = true;
+      }
+    } catch (e) {
+      console.warn('JsBarcode', e);
+      try {
+        // fallback imagen online CODE128
+        const url = 'https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(cod) + '&code=Code128&translate-esc=on&dpi=96';
+        barcodeEl.outerHTML = '<img id="qrStickerBarcode" src="' + url + '" alt="barcode" style="width:100%;max-width:320px;background:#fff;padding:8px;border-radius:6px"/>';
+        okBar = true;
+      } catch (e2) {}
     }
   }
-  if (!ok) return toast('No se pudo generar el QR. Revisa internet y recarga.');
+  if (!okQr && !okBar) return toast('No se pudo generar QR ni barras. Revisa internet.');
+  if (!okQr) toast('QR no disponible; usa el código de barras');
+  if (!okBar) toast('Barras no disponible; usa el QR');
   modal.classList.add('open');
 }
 function closeQrSticker() {
@@ -4002,15 +4031,24 @@ function closeQrSticker() {
 function printQrSticker() {
   const canvas = document.getElementById('qrStickerCanvas');
   const code = (document.getElementById('qrStickerCode') || {}).textContent || '';
-  if (!canvas) return;
-  const w = window.open('', '_blank', 'width=400,height=500');
+  const bar = document.getElementById('qrStickerBarcode');
+  let barHtml = '';
+  try {
+    if (bar && bar.tagName === 'IMG') barHtml = '<img src="' + bar.src + '" style="max-width:90mm;margin-top:12px"/>';
+    else if (bar && bar.outerHTML) {
+      // serialize svg
+      barHtml = '<div style="margin-top:12px">' + bar.outerHTML + '</div>';
+    }
+  } catch (e) {}
+  const w = window.open('', '_blank', 'width=420,height=640');
   if (!w) return toast('Permite ventanas emergentes para imprimir');
-  w.document.write('<html><head><title>QR ' + code + '</title><style>body{font-family:system-ui;text-align:center;padding:12px}img{width:70mm;height:70mm}p{font-size:14px;font-weight:700;margin:8px 0}</style></head><body>');
-  w.document.write('<img src="' + canvas.toDataURL('image/png') + '"/>');
+  w.document.write('<html><head><title>Etiqueta ' + code + '</title><style>body{font-family:system-ui;text-align:center;padding:12px}img.qr{width:55mm;height:55mm}p{font-size:14px;font-weight:700;margin:8px 0}svg{max-width:90mm;height:auto}</style></head><body>');
   w.document.write('<p>' + code + '</p>');
+  if (canvas) w.document.write('<div><div style="font-size:11px;margin-bottom:4px">QR</div><img class="qr" src="' + canvas.toDataURL('image/png') + '"/></div>');
+  if (barHtml) w.document.write('<div style="margin-top:16px"><div style="font-size:11px;margin-bottom:4px">Código de barras</div>' + barHtml + '</div>');
   w.document.write('</body></html>');
   w.document.close();
-  setTimeout(() => { try { w.print(); } catch (e) {} }, 300);
+  setTimeout(() => { try { w.print(); } catch (e) {} }, 350);
 }
 (function initQrSticker() {
   const c = document.getElementById('btnQrStickerClose');
