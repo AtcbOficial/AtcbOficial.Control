@@ -5354,11 +5354,6 @@ function friendlyCamLabel(c, i) {
 async function listQrCameras() {
   try {
     if (typeof Html5Qrcode === 'undefined' || !Html5Qrcode.getCameras) return [];
-    // Pedir permiso antes ayuda a que Android liste mejor los deviceId
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      stream.getTracks().forEach(t => t.stop());
-    } catch (e) {}
     const cams = await Html5Qrcode.getCameras();
     return Array.isArray(cams) ? cams : [];
   } catch (e) {
@@ -5389,29 +5384,12 @@ function fillQrCameraSelect(cams) {
 }
 
 function buildQrConfig() {
-  const cfg = {
-    fps: 12,
-    qrbox: function(viewW, viewH) {
-      const s = Math.floor(Math.min(viewW, viewH) * 0.72);
-      return { width: Math.max(180, s), height: Math.max(180, s) };
-    },
-    aspectRatio: 1.0,
-    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+  // Config simple y compatible (Edge/Android se rompe con constraints estrictos)
+  return {
+    fps: 10,
+    qrbox: { width: 220, height: 220 },
+    aspectRatio: 1.0
   };
-  try {
-    if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
-      cfg.formatsToSupport = [
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E
-      ];
-    }
-  } catch (e) {}
-  return cfg;
 }
 
 async function startQrWithSelectedCamera(onSuccess) {
@@ -5421,23 +5399,56 @@ async function startQrWithSelectedCamera(onSuccess) {
   if (qrScanner) {
     try { await qrScanner.stop(); } catch (e) {}
     try { await qrScanner.clear(); } catch (e) {}
+    qrScanner = null;
   }
+  // limpiar contenedor (Edge/Android a veces deja el video colgado)
+  try {
+    const box = document.getElementById(readerId);
+    if (box) box.innerHTML = '';
+  } catch (e) {}
   qrScanner = new Html5Qrcode(readerId);
   const sel = document.getElementById('qrCameraSelect');
   const camId = (sel && sel.value) || qrSelectedCameraId || '';
   const config = buildQrConfig();
-  // videoConstraints: más resolución ayuda códigos pequeños (macro la hace el hardware al acercar)
-  const vConstraints = camId
-    ? { deviceId: { exact: camId }, width: { ideal: 1920 }, height: { ideal: 1080 }, focusMode: 'continuous' }
-    : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, focusMode: 'continuous' };
-  try {
-    await qrScanner.start(vConstraints, config, onSuccess, () => {});
-  } catch (e1) {
-    // sin focusMode / resolución
-    if (camId) await qrScanner.start(camId, config, onSuccess, () => {});
-    else await qrScanner.start({ facingMode: 'environment' }, config, onSuccess, () => {});
+  const attempts = [];
+  if (camId) {
+    attempts.push(() => qrScanner.start(camId, config, onSuccess, () => {}));
+    attempts.push(() => qrScanner.start(
+      { deviceId: { exact: camId } },
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      onSuccess, () => {}
+    ));
+  }
+  attempts.push(() => qrScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 220, height: 220 } },
+    onSuccess, () => {}
+  ));
+  attempts.push(() => qrScanner.start(
+    { facingMode: 'user' },
+    { fps: 10, qrbox: { width: 220, height: 220 } },
+    onSuccess, () => {}
+  ));
+  let lastErr = null;
+  for (const run of attempts) {
+    try {
+      await run();
+      updateQrTorchBtn();
+      return;
+    } catch (e) {
+      lastErr = e;
+      console.warn('QR cam attempt', e);
+      try { await qrScanner.stop(); } catch (e2) {}
+      try { await qrScanner.clear(); } catch (e2) {}
+      try {
+        const box = document.getElementById(readerId);
+        if (box) box.innerHTML = '';
+      } catch (e2) {}
+      qrScanner = new Html5Qrcode(readerId);
+    }
   }
   updateQrTorchBtn();
+  throw lastErr || new Error('No camera');
 }
 
 function updateQrTorchBtn() {
@@ -5530,13 +5541,17 @@ async function openQrScanner(mode) {
     await startQrWithSelectedCamera(onSuccess);
   } catch (e) {
     console.warn(e);
-    // fallback facingMode
-    try {
-      await qrScanner.start({ facingMode: 'user' }, { fps: 10, qrbox: { width: 220, height: 220 } }, onSuccess, () => {});
-    } catch (e2) {
-      toast('No se pudo abrir la cámara. Da permiso o usa HTTPS.');
-      modal.classList.remove('open');
+    const msg = String((e && (e.message || e.name)) || e || '');
+    if (/NotAllowed|Permission|Denied/i.test(msg)) {
+      toast('Permiso de cámara denegado. Actívalo en el navegador para este sitio.');
+    } else if (/NotFound|DevicesNotFound/i.test(msg)) {
+      toast('No se encontró cámara en este dispositivo.');
+    } else if (/NotReadable|TrackStart|in use|Busy/i.test(msg)) {
+      toast('Cámara ocupada. Cierra otras apps (WhatsApp, Cámara) y reintenta.');
+    } else {
+      toast('No se pudo abrir la cámara. Cierra otras apps que la usen y reintenta.');
     }
+    modal.classList.remove('open');
   }
 }
 
