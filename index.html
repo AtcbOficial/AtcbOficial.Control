@@ -1834,7 +1834,7 @@ details.overdue-box[open]{
     </div>
     <div style="background:#fff;border-radius:10px;padding:10px;margin:0 0 8px">
       <div style="font-size:11px;color:#333;font-weight:700;margin-bottom:4px">Código de barras</div>
-      <svg id="qrStickerBarcode" style="width:100%;max-width:320px;height:auto;display:block;margin:0 auto"></svg>
+      <canvas id="qrStickerBarcode" style="width:100%;max-width:320px;height:auto;display:block;margin:0 auto;background:#fff"></canvas>
     </div>
     <p class="qr-hint">Imprime el que prefieras (QR o barras). Al escanear el valor del código id en Factura o en 📷 consulta se reconoce el producto/insumo.</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
@@ -3997,8 +3997,8 @@ async function showQrSticker(code, label) {
   let okBar = false;
   if (barcodeEl) {
     try {
-      barcodeEl.innerHTML = '';
-      if (typeof JsBarcode !== 'undefined') {
+      // Canvas (no SVG) para poder clic derecho → copiar/guardar imagen como el QR
+      if (barcodeEl.tagName === 'CANVAS' && typeof JsBarcode !== 'undefined') {
         JsBarcode(barcodeEl, cod, {
           format: 'CODE128',
           width: 2,
@@ -4010,15 +4010,21 @@ async function showQrSticker(code, label) {
           lineColor: '#000000'
         });
         okBar = true;
+      } else if (typeof JsBarcode !== 'undefined') {
+        // si quedó como img u otro nodo, recrear canvas
+        const parent = barcodeEl.parentNode;
+        const cvs = document.createElement('canvas');
+        cvs.id = 'qrStickerBarcode';
+        cvs.style.cssText = 'width:100%;max-width:320px;height:auto;display:block;margin:0 auto;background:#fff';
+        parent.replaceChild(cvs, barcodeEl);
+        JsBarcode(cvs, cod, {
+          format: 'CODE128', width: 2, height: 64, displayValue: true,
+          fontSize: 14, margin: 8, background: '#ffffff', lineColor: '#000000'
+        });
+        okBar = true;
       }
     } catch (e) {
       console.warn('JsBarcode', e);
-      try {
-        // fallback imagen online CODE128
-        const url = 'https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(cod) + '&code=Code128&translate-esc=on&dpi=96';
-        barcodeEl.outerHTML = '<img id="qrStickerBarcode" src="' + url + '" alt="barcode" style="width:100%;max-width:320px;background:#fff;padding:8px;border-radius:6px"/>';
-        okBar = true;
-      } catch (e2) {}
     }
   }
   if (!okQr && !okBar) return toast('No se pudo generar QR ni barras. Revisa internet.');
@@ -4034,20 +4040,17 @@ function printQrSticker() {
   const canvas = document.getElementById('qrStickerCanvas');
   const code = (document.getElementById('qrStickerCode') || {}).textContent || '';
   const bar = document.getElementById('qrStickerBarcode');
-  let barHtml = '';
+  let barSrc = '';
   try {
-    if (bar && bar.tagName === 'IMG') barHtml = '<img src="' + bar.src + '" style="max-width:90mm;margin-top:12px"/>';
-    else if (bar && bar.outerHTML) {
-      // serialize svg
-      barHtml = '<div style="margin-top:12px">' + bar.outerHTML + '</div>';
-    }
+    if (bar && bar.tagName === 'CANVAS') barSrc = bar.toDataURL('image/png');
+    else if (bar && bar.tagName === 'IMG') barSrc = bar.src;
   } catch (e) {}
   const w = window.open('', '_blank', 'width=420,height=640');
   if (!w) return toast('Permite ventanas emergentes para imprimir');
-  w.document.write('<html><head><title>Etiqueta ' + code + '</title><style>body{font-family:system-ui;text-align:center;padding:12px}img.qr{width:55mm;height:55mm}p{font-size:14px;font-weight:700;margin:8px 0}svg{max-width:90mm;height:auto}</style></head><body>');
+  w.document.write('<html><head><title>Etiqueta ' + code + '</title><style>body{font-family:system-ui;text-align:center;padding:12px}img.qr{width:55mm;height:55mm}img.bar{max-width:90mm;margin-top:8px}p{font-size:14px;font-weight:700;margin:8px 0}</style></head><body>');
   w.document.write('<p>' + code + '</p>');
   if (canvas) w.document.write('<div><div style="font-size:11px;margin-bottom:4px">QR</div><img class="qr" src="' + canvas.toDataURL('image/png') + '"/></div>');
-  if (barHtml) w.document.write('<div style="margin-top:16px"><div style="font-size:11px;margin-bottom:4px">Código de barras</div>' + barHtml + '</div>');
+  if (barSrc) w.document.write('<div style="margin-top:16px"><div style="font-size:11px;margin-bottom:4px">Código de barras</div><img class="bar" src="' + barSrc + '"/></div>');
   w.document.write('</body></html>');
   w.document.close();
   setTimeout(() => { try { w.print(); } catch (e) {} }, 350);
