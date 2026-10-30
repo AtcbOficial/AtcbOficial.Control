@@ -44,6 +44,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>AtcbOficial</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -737,6 +738,17 @@ details.overdue-box[open]{
 
 .money-input{text-align:right;font-variant-numeric:tabular-nums}
 
+
+.qr-modal-box{
+  background:linear-gradient(180deg,#1a2430 0%,#121922 100%);
+  border:1px solid #2e3d4f;border-radius:14px;padding:12px;width:100%;max-width:420px;
+  box-shadow:0 6px 0 #0a0e14,0 16px 40px rgba(0,0,0,.55);
+}
+.qr-modal-box h3{margin:0 0 8px;font-size:16px}
+#qrReader{width:100%;min-height:220px;border-radius:10px;overflow:hidden;background:#000}
+#qrReader video{border-radius:10px}
+.qr-hint{font-size:11px;color:var(--muted);margin:8px 0 0;line-height:1.35}
+
 </style>
 </head>
 <body class="auth-locked">
@@ -879,10 +891,13 @@ details.overdue-box[open]{
           <textarea id="fObs" placeholder="Observaciones (reparaciones, notas...)" style="min-height:56px"></textarea>
         </div>
         <div class="form-row">
-          <div class="search-wrap">
-            <input id="fProdSearch" placeholder="Buscar / código · pega: código;cant" autocomplete="off">
-            <p class="hint" style="margin:4px 0 0">Pega varias: Atcb <code>1-0001;5</code> · Perfumes <code>2-0001;30;5</code> (Enter o Agregar)</p>
-            <div id="prodDrop" class="dropdown"></div>
+          <div style="display:flex;gap:6px;align-items:flex-start">
+            <div class="search-wrap" style="flex:1;min-width:0">
+              <input id="fProdSearch" placeholder="Buscar / código · pega: código;cant" autocomplete="off">
+              <p class="hint" style="margin:4px 0 0">Pega: Atcb <code>1-0001;5</code> · Perfumes <code>2-0001;30;5</code> · o escanea QR</p>
+              <div id="prodDrop" class="dropdown"></div>
+            </div>
+            <button type="button" id="btnScanQr" class="secondary" title="Escanear QR del producto" style="flex-shrink:0;padding:8px 12px;white-space:nowrap">📷 QR</button>
           </div>
         </div>
         <div class="grid3" style="margin-bottom:8px">
@@ -1793,6 +1808,22 @@ details.overdue-box[open]{
   <button data-view="contabilidad">📒<br>Contab.</button>
   <button data-view="archivo">📁<br>Archivo</button>
 </nav>
+
+
+<div class="modal-overlay" id="qrModal">
+  <div class="qr-modal-box">
+    <h3>📷 Escanear código QR</h3>
+    <div id="qrReader"></div>
+    <p class="qr-hint">Apunta al QR del producto. Formatos:<br>
+      Atcb: <code>1-0001</code> o <code>1-0001;5</code><br>
+      Perfumes: <code>2-0001;30</code> o <code>2-0001;30;2</code>
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <button type="button" class="secondary" id="btnQrClose">Cerrar</button>
+      <button type="button" class="danger" id="btnQrStop">Detener cámara</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast" class="toast"></div>
 <div id="capModal" class="modal-overlay no-print">
@@ -4989,6 +5020,166 @@ function applyBulkFactLines(text) {
   toast(msg);
   return true;
 }
+
+
+/** Escáner QR → agrega línea(s) a la factura */
+let qrScanner = null;
+let qrBusy = false;
+
+function buildQrPayload(decoded) {
+  let s = String(decoded || '').trim();
+  if (!s) return null;
+  // URL con ?c= o path final
+  try {
+    if (/^https?:\/\//i.test(s)) {
+      const u = new URL(s);
+      const c = u.searchParams.get('c') || u.searchParams.get('codigo') || u.searchParams.get('code');
+      if (c) s = c;
+      else {
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (parts.length) s = decodeURIComponent(parts[parts.length - 1]);
+      }
+    }
+  } catch (e) {}
+  s = s.replace(/\s+/g, ' ').trim();
+  // Si es solo código sin cantidad → 1 unidad (perfumes: si solo código sin ml, bulk intentará)
+  if (/^[12]-\d{1,6}$/i.test(s) && s.indexOf(';') < 0) {
+    if (activeEmpresa === EMPRESA_PERFUMES) return s; // parseBulk / handler especial
+    return s + ';1';
+  }
+  return s;
+}
+
+async function addFromQrText(raw) {
+  const payload = buildQrPayload(raw);
+  if (!payload) return toast('QR vacío');
+  // Si ya es bloque con ; o saltos → bulk
+  if (payload.indexOf(';') >= 0 || payload.indexOf('\n') >= 0) {
+    if (applyBulkFactLines(payload)) return true;
+  }
+  // Solo código
+  const code = normCodigoId(payload.split(/[;\t,]/)[0] || payload);
+  const p = (products || []).find(x =>
+    (x.empresa || EMPRESA_ATCB) === activeEmpresa &&
+    normCodigoId(x.codigo) === code
+  );
+  if (!p) {
+    toast('No hay producto ' + code + ' en stock de esta empresa');
+    return false;
+  }
+  if (activeEmpresa === EMPRESA_PERFUMES) {
+    const caps = getProductCaps(p);
+    const keys = Object.keys(caps).filter(k => caps[k]).sort((a,b)=>+a-+b);
+    let ml = null;
+    // si el QR traía ml en segunda parte
+    const parts = payload.split(/[;\t,]/).map(x => x.trim()).filter(Boolean);
+    if (parts.length >= 2 && /^\d+(\.\d+)?$/.test(parts[1])) ml = +parts[1];
+    if (ml == null) {
+      if (keys.length === 1) ml = +keys[0];
+      else if (keys.length > 1) ml = await openCapModal(p);
+      else { toast(code + ' sin capacidades/fórmula'); return false; }
+    }
+    if (ml == null) return false;
+    const c = caps[String(Math.round(ml))] || caps[String(ml)];
+    if (!c) { toast(code + ': sin fórmula ' + ml + ' ml'); return false; }
+    let cant = 1;
+    if (parts.length >= 3) cant = parseFloat(parts[2].replace(',', '.')) || 1;
+    const row = {
+      name: (basePerfumeName(p.name) || p.name) + ' ' + Math.round(ml) + 'ml',
+      cant,
+      costo: +c.compra || 0,
+      precio: +c.venta || 0,
+      sub: 0,
+      codigo: code
+    };
+    row.sub = lineSub(row);
+    currentLines.push(row);
+    renderLines();
+    toast('📷 ' + row.name + ' ×' + cant);
+    return true;
+  }
+  // Atcb
+  const row = {
+    name: p.name || code,
+    cant: 1,
+    costo: +p.compra || 0,
+    precio: +p.venta || 0,
+    sub: 0,
+    codigo: code
+  };
+  row.sub = lineSub(row);
+  currentLines.push(row);
+  renderLines();
+  toast('📷 ' + row.name);
+  return true;
+}
+
+async function stopQrScanner() {
+  try {
+    if (qrScanner) {
+      await qrScanner.stop();
+      await qrScanner.clear();
+    }
+  } catch (e) {}
+  qrScanner = null;
+  qrBusy = false;
+}
+
+async function openQrScanner() {
+  if (typeof Html5Qrcode === 'undefined') {
+    return toast('Librería QR no cargó. Revisa internet y recarga.');
+  }
+  const modal = document.getElementById('qrModal');
+  if (!modal) return;
+  modal.classList.add('open');
+  await stopQrScanner();
+  const readerId = 'qrReader';
+  qrScanner = new Html5Qrcode(readerId);
+  qrBusy = false;
+  const onSuccess = async (decoded) => {
+    if (qrBusy) return;
+    qrBusy = true;
+    try {
+      await addFromQrText(decoded);
+      // breve pausa para no duplicar el mismo QR
+      setTimeout(() => { qrBusy = false; }, 1200);
+    } catch (e) {
+      qrBusy = false;
+      console.warn(e);
+      toast('Error al procesar QR');
+    }
+  };
+  try {
+    await qrScanner.start(
+      { facingMode: 'environment' },
+      { fps: 8, qrbox: { width: 220, height: 220 }, aspectRatio: 1 },
+      onSuccess,
+      () => {}
+    );
+  } catch (e) {
+    console.warn(e);
+    toast('No se pudo abrir la cámara. Da permiso o usa HTTPS.');
+    modal.classList.remove('open');
+  }
+}
+
+async function closeQrScanner() {
+  await stopQrScanner();
+  const modal = document.getElementById('qrModal');
+  if (modal) modal.classList.remove('open');
+}
+
+(function initQrScan() {
+  const b = document.getElementById('btnScanQr');
+  if (b) b.onclick = () => openQrScanner();
+  const c = document.getElementById('btnQrClose');
+  if (c) c.onclick = () => closeQrScanner();
+  const s = document.getElementById('btnQrStop');
+  if (s) s.onclick = async () => { await stopQrScanner(); toast('Cámara detenida'); };
+  const modal = document.getElementById('qrModal');
+  if (modal) modal.addEventListener('click', (e) => { if (e.target.id === 'qrModal') closeQrScanner(); });
+})();
+
 
 fProdSearch.oninput = () => {
   const raw = fProdSearch.value || '';
