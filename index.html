@@ -879,17 +879,10 @@ details.overdue-box[open]{
           <textarea id="fObs" placeholder="Observaciones (reparaciones, notas...)" style="min-height:56px"></textarea>
         </div>
         <div class="form-row">
-          <div style="display:grid;grid-template-columns:minmax(96px,32%) minmax(0,1fr);gap:6px;align-items:start">
-            <div class="search-wrap">
-              <textarea id="fProdCodigo" rows="1" placeholder="Código id…" title="Un código o varios (uno por línea)" autocomplete="off" style="min-height:38px;max-height:88px;resize:vertical;padding:8px 10px;line-height:1.3"></textarea>
-              <div id="prodCodeDrop" class="dropdown"></div>
-            </div>
-            <div class="search-wrap">
-              <input id="fProdSearch" placeholder="Buscar producto o escribir libre..." autocomplete="off">
-              <div id="prodDrop" class="dropdown"></div>
-            </div>
+          <div class="search-wrap">
+            <input id="fProdSearch" placeholder="Buscar producto, código id o escribir libre..." autocomplete="off">
+            <div id="prodDrop" class="dropdown"></div>
           </div>
-          <p class="hint" style="margin:4px 0 0">Código: uno o varios (salto de línea). Ej: 1-0001 luego 1-0010… se agregan a la lista.</p>
         </div>
         <div class="grid3" style="margin-bottom:8px">
           <input id="fCant" type="number" min="0.01" step="0.01" value="1" placeholder="Cant.">
@@ -4892,129 +4885,6 @@ fCliente.oninput = () => {
 };
 fCliente.onblur = () => setTimeout(() => cliDrop.classList.remove('open'), 200);
 
-
-/** Parsea códigos pegados: saltos de línea, comas o ; */
-function parseCodigoList(raw) {
-  return String(raw || '')
-    .split(/[\n\r,;]+/)
-    .map(s => normCodigoId(s.trim()))
-    .filter(Boolean);
-}
-function findProdByCodigo(code) {
-  const n = normCodigoId(code);
-  if (!n) return null;
-  return (products || []).find(p =>
-    (p.empresa || EMPRESA_ATCB) === activeEmpresa &&
-    normCodigoId(p.codigo) === n
-  ) || null;
-}
-function lineFromProduct(p, ml) {
-  let name = p.name || '';
-  let costo = +p.compra || 0;
-  let precio = +p.venta || 0;
-  if (activeEmpresa === EMPRESA_PERFUMES) {
-    const caps = getProductCaps(p);
-    const keys = Object.keys(caps).filter(k => caps[k]).sort((a,b)=>+a-+b);
-    if (ml != null && caps[String(ml)]) {
-      const c = caps[String(ml)];
-      name = basePerfumeName(p.name) + ' ' + ml + 'ml';
-      costo = +c.compra || 0;
-      precio = +c.venta || 0;
-    } else if (keys.length === 1) {
-      const k = keys[0];
-      const c = caps[k];
-      name = basePerfumeName(p.name) + ' ' + k + 'ml';
-      costo = +c.compra || 0;
-      precio = +c.venta || 0;
-    } else {
-      name = basePerfumeName(p.name) || p.name;
-    }
-  }
-  const row = { name, cant: 1, costo, precio, sub: 0 };
-  row.sub = lineSub(row);
-  return row;
-}
-async function addProductsByCodigos(raw) {
-  const codes = parseCodigoList(raw);
-  if (!codes.length) return toast('Escribe o pega código(s) id');
-  let ok = 0, miss = [];
-  for (const code of codes) {
-    const p = findProdByCodigo(code);
-    if (!p) { miss.push(code); continue; }
-    const caps = getProductCaps(p);
-    const keys = Object.keys(caps).filter(k => caps[k]);
-    let ml = null;
-    if (activeEmpresa === EMPRESA_PERFUMES && keys.length > 1) {
-      ml = await openCapModal(p);
-      if (ml == null) continue;
-    }
-    currentLines.push(lineFromProduct(p, ml));
-    ok++;
-  }
-  renderLines();
-  const el = document.getElementById('fProdCodigo');
-  if (el) el.value = '';
-  if (ok) toast(ok + ' producto(s) agregado(s)' + (miss.length ? ' · no hallados: ' + miss.join(', ') : ''));
-  else toast(miss.length ? 'No hallados: ' + miss.join(', ') : 'Nada agregado');
-}
-function bindFactCodigoSearch() {
-  const el = document.getElementById('fProdCodigo');
-  const drop = document.getElementById('prodCodeDrop');
-  if (!el || el._bound) return;
-  el._bound = 1;
-  el.addEventListener('input', () => {
-    const raw = el.value || '';
-    // multilínea → no dropdown, listo para Enter/agregar
-    if (/[\n\r]/.test(raw) || parseCodigoList(raw).length > 1) {
-      if (drop) drop.classList.remove('open');
-      return;
-    }
-    const q = normCodigoId(raw.trim()).toLowerCase();
-    if (!drop) return;
-    if (q.length < 1) { drop.classList.remove('open'); return; }
-    const matches = (products || [])
-      .filter(p => (p.empresa || EMPRESA_ATCB) === activeEmpresa)
-      .filter(p => normCodigoId(p.codigo).toLowerCase().includes(q))
-      .slice(0, 12);
-    if (!matches.length) { drop.classList.remove('open'); return; }
-    drop.innerHTML = matches.map(p => {
-      const label = (activeEmpresa === EMPRESA_PERFUMES) ? (basePerfumeName(p.name) || p.name) : p.name;
-      return `<div data-id="${p.id}"><strong>${escapeHtml(p.codigo || '')}</strong> · ${escapeHtml(label)}</div>`;
-    }).join('');
-    drop.classList.add('open');
-    drop.querySelectorAll('div').forEach(d => {
-      d.onclick = async () => {
-        const p = products.find(x => x.id === +d.dataset.id);
-        drop.classList.remove('open');
-        if (!p) return;
-        const caps = getProductCaps(p);
-        const keys = Object.keys(caps).filter(k => caps[k]);
-        let ml = null;
-        if (activeEmpresa === EMPRESA_PERFUMES && keys.length > 1) {
-          ml = await openCapModal(p);
-          if (ml == null) return;
-        }
-        currentLines.push(lineFromProduct(p, ml));
-        el.value = '';
-        renderLines();
-      };
-    });
-  });
-  el.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      addProductsByCodigos(el.value);
-    }
-  });
-  el.addEventListener('paste', () => {
-    setTimeout(() => {
-      const codes = parseCodigoList(el.value);
-      if (codes.length > 1) addProductsByCodigos(el.value);
-    }, 0);
-  });
-  el.addEventListener('blur', () => setTimeout(() => drop && drop.classList.remove('open'), 200));
-}
-
 fProdSearch.oninput = () => {
   const q = fProdSearch.value.trim().toLowerCase();
   const drop = prodDrop;
@@ -5024,8 +4894,8 @@ fProdSearch.oninput = () => {
     .filter(p => {
       const name = (p.name || '').toLowerCase();
       const base = basePerfumeName(p.name).toLowerCase();
-      const cod = (p.codigo || '').toLowerCase();
-      return name.includes(q) || base.includes(q) || cod.includes(q);
+      const cod = String(p.codigo || '').toLowerCase();
+      return name.includes(q) || base.includes(q) || (cod && cod.includes(q));
     })
     .slice(0, 10);
   if (!matches.length) { drop.classList.remove('open'); return; }
@@ -5041,7 +4911,8 @@ fProdSearch.oninput = () => {
     }
     const label = (activeEmpresa === EMPRESA_PERFUMES) ? (basePerfumeName(p.name) || p.name) : p.name;
     const cod = (p.codigo || '').trim();
-    return `<div data-id="${p.id}">${cod ? '<strong>'+escapeHtml(cod)+'</strong> · ' : ''}${escapeHtml(label)} · ${priceTxt}</div>`;
+    const codTxt = cod ? ` · 🪪 ${escapeHtml(cod)}` : '';
+    return `<div data-id="${p.id}">${escapeHtml(label)}${codTxt} · ${priceTxt}</div>`;
   }).join('');
   drop.classList.add('open');
   drop.querySelectorAll('div').forEach(el => {
@@ -5096,7 +4967,7 @@ function clearFactForm() {
   editingInvId = null; currentLines = []; editingLineIdx = null;
   fFecha.value = today();
   fCliente.value = fDoc.value = fDir.value = fTel.value = fObs.value = '';
-  fProdSearch.value = ''; const _fpc=document.getElementById('fProdCodigo'); if(_fpc) _fpc.value=''; fCant.value = 1; const _fc=document.getElementById('fCosto'); if(_fc) _fc.value=''; fPrecio.value = '';
+  fProdSearch.value = ''; fCant.value = 1; const _fc=document.getElementById('fCosto'); if(_fc) _fc.value=''; fPrecio.value = '';
   factTitle.textContent = 'Nueva factura / cotización';
   renderLines();
 }
