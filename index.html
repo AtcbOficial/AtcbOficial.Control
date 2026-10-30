@@ -779,6 +779,7 @@ details.overdue-box[open]{
         <option value="atcb">🧊 AtcbOficial</option>
         <option value="perfumes">🧴 Perfumes L&amp;R</option>
       </select>
+      <button type="button" class="sm secondary" id="btnLookupQr" title="Consultar código QR (stock / insumos)" style="display:none;padding:5px 8px">📷</button>
       <button type="button" class="sm secondary" id="btnLogout" title="Cerrar sesión" style="display:none;padding:5px 8px">⎋</button>
     </div>
   </div>
@@ -1837,11 +1838,14 @@ details.overdue-box[open]{
 
 <div class="modal-overlay" id="qrModal">
   <div class="qr-modal-box">
-    <h3>📷 Escanear código QR</h3>
+    <h3 id="qrModalTitle">📷 Escanear código QR</h3>
+    <label class="label" style="display:block;margin:0 0 4px">Cámara</label>
+    <select id="qrCameraSelect" style="margin-bottom:8px;font-size:12px"></select>
     <div id="qrReader"></div>
-    <p class="qr-hint">Apunta al QR del producto. Formatos:<br>
+    <p class="qr-hint" id="qrModalHint">Apunta al QR del producto. Formatos:<br>
       Atcb: <code>1-0001</code> o <code>1-0001;5</code><br>
-      Perfumes: <code>2-0001;30</code> o <code>2-0001;30;2</code>
+      Perfumes: <code>2-0001;30</code> o <code>2-0001;30;2</code><br>
+      Insumos: <code>iq-0001</code> · <code>ii-0001</code>
     </p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
       <button type="button" class="secondary" id="btnQrClose">Cerrar</button>
@@ -1952,10 +1956,12 @@ function updateAuthUI() {
   const gate = document.getElementById('authGate');
   const btnOut = document.getElementById('btnLogout');
   const lab = document.getElementById('authUserLabel');
+  const btnLq = document.getElementById('btnLookupQr');
   if (fbUser) {
     document.body.classList.remove('auth-locked');
     if (gate) gate.classList.add('hidden');
     if (btnOut) btnOut.style.display = '';
+    if (btnLq) btnLq.style.display = '';
     if (lab) {
       lab.textContent = fbUser.email || fbUser.displayName || 'Sesión';
       lab.title = fbUser.email || '';
@@ -1965,6 +1971,7 @@ function updateAuthUI() {
     document.body.classList.add('auth-locked');
     if (gate) gate.classList.remove('hidden');
     if (btnOut) btnOut.style.display = 'none';
+    if (btnLq) btnLq.style.display = 'none';
     if (lab) { lab.textContent = ''; lab.title = ''; }
     setFbStatus('Sin sesión · inicia con Google');
   }
@@ -5289,25 +5296,100 @@ async function stopQrScanner() {
   qrBusy = false;
 }
 
-async function openQrScanner() {
+
+let qrScanMode = 'fact'; // 'fact' | 'lookup'
+let qrCameras = [];
+let qrSelectedCameraId = localStorage.getItem('atcb_qr_cam') || '';
+
+async function listQrCameras() {
+  try {
+    if (typeof Html5Qrcode === 'undefined' || !Html5Qrcode.getCameras) return [];
+    const cams = await Html5Qrcode.getCameras();
+    return Array.isArray(cams) ? cams : [];
+  } catch (e) {
+    console.warn(e);
+    return [];
+  }
+}
+
+function fillQrCameraSelect(cams) {
+  const sel = document.getElementById('qrCameraSelect');
+  if (!sel) return;
+  qrCameras = cams || [];
+  if (!qrCameras.length) {
+    sel.innerHTML = '<option value="">Cámara por defecto</option>';
+    return;
+  }
+  sel.innerHTML = qrCameras.map((c, i) => {
+    const label = (c.label && String(c.label).trim()) || ('Cámara ' + (i + 1));
+    return '<option value="' + c.id + '">' + label.replace(/</g, '') + '</option>';
+  }).join('');
+  let pick = qrSelectedCameraId;
+  if (!pick || !qrCameras.some(c => c.id === pick)) {
+    // Prefer back / environment / rear if label suggests it
+    const back = qrCameras.find(c => /back|rear|environment|trasera|posterior/i.test(c.label || ''));
+    pick = (back && back.id) || qrCameras[0].id;
+  }
+  sel.value = pick;
+  qrSelectedCameraId = pick;
+}
+
+async function startQrWithSelectedCamera(onSuccess) {
+  const readerId = 'qrReader';
+  if (qrScanner) {
+    try { await qrScanner.stop(); } catch (e) {}
+    try { await qrScanner.clear(); } catch (e) {}
+  }
+  qrScanner = new Html5Qrcode(readerId);
+  const sel = document.getElementById('qrCameraSelect');
+  const camId = (sel && sel.value) || qrSelectedCameraId || '';
+  const config = { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 };
+  if (camId) {
+    await qrScanner.start(camId, config, onSuccess, () => {});
+  } else {
+    await qrScanner.start({ facingMode: 'environment' }, config, onSuccess, () => {});
+  }
+}
+
+async function openQrScanner(mode) {
   if (typeof Html5Qrcode === 'undefined') {
     return toast('Librería QR no cargó. Revisa internet y recarga.');
   }
+  qrScanMode = mode === 'lookup' ? 'lookup' : 'fact';
   const modal = document.getElementById('qrModal');
   if (!modal) return;
+  const title = document.getElementById('qrModalTitle');
+  const hint = document.getElementById('qrModalHint');
+  if (title) title.textContent = qrScanMode === 'lookup' ? '📷 Consultar QR (ficha)' : '📷 Escanear QR (factura)';
+  if (hint) {
+    if (qrScanMode === 'lookup') {
+      hint.innerHTML = 'Escanea un código id de <strong>stock</strong> o <strong>insumo</strong>. Se abre la ficha 👀 con el detalle.';
+    } else {
+      hint.innerHTML = 'Apunta al QR del producto. Formatos:<br>Atcb: <code>1-0001</code> o <code>1-0001;5</code><br>Perfumes: <code>2-0001;30</code> o <code>2-0001;30;2</code><br>Insumos: <code>iq-0001</code> · <code>ii-0001</code>';
+    }
+  }
   modal.classList.add('open');
   await stopQrScanner();
-  const readerId = 'qrReader';
-  qrScanner = new Html5Qrcode(readerId);
+  const cams = await listQrCameras();
+  fillQrCameraSelect(cams);
   qrBusy = false;
   const onSuccess = async (decoded) => {
     if (qrBusy) return;
     qrBusy = true;
     try {
-      const ok = await addFromQrText(decoded);
-      if (ok) playScanBeep();
-      // breve pausa para no duplicar el mismo QR
-      setTimeout(() => { qrBusy = false; }, 1200);
+      if (qrScanMode === 'lookup') {
+        const ok = await lookupFromQrText(decoded);
+        if (ok) {
+          playScanBeep();
+          await closeQrScanner();
+        } else {
+          setTimeout(() => { qrBusy = false; }, 900);
+        }
+      } else {
+        const ok = await addFromQrText(decoded);
+        if (ok) playScanBeep();
+        setTimeout(() => { qrBusy = false; }, 1200);
+      }
     } catch (e) {
       qrBusy = false;
       console.warn(e);
@@ -5315,17 +5397,70 @@ async function openQrScanner() {
     }
   };
   try {
-    await qrScanner.start(
-      { facingMode: 'environment' },
-      { fps: 8, qrbox: { width: 220, height: 220 }, aspectRatio: 1 },
-      onSuccess,
-      () => {}
-    );
+    await startQrWithSelectedCamera(onSuccess);
   } catch (e) {
     console.warn(e);
-    toast('No se pudo abrir la cámara. Da permiso o usa HTTPS.');
-    modal.classList.remove('open');
+    // fallback facingMode
+    try {
+      await qrScanner.start({ facingMode: 'user' }, { fps: 10, qrbox: { width: 220, height: 220 } }, onSuccess, () => {});
+    } catch (e2) {
+      toast('No se pudo abrir la cámara. Da permiso o usa HTTPS.');
+      modal.classList.remove('open');
+    }
   }
+}
+
+/** Consulta global: stock (1-/2-) o insumos (iq-/ii-) → ficha 👀 */
+async function lookupFromQrText(raw) {
+  let s = String(raw || '').trim();
+  if (!s) { toast('QR vacío'); return false; }
+  try {
+    if (/^https?:\/\//i.test(s)) {
+      const u = new URL(s);
+      const c = u.searchParams.get('c') || u.searchParams.get('codigo') || u.searchParams.get('code');
+      if (c) s = c;
+      else {
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (parts.length) s = decodeURIComponent(parts[parts.length - 1]);
+      }
+    }
+  } catch (e) {}
+  // primera pieza si viene bulk
+  s = s.split(/[\n\r;,\t]/)[0].trim();
+  const low = s.toLowerCase();
+
+  // Insumos
+  if (/^(iq|ii)-?\d+/i.test(low)) {
+    const code = normInsCodigo(s);
+    const ins = (insumos || []).find(i => normInsCodigo(i.codigo) === code);
+    if (!ins) {
+      toast('No hay insumo ' + code);
+      return false;
+    }
+    try { viewInsDetail(ins.id); } catch (e) { console.warn(e); toast('No se pudo abrir ficha'); return false; }
+    toast('👀 Insumo ' + code);
+    return true;
+  }
+
+  // Stock productos
+  const code = normCodigoId(s);
+  const prod = (products || []).find(x => normCodigoId(x.codigo) === code);
+  if (!prod) {
+    toast('No hay producto ' + (code || s) + ' en stock');
+    return false;
+  }
+  // Alinear empresa activa para que la UI coincida
+  try {
+    if (prod.empresa && prod.empresa !== activeEmpresa) {
+      activeEmpresa = prod.empresa;
+      try { applyEmpresaUI(); } catch (e) {}
+      const sel = document.getElementById('empresaSelect');
+      if (sel) sel.value = activeEmpresa;
+    }
+  } catch (e) {}
+  try { viewProdDetail(prod.id); } catch (e) { console.warn(e); toast('No se pudo abrir ficha'); return false; }
+  toast('👀 ' + (prod.codigo || code));
+  return true;
 }
 
 async function closeQrScanner() {
@@ -5336,13 +5471,46 @@ async function closeQrScanner() {
 
 (function initQrScan() {
   const b = document.getElementById('btnScanQr');
-  if (b) b.onclick = () => openQrScanner();
+  if (b) b.onclick = () => openQrScanner('fact');
+  const bL = document.getElementById('btnLookupQr');
+  if (bL) bL.onclick = () => openQrScanner('lookup');
   const c = document.getElementById('btnQrClose');
   if (c) c.onclick = () => closeQrScanner();
   const s = document.getElementById('btnQrStop');
   if (s) s.onclick = async () => { await stopQrScanner(); toast('Cámara detenida'); };
   const modal = document.getElementById('qrModal');
   if (modal) modal.addEventListener('click', (e) => { if (e.target.id === 'qrModal') closeQrScanner(); });
+  const camSel = document.getElementById('qrCameraSelect');
+  if (camSel && !camSel._bound) {
+    camSel._bound = 1;
+    camSel.addEventListener('change', async () => {
+      qrSelectedCameraId = camSel.value || '';
+      try { localStorage.setItem('atcb_qr_cam', qrSelectedCameraId); } catch (e) {}
+      if (!document.getElementById('qrModal')?.classList.contains('open')) return;
+      const onSuccess = async (decoded) => {
+        if (qrBusy) return;
+        qrBusy = true;
+        try {
+          if (qrScanMode === 'lookup') {
+            const ok = await lookupFromQrText(decoded);
+            if (ok) { playScanBeep(); await closeQrScanner(); }
+            else setTimeout(() => { qrBusy = false; }, 900);
+          } else {
+            const ok = await addFromQrText(decoded);
+            if (ok) playScanBeep();
+            setTimeout(() => { qrBusy = false; }, 1200);
+          }
+        } catch (e) { qrBusy = false; }
+      };
+      try {
+        await stopQrScanner();
+        await startQrWithSelectedCamera(onSuccess);
+        toast('Cámara cambiada');
+      } catch (e) {
+        toast('No se pudo cambiar de cámara');
+      }
+    });
+  }
 })();
 
 
