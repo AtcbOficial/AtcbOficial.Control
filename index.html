@@ -1284,6 +1284,10 @@ details.overdue-box[open]{
       <input id="insProd" placeholder="Nombre del producto" style="margin-bottom:6px">
       <input id="insCodigo" placeholder="Auto: iq-0001 / ii-0001 (editable)" style="margin-bottom:6px;text-transform:uppercase" autocomplete="off">
       <p class="hint" style="margin:0 0 6px">Químico <code>iq-0001</code> · Implemento <code>ii-0001</code></p>
+      <label class="label">Link imagen (https://…)</label>
+      <input type="url" id="insImgUrl" placeholder="https://… foto del insumo" style="margin-bottom:4px">
+      <p class="hint" style="margin:0 0 6px">Solo URL pública (misma lógica que stock). No se sube archivo.</p>
+      <img id="insImgPreview" class="prod-img-preview" alt="preview" style="margin-bottom:8px">
       <div class="grid2" style="margin-bottom:6px">
         <input id="insPrecio" type="number" min="0" step="0.0001" placeholder="Precio base ($/g o $/ud)">
         <input id="insStock" type="number" min="0" step="0.01" placeholder="Stock">
@@ -2894,6 +2898,7 @@ function loadFromObj(obj) {
   }));
   insumos = (obj.insumos || []).map(i => ({
     codigo: i.codigo != null ? String(i.codigo) : '',
+    img: (i.img && String(i.img).indexOf('http') === 0) ? String(i.img) : '',
     id: +i.id || 0,
     cat: i.cat === 'implemento' ? 'implemento' : 'quimico',
     producto: i.producto || i.name || '',
@@ -3923,20 +3928,22 @@ function playScanBeep() {
     if (!AC) return;
     const ctx = playScanBeep._ctx || (playScanBeep._ctx = new AC());
     if (ctx.state === 'suspended') ctx.resume();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.value = 880;
-    g.gain.value = 0.0001;
-    o.connect(g); g.connect(ctx.destination);
     const t = ctx.currentTime;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-    o.frequency.setValueAtTime(880, t);
-    o.frequency.setValueAtTime(1175, t + 0.09);
-    o.start(t);
-    o.stop(t + 0.2);
+    // pitido agudo y fuerte (doble tono)
+    const mk = (freq, start, dur, vol) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(vol, start + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(start);
+      o.stop(start + dur + 0.02);
+    };
+    mk(1800, t, 0.12, 0.55);
+    mk(2400, t + 0.11, 0.14, 0.6);
   } catch (e) {}
 }
 
@@ -8125,8 +8132,9 @@ function renderInsumos() {
           return `<div class="line">🏭 <strong>${escapeHtml(name)}</strong> · ${money(pv.precio)} / ${und}</div>`;
         }).join('');
         const icod = (i.codigo || '').trim();
+        const iimg = (i.img && String(i.img).indexOf('http') === 0) ? i.img : '';
         return `<div class="list-card">
-          <div class="title">${escapeHtml(i.producto)} <span class="chip" style="background:#1a2a3d;color:var(--accent)">${und}</span></div>
+          <div class="title">${iimg ? `<img class="thumb" src="${escapeHtml(iimg)}" alt="" onerror="this.style.display='none'">` : ''}${escapeHtml(i.producto)} <span class="chip" style="background:#1a2a3d;color:var(--accent)">${und}</span></div>
           ${icod ? `<div class="line">🪪 <strong>${escapeHtml(icod)}</strong></div>` : ''}
           <div class="line">Precio base: <strong>$ ${formatMoneyInput(i.precio)}</strong> / ${und} · Stock: <strong>${i.stock || 0}</strong></div>
           ${provLines || '<div class="line" style="color:var(--muted)">🏭 Sin proveedores anotados</div>'}
@@ -8156,6 +8164,8 @@ function openInsForm(isNew) {
     const obs = document.getElementById('insObs'); if (obs) obs.value = '';
     const ic = document.getElementById('insCodigo');
     if (ic) ic.value = nextInsCodigo('quimico');
+    const iu = document.getElementById('insImgUrl'); if (iu) iu.value = '';
+    const ip = document.getElementById('insImgPreview'); if (ip) { ip.src = ''; ip.classList.remove('show'); }
     insProvOffers = [];
     renderInsProvOffers();
   }
@@ -8172,6 +8182,11 @@ function editInsumo(id) {
   document.getElementById('insStock').value = i.stock || 0;
   const obs = document.getElementById('insObs'); if (obs) obs.value = i.obs || '';
   const ic = document.getElementById('insCodigo'); if (ic) ic.value = i.codigo || '';
+  const iu = document.getElementById('insImgUrl');
+  const imgv = (i.img && String(i.img).indexOf('http') === 0) ? i.img : '';
+  if (iu) iu.value = imgv;
+  const ip = document.getElementById('insImgPreview');
+  if (ip) { if (imgv) { ip.src = imgv; ip.classList.add('show'); } else { ip.src = ''; ip.classList.remove('show'); } }
   insProvOffers = (i.proveedores || []).map(pv => ({ id: +pv.id, nombre: pv.nombre || '', precio: +pv.precio || 0 }));
   openInsForm(false);
   renderInsProvOffers();
@@ -8190,11 +8205,15 @@ async function saveInsumo() {
   if (!codigo) codigo = nextInsCodigo(cat);
   if (isInsCodigoTaken(codigo, insEditingId)) return toast('Código id "' + codigo + '" ya existe en otro insumo');
   const icEl = document.getElementById('insCodigo'); if (icEl) icEl.value = codigo;
+  let img = ((document.getElementById('insImgUrl') || {}).value || '').trim();
+  if (img.indexOf('data:') === 0) img = '';
+  if (img && img.indexOf('http') !== 0) img = '';
   const obj = {
     id: insEditingId != null ? +insEditingId : nextInsId++,
     cat,
     producto,
     codigo,
+    img: img || '',
     precio: parseFloat(document.getElementById('insPrecio').value) || 0,
     stock: parseFloat(document.getElementById('insStock').value) || 0,
     obs: ((document.getElementById('insObs') || {}).value || '').trim(),
@@ -8544,6 +8563,17 @@ function clearLab() {
   if (fCat) fCat.onchange = () => renderInsumos();
   const sSort = document.getElementById('insSort');
   if (sSort) sSort.onchange = () => renderInsumos();
+  const insImgUrl = document.getElementById('insImgUrl');
+  if (insImgUrl && !insImgUrl._bound) {
+    insImgUrl._bound = 1;
+    insImgUrl.addEventListener('input', function() {
+      const u = (this.value || '').trim();
+      const ip = document.getElementById('insImgPreview');
+      if (!ip) return;
+      if (u.indexOf('http') === 0) { ip.src = u; ip.classList.add('show'); }
+      else { ip.src = ''; ip.classList.remove('show'); }
+    });
+  }
   if (bAddP) bAddP.onclick = () => addInsProvOffer();
   const bLS = document.getElementById('btnLabSaveStock');
   const bLC = document.getElementById('btnLabClear');
