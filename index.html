@@ -1309,12 +1309,16 @@ details.overdue-box[open]{
       </div>
       <div class="section-title" style="margin:0 0 8px">🧪 Insumos / Implementos</div>
       <div class="sticky-search">
-        <div class="actions">
-          <input id="insSearch" placeholder="Buscar...">
-          <select id="insFilterCat">
-            <option value="">Todas las categorías</option>
+        <div class="actions" style="grid-template-columns:1fr auto auto;gap:6px">
+          <input id="insSearch" placeholder="Buscar nombre o código...">
+          <select id="insFilterCat" title="Categoría" style="min-width:110px">
+            <option value="">Todas</option>
             <option value="quimico">Químico (g)</option>
             <option value="implemento">Implemento (ud)</option>
+          </select>
+          <select id="insSort" title="Ordenar" style="min-width:120px">
+            <option value="name">Nombre A-Z</option>
+            <option value="code">Código id ↑</option>
           </select>
         </div>
       </div>
@@ -8091,6 +8095,24 @@ function renderInsumos() {
     }).join(' ');
     return name.includes(q) || obs.includes(q) || cod.includes(q) || provNames.includes(q);
   });
+  const sortMode = ((document.getElementById('insSort') || {}).value) || 'name';
+  list.sort((a, b) => {
+    if (sortMode === 'code') {
+      const ca = String(a.codigo || '');
+      const cb = String(b.codigo || '');
+      // iq/ii + número ascendente
+      const ma = ca.match(/^(iq|ii)-?(\d+)$/i);
+      const mb = cb.match(/^(iq|ii)-?(\d+)$/i);
+      if (ma && mb) {
+        if (ma[1].toLowerCase() !== mb[1].toLowerCase()) return ma[1].toLowerCase().localeCompare(mb[1].toLowerCase());
+        return (parseInt(ma[2], 10) || 0) - (parseInt(mb[2], 10) || 0);
+      }
+      if (ma && !mb) return -1;
+      if (!ma && mb) return 1;
+      return ca.localeCompare(cb, 'es', { numeric: true, sensitivity: 'base' });
+    }
+    return String(a.producto || '').localeCompare(String(b.producto || ''), 'es', { sensitivity: 'base' });
+  });
   const el = document.getElementById('insList');
   if (!el) return;
   el.innerHTML = list.length
@@ -8520,6 +8542,8 @@ function clearLab() {
   if (bCancel) bCancel.onclick = () => closeInsForm();
   if (sIns) sIns.oninput = () => renderInsumos();
   if (fCat) fCat.onchange = () => renderInsumos();
+  const sSort = document.getElementById('insSort');
+  if (sSort) sSort.onchange = () => renderInsumos();
   if (bAddP) bAddP.onclick = () => addInsProvOffer();
   const bLS = document.getElementById('btnLabSaveStock');
   const bLC = document.getElementById('btnLabClear');
