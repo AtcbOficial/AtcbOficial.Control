@@ -1281,6 +1281,8 @@ details.overdue-box[open]{
         <option value="implemento">Implemento (unidades)</option>
       </select>
       <input id="insProd" placeholder="Nombre del producto" style="margin-bottom:6px">
+      <input id="insCodigo" placeholder="Auto: iq-0001 / ii-0001 (editable)" style="margin-bottom:6px;text-transform:uppercase" autocomplete="off">
+      <p class="hint" style="margin:0 0 6px">Químico <code>iq-0001</code> · Implemento <code>ii-0001</code></p>
       <div class="grid2" style="margin-bottom:6px">
         <input id="insPrecio" type="number" min="0" step="0.0001" placeholder="Precio base ($/g o $/ud)">
         <input id="insStock" type="number" min="0" step="0.01" placeholder="Stock">
@@ -1809,6 +1811,20 @@ details.overdue-box[open]{
   <button data-view="archivo">📁<br>Archivo</button>
 </nav>
 
+
+
+<div class="modal-overlay" id="qrStickerModal">
+  <div class="qr-modal-box" style="text-align:center">
+    <h3 id="qrStickerTitle">QR etiqueta</h3>
+    <canvas id="qrStickerCanvas" style="margin:8px auto;background:#fff;border-radius:8px;max-width:100%"></canvas>
+    <p class="qr-hint" id="qrStickerCode" style="font-size:14px;font-weight:700;color:var(--text)"></p>
+    <p class="qr-hint">Imprime este QR en tu sticker. Al escanear en Factura agrega el producto.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <button type="button" class="secondary" id="btnQrStickerClose">Cerrar</button>
+      <button type="button" class="success" id="btnQrStickerPrint">🖨️ Imprimir</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="qrModal">
   <div class="qr-modal-box">
@@ -2872,6 +2888,7 @@ function loadFromObj(obj) {
       : ((inv.empresa === EMPRESA_PERFUMES || inv.empresa === 'perfumes') ? EMPRESA_PERFUMES : EMPRESA_ATCB)
   }));
   insumos = (obj.insumos || []).map(i => ({
+    codigo: i.codigo != null ? String(i.codigo) : '',
     id: +i.id || 0,
     cat: i.cat === 'implemento' ? 'implemento' : 'quimico',
     producto: i.producto || i.name || '',
@@ -3852,6 +3869,92 @@ function assertCodigoLibre(codigo, excludeId, empresa) {
 }
 
 
+
+/** Códigos insumos: iq- (químico) · ii- (implemento) */
+function normInsCodigo(c) {
+  let s = String(c || '').trim().toLowerCase().replace(/\s+/g, '');
+  if (!s) return '';
+  const m = s.match(/^(iq|ii)-?(\d{1,6})$/i);
+  if (m) return m[1].toLowerCase() + '-' + m[2].padStart(4, '0');
+  return s;
+}
+function nextInsCodigo(cat) {
+  const pref = (cat === 'implemento') ? 'ii' : 'iq';
+  let max = 0;
+  (insumos || []).forEach(i => {
+    const n = normInsCodigo(i.codigo);
+    const m = n.match(new RegExp('^' + pref + '-(\\d+)$'));
+    if (m) max = Math.max(max, parseInt(m[1], 10) || 0);
+  });
+  return pref + '-' + String(max + 1).padStart(4, '0');
+}
+function isInsCodigoTaken(codigo, excludeId) {
+  const n = normInsCodigo(codigo);
+  if (!n) return false;
+  return (insumos || []).some(i => {
+    if (excludeId != null && +i.id === +excludeId) return false;
+    return normInsCodigo(i.codigo) === n;
+  });
+}
+
+async function showProdQr(id) {
+  const p = products.find(x => +x.id === +id);
+  if (!p) return;
+  const code = normCodigoId(p.codigo);
+  if (!code) return toast('Este producto no tiene código id');
+  await showQrSticker(code, (activeEmpresa === EMPRESA_PERFUMES ? basePerfumeName(p.name) : p.name) || code);
+}
+async function showInsQr(id) {
+  const i = insumos.find(x => +x.id === +id);
+  if (!i) return;
+  const code = normInsCodigo(i.codigo);
+  if (!code) return toast('Este insumo no tiene código id');
+  await showQrSticker(code, i.producto || code);
+}
+async function showQrSticker(code, label) {
+  if (typeof QRCode === 'undefined') return toast('Librería QR no cargó');
+  const modal = document.getElementById('qrStickerModal');
+  const canvas = document.getElementById('qrStickerCanvas');
+  const title = document.getElementById('qrStickerTitle');
+  const codeEl = document.getElementById('qrStickerCode');
+  if (!modal || !canvas) return;
+  if (title) title.textContent = '📷 QR · ' + (label || code);
+  if (codeEl) codeEl.textContent = code;
+  try {
+    await QRCode.toCanvas(canvas, code, { width: 280, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
+  } catch (e) {
+    console.warn(e);
+    return toast('No se pudo generar QR');
+  }
+  modal.classList.add('open');
+}
+function closeQrSticker() {
+  const modal = document.getElementById('qrStickerModal');
+  if (modal) modal.classList.remove('open');
+}
+function printQrSticker() {
+  const canvas = document.getElementById('qrStickerCanvas');
+  const code = (document.getElementById('qrStickerCode') || {}).textContent || '';
+  if (!canvas) return;
+  const w = window.open('', '_blank', 'width=400,height=500');
+  if (!w) return toast('Permite ventanas emergentes para imprimir');
+  w.document.write('<html><head><title>QR ' + code + '</title><style>body{font-family:system-ui;text-align:center;padding:12px}img{width:70mm;height:70mm}p{font-size:14px;font-weight:700;margin:8px 0}</style></head><body>');
+  w.document.write('<img src="' + canvas.toDataURL('image/png') + '"/>');
+  w.document.write('<p>' + code + '</p>');
+  w.document.write('</body></html>');
+  w.document.close();
+  setTimeout(() => { try { w.print(); } catch (e) {} }, 300);
+}
+(function initQrSticker() {
+  const c = document.getElementById('btnQrStickerClose');
+  if (c) c.onclick = () => closeQrSticker();
+  const pr = document.getElementById('btnQrStickerPrint');
+  if (pr) pr.onclick = () => printQrSticker();
+  const modal = document.getElementById('qrStickerModal');
+  if (modal) modal.addEventListener('click', e => { if (e.target.id === 'qrStickerModal') closeQrSticker(); });
+})();
+
+
 function exportCatalogSelection() {
   const ids = [...stockExportSel];
   if (!ids.length) return toast('Selecciona al menos un producto');
@@ -3955,6 +4058,7 @@ function renderProducts() {
           ${obs ? `<div class="line">📝 ${escapeHtml(obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
             <button type="button" class="sm secondary" onclick="viewProdDetail(${p.id})" title="Ver detalles">👀</button>
+            <button type="button" class="sm secondary" onclick="showProdQr(${p.id})" title="QR para sticker">📷 QR</button>
             <button type="button" class="sm success" onclick="waProdObs(${p.id})" title="WhatsApp observaciones">📲</button>
             ${(p.lab || hasMulti || Object.keys(caps).length) ? `<button type="button" class="sm secondary" onclick="startLabNewCap(${p.id})" title="Nueva capacidad en laboratorio">🔬+</button>` : ''}
             <button type="button" class="sm secondary" onclick="editProd(${p.id})">✏️</button>
@@ -7930,11 +8034,12 @@ function renderInsumos() {
   if (q) list = list.filter(i => {
     const name = (i.producto || '').toLowerCase();
     const obs = (i.obs || '').toLowerCase();
+    const cod = (i.codigo || '').toLowerCase();
     const provNames = (i.proveedores || []).map(pv => {
       const p = (proveedores || []).find(x => +x.id === +pv.id);
       return (p && p.nombre || '').toLowerCase();
     }).join(' ');
-    return name.includes(q) || obs.includes(q) || provNames.includes(q);
+    return name.includes(q) || obs.includes(q) || cod.includes(q) || provNames.includes(q);
   });
   const el = document.getElementById('insList');
   if (!el) return;
@@ -7947,13 +8052,16 @@ function renderInsumos() {
           const name = (p && p.nombre) || pv.nombre || ('Proveedor #' + pv.id);
           return `<div class="line">🏭 <strong>${escapeHtml(name)}</strong> · ${money(pv.precio)} / ${und}</div>`;
         }).join('');
+        const icod = (i.codigo || '').trim();
         return `<div class="list-card">
           <div class="title">${escapeHtml(i.producto)} <span class="chip" style="background:#1a2a3d;color:var(--accent)">${und}</span></div>
+          ${icod ? `<div class="line">🪪 <strong>${escapeHtml(icod)}</strong></div>` : ''}
           <div class="line">Precio base: <strong>$ ${formatMoneyInput(i.precio)}</strong> / ${und} · Stock: <strong>${i.stock || 0}</strong></div>
           ${provLines || '<div class="line" style="color:var(--muted)">🏭 Sin proveedores anotados</div>'}
           ${obs ? `<div class="line">📝 ${escapeHtml(obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
             <button type="button" class="sm secondary" onclick="viewInsDetail(${i.id})" title="Ver detalles">👀</button>
+            <button type="button" class="sm secondary" onclick="showInsQr(${i.id})" title="QR sticker">📷 QR</button>
             <button type="button" class="sm success" onclick="waInsObs(${i.id})" title="WhatsApp observaciones">📲</button>
             <button type="button" class="sm secondary" onclick="editInsumo(${i.id})">✏️</button>
             <button type="button" class="sm danger" onclick="delInsumo(${i.id})">🗑️</button>
@@ -7974,6 +8082,8 @@ function openInsForm(isNew) {
     document.getElementById('insPrecio').value = '';
     document.getElementById('insStock').value = '0';
     const obs = document.getElementById('insObs'); if (obs) obs.value = '';
+    const ic = document.getElementById('insCodigo');
+    if (ic) ic.value = nextInsCodigo('quimico');
     insProvOffers = [];
     renderInsProvOffers();
   }
@@ -7989,6 +8099,7 @@ function editInsumo(id) {
   document.getElementById('insPrecio').value = i.precio || 0;
   document.getElementById('insStock').value = i.stock || 0;
   const obs = document.getElementById('insObs'); if (obs) obs.value = i.obs || '';
+  const ic = document.getElementById('insCodigo'); if (ic) ic.value = i.codigo || '';
   insProvOffers = (i.proveedores || []).map(pv => ({ id: +pv.id, nombre: pv.nombre || '', precio: +pv.precio || 0 }));
   openInsForm(false);
   renderInsProvOffers();
@@ -8002,10 +8113,16 @@ function closeInsForm() {
 async function saveInsumo() {
   const producto = (document.getElementById('insProd').value || '').trim();
   if (!producto) return toast('Nombre requerido');
+  const cat = document.getElementById('insCat').value || 'quimico';
+  let codigo = normInsCodigo((document.getElementById('insCodigo') || {}).value || '');
+  if (!codigo) codigo = nextInsCodigo(cat);
+  if (isInsCodigoTaken(codigo, insEditingId)) return toast('Código id "' + codigo + '" ya existe en otro insumo');
+  const icEl = document.getElementById('insCodigo'); if (icEl) icEl.value = codigo;
   const obj = {
     id: insEditingId != null ? +insEditingId : nextInsId++,
-    cat: document.getElementById('insCat').value || 'quimico',
+    cat,
     producto,
+    codigo,
     precio: parseFloat(document.getElementById('insPrecio').value) || 0,
     stock: parseFloat(document.getElementById('insStock').value) || 0,
     obs: ((document.getElementById('insObs') || {}).value || '').trim(),
@@ -8340,6 +8457,15 @@ function clearLab() {
   const fCat = document.getElementById('insFilterCat');
   const bAddP = document.getElementById('btnAddInsProv');
   if (bNew) bNew.onclick = () => openInsForm(true);
+  const insCatEl = document.getElementById('insCat');
+  if (insCatEl && !insCatEl._codeBound) {
+    insCatEl._codeBound = 1;
+    insCatEl.addEventListener('change', () => {
+      if (insEditingId != null) return;
+      const ic = document.getElementById('insCodigo');
+      if (ic) ic.value = nextInsCodigo(insCatEl.value || 'quimico');
+    });
+  }
   if (bSave) bSave.onclick = () => saveInsumo();
   if (bCancel) bCancel.onclick = () => closeInsForm();
   if (sIns) sIns.oninput = () => renderInsumos();
