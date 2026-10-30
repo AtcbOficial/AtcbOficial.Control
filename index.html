@@ -1855,10 +1855,12 @@ details.overdue-box[open]{
       Perfumes: <code>2-0001;30</code> o <code>2-0001;30;2</code><br>
       Insumos: <code>iq-0001</code> · <code>ii-0001</code>
     </p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
       <button type="button" class="secondary" id="btnQrClose">Cerrar</button>
-      <button type="button" class="danger" id="btnQrStop">Detener cámara</button>
+      <button type="button" class="secondary" id="btnQrTorch" title="Linterna">🔦 Linterna</button>
+      <button type="button" class="danger" id="btnQrStop">Detener</button>
     </div>
+    <p class="qr-hint" style="margin-top:8px">En muchos móviles el navegador solo lista <strong>frontal</strong> y <strong>1 trasera</strong> (aunque el teléfono tenga 3). Acerca el código y usa la linterna si hay poca luz.</p>
   </div>
 </div>
 
@@ -5338,10 +5340,25 @@ async function stopQrScanner() {
 let qrScanMode = 'fact'; // 'fact' | 'lookup'
 let qrCameras = [];
 let qrSelectedCameraId = localStorage.getItem('atcb_qr_cam') || '';
+let qrTorchOn = false;
+
+function friendlyCamLabel(c, i) {
+  const raw = String((c && c.label) || '').trim();
+  const low = raw.toLowerCase();
+  if (/front|user|frontal/i.test(low)) return 'Frontal' + (raw ? ' · ' + raw : '');
+  if (/back|rear|environment|trasera|posterior/i.test(low)) return 'Trasera' + (raw ? ' · ' + raw : '');
+  if (raw) return raw;
+  return 'Cámara ' + (i + 1);
+}
 
 async function listQrCameras() {
   try {
     if (typeof Html5Qrcode === 'undefined' || !Html5Qrcode.getCameras) return [];
+    // Pedir permiso antes ayuda a que Android liste mejor los deviceId
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      stream.getTracks().forEach(t => t.stop());
+    } catch (e) {}
     const cams = await Html5Qrcode.getCameras();
     return Array.isArray(cams) ? cams : [];
   } catch (e) {
@@ -5359,12 +5376,11 @@ function fillQrCameraSelect(cams) {
     return;
   }
   sel.innerHTML = qrCameras.map((c, i) => {
-    const label = (c.label && String(c.label).trim()) || ('Cámara ' + (i + 1));
+    const label = friendlyCamLabel(c, i);
     return '<option value="' + c.id + '">' + label.replace(/</g, '') + '</option>';
   }).join('');
   let pick = qrSelectedCameraId;
   if (!pick || !qrCameras.some(c => c.id === pick)) {
-    // Prefer back / environment / rear if label suggests it
     const back = qrCameras.find(c => /back|rear|environment|trasera|posterior/i.test(c.label || ''));
     pick = (back && back.id) || qrCameras[0].id;
   }
@@ -5372,8 +5388,36 @@ function fillQrCameraSelect(cams) {
   qrSelectedCameraId = pick;
 }
 
+function buildQrConfig() {
+  const cfg = {
+    fps: 12,
+    qrbox: function(viewW, viewH) {
+      const s = Math.floor(Math.min(viewW, viewH) * 0.72);
+      return { width: Math.max(180, s), height: Math.max(180, s) };
+    },
+    aspectRatio: 1.0,
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+  };
+  try {
+    if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+      cfg.formatsToSupport = [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E
+      ];
+    }
+  } catch (e) {}
+  return cfg;
+}
+
 async function startQrWithSelectedCamera(onSuccess) {
   const readerId = 'qrReader';
+  qrTorchOn = false;
+  updateQrTorchBtn();
   if (qrScanner) {
     try { await qrScanner.stop(); } catch (e) {}
     try { await qrScanner.clear(); } catch (e) {}
@@ -5381,11 +5425,59 @@ async function startQrWithSelectedCamera(onSuccess) {
   qrScanner = new Html5Qrcode(readerId);
   const sel = document.getElementById('qrCameraSelect');
   const camId = (sel && sel.value) || qrSelectedCameraId || '';
-  const config = { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 };
-  if (camId) {
-    await qrScanner.start(camId, config, onSuccess, () => {});
-  } else {
-    await qrScanner.start({ facingMode: 'environment' }, config, onSuccess, () => {});
+  const config = buildQrConfig();
+  // videoConstraints: más resolución ayuda códigos pequeños (macro la hace el hardware al acercar)
+  const vConstraints = camId
+    ? { deviceId: { exact: camId }, width: { ideal: 1920 }, height: { ideal: 1080 }, focusMode: 'continuous' }
+    : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, focusMode: 'continuous' };
+  try {
+    await qrScanner.start(vConstraints, config, onSuccess, () => {});
+  } catch (e1) {
+    // sin focusMode / resolución
+    if (camId) await qrScanner.start(camId, config, onSuccess, () => {});
+    else await qrScanner.start({ facingMode: 'environment' }, config, onSuccess, () => {});
+  }
+  updateQrTorchBtn();
+}
+
+function updateQrTorchBtn() {
+  const b = document.getElementById('btnQrTorch');
+  if (!b) return;
+  b.textContent = qrTorchOn ? '🔦 ON' : '🔦 Linterna';
+  b.classList.toggle('success', !!qrTorchOn);
+}
+
+async function toggleQrTorch() {
+  if (!qrScanner) return toast('Abre el escáner primero');
+  try {
+    let caps = null;
+    try { caps = qrScanner.getRunningTrackCapabilities && qrScanner.getRunningTrackCapabilities(); } catch (e) {}
+    const hasTorch = caps && (caps.torch === true || (caps.torch && caps.torch !== false) || (Array.isArray(caps.torch) && caps.torch.length));
+    // Algunos Android solo responden con advanced torch
+    const next = !qrTorchOn;
+    try {
+      await qrScanner.applyVideoConstraints({ advanced: [{ torch: next }] });
+      qrTorchOn = next;
+      updateQrTorchBtn();
+      toast(qrTorchOn ? 'Linterna encendida' : 'Linterna apagada');
+      return;
+    } catch (e1) {
+      try {
+        await qrScanner.applyVideoConstraints({ torch: next });
+        qrTorchOn = next;
+        updateQrTorchBtn();
+        toast(qrTorchOn ? 'Linterna encendida' : 'Linterna apagada');
+        return;
+      } catch (e2) {
+        console.warn(e2);
+        toast(hasTorch === false
+          ? 'Esta cámara no permite linterna desde el navegador'
+          : 'No se pudo controlar la linterna en este dispositivo/navegador');
+      }
+    }
+  } catch (e) {
+    console.warn(e);
+    toast('Linterna no disponible aquí');
   }
 }
 
@@ -5515,7 +5607,9 @@ async function closeQrScanner() {
   const c = document.getElementById('btnQrClose');
   if (c) c.onclick = () => closeQrScanner();
   const s = document.getElementById('btnQrStop');
-  if (s) s.onclick = async () => { await stopQrScanner(); toast('Cámara detenida'); };
+  if (s) s.onclick = async () => { qrTorchOn = false; updateQrTorchBtn(); await stopQrScanner(); toast('Cámara detenida'); };
+  const t = document.getElementById('btnQrTorch');
+  if (t) t.onclick = () => toggleQrTorch();
   const modal = document.getElementById('qrModal');
   if (modal) modal.addEventListener('click', (e) => { if (e.target.id === 'qrModal') closeQrScanner(); });
   const camSel = document.getElementById('qrCameraSelect');
