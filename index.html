@@ -1724,26 +1724,7 @@ details.overdue-box[open]{
         </div>
       </div>
     </details>
-
-    <details class="collapse">
-      <summary>🧾 Encabezado ticket térmico</summary>
-      <div class="body">
-        <p class="sub">Imagen angosta para Phomemo / ticket 🧾. Si no pones link, usa el encabezado del PDF.</p>
-        <div style="background:#fff;border-radius:8px;padding:6px;margin-bottom:10px">
-          <img id="thermalBannerPreview" alt="Banner térmico" style="width:100%;max-height:80px;object-fit:contain;display:block;border-radius:4px">
-        </div>
-        <label class="label">Link del banner térmico</label>
-        <input id="thermalBannerUrl" type="url" placeholder="https://… imagen pública (angosta)" style="margin-bottom:8px">
-        <p class="hint" style="margin:0 0 8px">Recomendado: logo simple, fondo claro, poco detalle (papel ~50 mm).</p>
-        <div class="actions">
-          <button type="button" id="btnApplyThermalUrl" class="success">Aplicar link</button>
-          <button type="button" id="btnClearThermal" class="secondary">Quitar (usar PDF)</button>
-          <button type="button" id="btnSaveThermal">💾 Guardar</button>
-        </div>
-      </div>
-    </details>
-
-    <details class="collapse" data-emp="perfumes" id="archivoCaps">
+<details class="collapse" data-emp="perfumes" id="archivoCaps">
       <summary>🧴 Capacidades de laboratorio (ml)</summary>
       <div class="body">
         <p class="sub" style="margin:0 0 10px">Presentaciones con las que trabajas (ej. 30, 60, 120). Se usan en Lab y al facturar Perfumes.</p>
@@ -6872,7 +6853,7 @@ function printInv(id) {
 function buildThermalHtml(inv) {
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
-  const banner = normImgUrl(e.thermalBanner || e.pdfBanner || '') || '';
+  const banner = ''; // sin encabezado gráfico
   const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=2&data=' + encodeURIComponent(String(cod));
   const items = (inv.items || []).map(function (it) {
     const cant = it.cant || 0;
@@ -6969,6 +6950,17 @@ function openThermalModal(id) {
     const full = buildThermalHtml(inv);
     const bodyMatch = full.match(/<body[^>]*>([\s\S]*)<\/body>/i);
     wrap.innerHTML = bodyMatch ? bodyMatch[1] : full;
+    wrap.querySelectorAll('img').forEach(function (im) {
+      const src = (im.getAttribute('src') || '');
+      if (!/qrserver|create-qr-code|qr/i.test(src)) im.remove();
+      else {
+        im.style.maxHeight = '110px';
+        im.style.width = 'auto';
+        im.style.maxWidth = '110px';
+        im.style.display = 'block';
+        im.style.margin = '4px auto';
+      }
+    });
     wrap.querySelectorAll('img').forEach(function (im) {
       im.style.maxHeight = '72px';
       im.style.width = 'auto';
@@ -7193,63 +7185,62 @@ async function thermalRenderCanvas(inv) {
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
 
-  // Construir líneas de texto
+  // Texto agrandado; QR se mantiene en 96px (no tocar)
   const lines = [];
   function add(t, o) {
-    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 16, bold: false, center: false, right: false }, o || {}));
+    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 22, bold: false, center: false, right: false }, o || {}));
   }
-  add(e.name || e.label || 'Empresa', { size: 18, bold: true, center: true });
-  if (e.nit) add('NIT ' + e.nit, { size: 13, center: true });
-  if (e.tel) add('Tel. ' + e.tel, { size: 13, center: true });
-  add('--------------------------------', { center: true, size: 13 });
-  add(String(cod), { size: 20, bold: true, center: true });
-  add('--------------------------------', { center: true, size: 13 });
-  add('CLIENTE', { size: 14, bold: true });
-  add(inv.cliente || '-');
-  if (inv.documento) add('Doc: ' + inv.documento, { size: 13 });
-  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 13 });
-  add('Fecha: ' + fmtDate(inv.fecha), { size: 13 });
-  add('--------------------------------', { center: true, size: 13 });
-  add('PRODUCTOS', { size: 14, bold: true });
+  add(e.name || e.label || 'Empresa', { size: 26, bold: true, center: true });
+  if (e.nit) add('NIT ' + e.nit, { size: 18, center: true });
+  if (e.tel) add('Tel. ' + e.tel, { size: 18, center: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add(String(cod), { size: 28, bold: true, center: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add('CLIENTE', { size: 20, bold: true });
+  add(inv.cliente || '-', { size: 22 });
+  if (inv.documento) add('Doc: ' + inv.documento, { size: 18 });
+  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 18 });
+  add('Fecha: ' + fmtDate(inv.fecha), { size: 18 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('PRODUCTOS', { size: 20, bold: true });
   (inv.items || []).forEach(function (it) {
     const cant = it.cant || 0;
     const name = it.name || '';
     const sub = money(it.sub != null ? it.sub : cant * (it.precio || 0));
-    add(cant + ' x ' + name, { size: 13 });
-    add(sub, { size: 13, right: true });
+    add(cant + ' x ' + name, { size: 18 });
+    add(sub, { size: 18, right: true });
   });
-  if (!(inv.items || []).length) add('(sin items)', { size: 13 });
-  add('--------------------------------', { center: true, size: 13 });
-  add('TOTAL  ' + money(inv.total), { size: 18, bold: true });
+  if (!(inv.items || []).length) add('(sin items)', { size: 18 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('TOTAL  ' + money(inv.total), { size: 26, bold: true });
   if ((inv.abonos || []).length) {
-    add('ABONOS', { size: 14, bold: true });
+    add('ABONOS', { size: 20, bold: true });
     inv.abonos.forEach(function (a) {
-      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 12 });
+      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 17 });
     });
-    add('Abonado ' + money(totalAbonado(inv)), { size: 13, bold: true });
-    add('Saldo ' + money(saldoPendiente(inv)), { size: 13, bold: true });
+    add('Abonado ' + money(totalAbonado(inv)), { size: 18, bold: true });
+    add('Saldo ' + money(saldoPendiente(inv)), { size: 18, bold: true });
   }
   if (inv.obs) {
-    add('OBS.', { size: 14, bold: true });
-    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 12 }); });
+    add('OBS.', { size: 20, bold: true });
+    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 17 }); });
   }
-  add('--------------------------------', { center: true, size: 13 });
-  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 11 });
-  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 11 });
-  add('--------------------------------', { center: true, size: 13 });
-  add('MEDIO DE PAGO', { size: 14, bold: true });
-  add('Bancolombia', { size: 13 });
-  add('Llave BRE-B @bonilla8395', { size: 13, bold: true });
-  add('Ahorros 86900003930', { size: 13 });
-  add('Luis Bonilla P. J.', { size: 12 });
-  add('Pasaporte 5001998395', { size: 12 });
-  add('Gracias por su compra', { size: 14, center: true, bold: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 15 });
+  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 15 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('MEDIO DE PAGO', { size: 20, bold: true });
+  add('Bancolombia', { size: 18 });
+  add('Llave BRE-B @bonilla8395', { size: 18, bold: true });
+  add('Ahorros 86900003930', { size: 18 });
+  add('Luis Bonilla P. J.', { size: 17 });
+  add('Pasaporte 5001998395', { size: 16 });
+  add('Gracias por su compra', { size: 20, center: true, bold: true });
 
-  // Medir altura
   const measure = document.createElement('canvas').getContext('2d');
   let needH = pad + 8;
-  // barra de prueba + espacio QR
-  needH += 8 + 8 + 100 + 8;
+  // espacio QR 96px (mismo tamaño que el respaldo que imprime bien)
+  needH += 8 + 96 + 8;
   lines.forEach(function (L) {
     measure.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
     const maxW = W - pad * 2;
@@ -7266,22 +7257,19 @@ async function thermalRenderCanvas(inv) {
     if (line) rows++;
     needH += Math.max(1, rows) * (L.size + 3) + 1;
   });
-  needH += pad + 20;
+  needH += pad + 16;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = Math.max(needH, 200);
   const ctx = canvas.getContext('2d');
-  // blanco
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, canvas.height);
-  // barra negra de prueba (si sale, el protocolo funciona)
   ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, W, 6);
 
-  let y = 14;
+  let y = pad;
 
-  // QR (opcional)
+  // QR — MISMO método y tamaño 96 que el respaldo que imprime bien
   try {
     await new Promise(function (resolve) {
       const img = new Image();
@@ -7323,17 +7311,12 @@ async function thermalRenderCanvas(inv) {
       const tw = ctx.measureText(wl).width;
       if (L.center) x = Math.max(0, (W - tw) / 2);
       if (L.right) x = Math.max(pad, W - pad - tw);
-      // fillText usa baseline: y + size
       ctx.fillText(wl, x, y + L.size);
       y += L.size + 3;
     });
     y += 1;
   });
 
-  // barra inferior
-  ctx.fillRect(0, Math.min(canvas.height - 4, y + 4), W, 4);
-
-  // guardar ref para depuración
   const hold = document.getElementById('thermalPrintCanvas');
   if (hold) {
     hold.width = canvas.width;
@@ -7775,36 +7758,6 @@ btnSaveBanner.onclick = async () => {
   await autoSave();
   toast('Banner PDF de ' + (e.label || activeEmpresa) + ' guardado');
 };
-
-(function initThermalBanner() {
-  const applyT = async () => {
-    const url = normImgUrl((document.getElementById('thermalBannerUrl') || {}).value);
-    if (!url) return toast('Pega un link https de la imagen térmica');
-    const e = empCfg();
-    e.thermalBanner = url;
-    settings.empresas = settings.empresas || {};
-    settings.empresas[activeEmpresa] = e;
-    try { syncSettingsUI(); } catch (err) {}
-    toast('Banner térmico aplicado');
-    await autoSave();
-  };
-  const bA = document.getElementById('btnApplyThermalUrl');
-  if (bA) bA.onclick = applyT;
-  const bS = document.getElementById('btnSaveThermal');
-  if (bS) bS.onclick = applyT;
-  const bC = document.getElementById('btnClearThermal');
-  if (bC) bC.onclick = async () => {
-    const e = empCfg();
-    e.thermalBanner = '';
-    settings.empresas = settings.empresas || {};
-    settings.empresas[activeEmpresa] = e;
-    const tbu = document.getElementById('thermalBannerUrl');
-    if (tbu) tbu.value = '';
-    try { syncSettingsUI(); } catch (err) {}
-    toast('Térmico: usará el encabezado del PDF');
-    await autoSave();
-  };
-})();
 
 function refreshAll() {
   renderStats(); renderProducts(); renderClients(); renderInvoices(); renderLines(); syncSettingsUI();
