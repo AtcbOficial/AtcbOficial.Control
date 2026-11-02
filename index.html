@@ -7158,107 +7158,130 @@ async function thermalBleSend(bytes) {
   }
 }
 
-/** Canvas → raster 1 bit MSB, 384 px de ancho (48 bytes) M110 */
+/** Canvas → raster 1 bit MSB, filas de 48 bytes (384 px) fijas para M110 */
 function thermalCanvasToRaster(canvas) {
-  const w = canvas.width;
+  const W = 384;
+  const widthBytes = 48; // M110 / M120 siempre
   const h = canvas.height;
-  const widthBytes = Math.ceil(w / 8);
-  const ctx = canvas.getContext('2d');
-  const img = ctx.getImageData(0, 0, w, h);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const img = ctx.getImageData(0, 0, canvas.width, h);
+  const srcW = canvas.width;
   const data = new Uint8Array(widthBytes * h);
+  // centrar si el canvas no es exactamente 384
+  const xOff = Math.max(0, Math.floor((W - srcW) / 2));
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
+    for (let x = 0; x < srcW; x++) {
+      const i = (y * srcW + x) * 4;
+      const a = img.data[i + 3];
+      if (a < 10) continue;
       const gray = img.data[i] * 0.299 + img.data[i + 1] * 0.587 + img.data[i + 2] * 0.114;
-      if (gray < 160) {
-        data[y * widthBytes + (x >> 3)] |= (0x80 >> (x & 7));
+      // umbral alto: texto antialias → negro (Phomymo usa < 128; nosotros < 200)
+      if (gray < 200) {
+        const px = x + xOff;
+        if (px < 0 || px >= W) continue;
+        data[y * widthBytes + (px >> 3)] |= (0x80 >> (px & 7));
       }
     }
   }
   return { data: data, widthBytes: widthBytes, heightLines: h };
 }
 
+/** Dibuja ticket en canvas 384×H con texto nítido negro sobre blanco */
 async function thermalRenderCanvas(inv) {
   const W = 384;
-  const pad = 12;
-  const lines = [];
+  const pad = 10;
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
-  const push = function (t, opt) {
-    lines.push(Object.assign({ t: String(t || ''), size: 18, bold: false, center: false }, opt || {}));
-  };
-  push(e.name || e.label || 'Empresa', { size: 20, bold: true, center: true });
-  if (e.nit) push('NIT ' + e.nit, { size: 14, center: true });
-  if (e.tel) push('Tel. ' + e.tel, { size: 14, center: true });
-  if (e.dir) push(e.dir, { size: 13, center: true });
-  push('--------------------------------', { center: true, size: 14 });
-  push(cod, { size: 22, bold: true, center: true });
-  push('--------------------------------', { center: true, size: 14 });
-  push('CLIENTE', { size: 15, bold: true });
-  push(inv.cliente || '');
-  if (inv.documento) push('Doc: ' + inv.documento, { size: 14 });
-  if (inv.telefono) push('Tel: ' + inv.telefono, { size: 14 });
-  push('Fecha: ' + fmtDate(inv.fecha), { size: 14 });
-  push('--------------------------------', { center: true, size: 14 });
-  push('PRODUCTOS', { size: 15, bold: true });
+
+  // Construir líneas de texto
+  const lines = [];
+  function add(t, o) {
+    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 16, bold: false, center: false, right: false }, o || {}));
+  }
+  add(e.name || e.label || 'Empresa', { size: 18, bold: true, center: true });
+  if (e.nit) add('NIT ' + e.nit, { size: 13, center: true });
+  if (e.tel) add('Tel. ' + e.tel, { size: 13, center: true });
+  add('--------------------------------', { center: true, size: 13 });
+  add(String(cod), { size: 20, bold: true, center: true });
+  add('--------------------------------', { center: true, size: 13 });
+  add('CLIENTE', { size: 14, bold: true });
+  add(inv.cliente || '-');
+  if (inv.documento) add('Doc: ' + inv.documento, { size: 13 });
+  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 13 });
+  add('Fecha: ' + fmtDate(inv.fecha), { size: 13 });
+  add('--------------------------------', { center: true, size: 13 });
+  add('PRODUCTOS', { size: 14, bold: true });
   (inv.items || []).forEach(function (it) {
     const cant = it.cant || 0;
     const name = it.name || '';
     const sub = money(it.sub != null ? it.sub : cant * (it.precio || 0));
-    push(cant + ' x ' + name, { size: 15 });
-    push(sub, { size: 15, right: true });
+    add(cant + ' x ' + name, { size: 13 });
+    add(sub, { size: 13, right: true });
   });
-  push('--------------------------------', { center: true, size: 14 });
-  push('TOTAL  ' + money(inv.total), { size: 22, bold: true });
+  if (!(inv.items || []).length) add('(sin items)', { size: 13 });
+  add('--------------------------------', { center: true, size: 13 });
+  add('TOTAL  ' + money(inv.total), { size: 18, bold: true });
   if ((inv.abonos || []).length) {
-    push('ABONOS', { size: 15, bold: true });
+    add('ABONOS', { size: 14, bold: true });
     inv.abonos.forEach(function (a) {
-      push(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 14 });
+      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 12 });
     });
-    push('Abonado ' + money(totalAbonado(inv)), { size: 15, bold: true });
-    push('Saldo ' + money(saldoPendiente(inv)), { size: 15, bold: true });
+    add('Abonado ' + money(totalAbonado(inv)), { size: 13, bold: true });
+    add('Saldo ' + money(saldoPendiente(inv)), { size: 13, bold: true });
   }
   if (inv.obs) {
-    push('OBS.', { size: 15, bold: true });
-    String(inv.obs).split(/\n/).forEach(function (l) { push(l, { size: 13 }); });
+    add('OBS.', { size: 14, bold: true });
+    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 12 }); });
   }
-  push('--------------------------------', { center: true, size: 14 });
-  push('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 12 });
-  push('--------------------------------', { center: true, size: 14 });
-  push('MEDIO DE PAGO', { size: 15, bold: true });
-  push('Bancolombia', { size: 14 });
-  push('Llave BRE-B @bonilla8395', { size: 14, bold: true });
-  push('Ahorros 86900003930', { size: 14 });
-  push('Luis Bonilla P. J.', { size: 14 });
-  push('Pasaporte 5001998395', { size: 13 });
-  push('Gracias por su compra', { size: 16, center: true, bold: true });
+  add('--------------------------------', { center: true, size: 13 });
+  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 11 });
+  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 11 });
+  add('--------------------------------', { center: true, size: 13 });
+  add('MEDIO DE PAGO', { size: 14, bold: true });
+  add('Bancolombia', { size: 13 });
+  add('Llave BRE-B @bonilla8395', { size: 13, bold: true });
+  add('Ahorros 86900003930', { size: 13 });
+  add('Luis Bonilla P. J.', { size: 12 });
+  add('Pasaporte 5001998395', { size: 12 });
+  add('Gracias por su compra', { size: 14, center: true, bold: true });
 
-  const canvas = document.getElementById('thermalPrintCanvas') || document.createElement('canvas');
-  canvas.width = W;
-  const ctx = canvas.getContext('2d');
-  let y = pad + 130;
+  // Medir altura
+  const measure = document.createElement('canvas').getContext('2d');
+  let needH = pad + 8;
+  // barra de prueba + espacio QR
+  needH += 8 + 8 + 100 + 8;
   lines.forEach(function (L) {
-    ctx.font = (L.bold ? 'bold ' : '') + L.size + 'px Arial,Helvetica,sans-serif';
+    measure.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
     const maxW = W - pad * 2;
-    const words = L.t.split(/\s+/);
+    const words = String(L.t).split(/\s+/);
     let line = '';
-    const wrapped = [];
+    let rows = 0;
     words.forEach(function (w) {
       const test = line ? line + ' ' + w : w;
-      if (ctx.measureText(test).width > maxW && line) {
-        wrapped.push(line);
+      if (measure.measureText(test).width > maxW && line) {
+        rows++;
         line = w;
       } else line = test;
     });
-    if (line) wrapped.push(line);
-    if (!wrapped.length) wrapped.push('');
-    y += wrapped.length * (L.size + 4) + 2;
+    if (line) rows++;
+    needH += Math.max(1, rows) * (L.size + 3) + 1;
   });
-  canvas.height = Math.max(200, y + pad);
-  ctx.fillStyle = '#fff';
+  needH += pad + 20;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = Math.max(needH, 200);
+  const ctx = canvas.getContext('2d');
+  // blanco
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, canvas.height);
-  ctx.fillStyle = '#000';
-  y = pad;
+  // barra negra de prueba (si sale, el protocolo funciona)
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, W, 6);
+
+  let y = 14;
+
+  // QR (opcional)
   try {
     await new Promise(function (resolve) {
       const img = new Image();
@@ -7266,21 +7289,24 @@ async function thermalRenderCanvas(inv) {
       let done = false;
       const fin = function () { if (!done) { done = true; resolve(); } };
       img.onload = function () {
-        const qs = 120;
-        ctx.drawImage(img, (W - qs) / 2, y, qs, qs);
-        y += qs + 8;
+        try {
+          const qs = 96;
+          ctx.drawImage(img, (W - qs) / 2, y, qs, qs);
+          y += qs + 6;
+        } catch (e) {}
         fin();
       };
       img.onerror = fin;
-      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=1&data=' + encodeURIComponent(cod);
-      setTimeout(fin, 1500);
+      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=1&data=' + encodeURIComponent(String(cod));
+      setTimeout(fin, 2000);
     });
   } catch (e) {}
 
+  ctx.fillStyle = '#000000';
   lines.forEach(function (L) {
-    ctx.font = (L.bold ? 'bold ' : '') + L.size + 'px Arial,Helvetica,sans-serif';
+    ctx.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
     const maxW = W - pad * 2;
-    const words = L.t.split(/\s+/);
+    const words = String(L.t).split(/\s+/);
     let line = '';
     const wrapped = [];
     words.forEach(function (w) {
@@ -7294,13 +7320,27 @@ async function thermalRenderCanvas(inv) {
     if (!wrapped.length) wrapped.push('');
     wrapped.forEach(function (wl) {
       let x = pad;
-      if (L.center) x = (W - ctx.measureText(wl).width) / 2;
-      if (L.right) x = W - pad - ctx.measureText(wl).width;
+      const tw = ctx.measureText(wl).width;
+      if (L.center) x = Math.max(0, (W - tw) / 2);
+      if (L.right) x = Math.max(pad, W - pad - tw);
+      // fillText usa baseline: y + size
       ctx.fillText(wl, x, y + L.size);
-      y += L.size + 4;
+      y += L.size + 3;
     });
-    y += 2;
+    y += 1;
   });
+
+  // barra inferior
+  ctx.fillRect(0, Math.min(canvas.height - 4, y + 4), W, 4);
+
+  // guardar ref para depuración
+  const hold = document.getElementById('thermalPrintCanvas');
+  if (hold) {
+    hold.width = canvas.width;
+    hold.height = canvas.height;
+    hold.getContext('2d').drawImage(canvas, 0, 0);
+  }
+  console.log('[thermal] canvas rendered', canvas.width, 'x', canvas.height, 'lines', lines.length);
   return canvas;
 }
 
@@ -7335,13 +7375,24 @@ async function thermalBlePrint() {
     console.log('[thermal] print', widthBytes, heightLines, data.length);
     if (heightLines < 8) throw new Error('Ticket demasiado corto');
 
-    setThermalStatus('Imprimiendo… 0%');
-    // printM110 de Phomymo
-    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
+    // Contar bits negros (si 0 → imagen blanca)
+    let blackBits = 0;
+    for (let bi = 0; bi < data.length; bi++) {
+      let v = data[bi];
+      while (v) { blackBits += v & 1; v >>= 1; }
+    }
+    console.log('[thermal] blackBits', blackBits, 'of', data.length * 8);
+    if (blackBits < 50) throw new Error('Imagen casi blanca (' + blackBits + ' px). Reintenta.');
+
+    setThermalStatus('Imprimiendo… 0% (' + blackBits + ' px negros)');
+    // printM110 Phomymo
+    await thermalBleSend(new Uint8Array([0x1b, 0x40])); // ESC @ init
+    await thermalDelay(50);
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5])); // SPEED
     await thermalDelay(30);
-    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 12]));
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 14])); // DENSITY fuerte
     await thermalDelay(30);
-    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0a]));
+    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0a])); // media gap/label
     await thermalDelay(30);
     await thermalBleSend(new Uint8Array([
       0x1d, 0x76, 0x30, 0x00,
