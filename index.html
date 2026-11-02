@@ -7186,7 +7186,7 @@ function thermalCanvasToRaster(canvas) {
   return { data: data, widthBytes: widthBytes, heightLines: h };
 }
 
-/** Dibuja ticket en canvas 384×H — logo, texto grande, productos sin precio unitario */
+/** Dibuja ticket 384px. Logo/QR sin contaminar canvas (CORS → papel blanco). */
 async function thermalRenderCanvas(inv) {
   const W = 384;
   const pad = 8;
@@ -7198,7 +7198,6 @@ async function thermalRenderCanvas(inv) {
   function add(t, o) {
     lines.push(Object.assign({ t: String(t == null ? '' : t), size: 22, bold: false, center: false, right: false }, o || {}));
   }
-  // Tamaños ~50% mayores que la versión anterior
   add(e.name || e.label || 'Empresa', { size: 26, bold: true, center: true });
   if (e.nit) add('NIT ' + e.nit, { size: 18, center: true });
   if (e.tel) add('Tel. ' + e.tel, { size: 18, center: true });
@@ -7215,10 +7214,7 @@ async function thermalRenderCanvas(inv) {
   add('--------------------------------', { center: true, size: 18 });
   add('PRODUCTOS', { size: 20, bold: true });
   (inv.items || []).forEach(function (it) {
-    const cant = it.cant || 0;
-    const name = it.name || '';
-    // Solo cantidad + nombre (sin precios unitarios ni subtotales por línea)
-    add(cant + ' ' + name, { size: 20 });
+    add((it.cant || 0) + ' ' + (it.name || ''), { size: 20 });
   });
   if (!(inv.items || []).length) add('(sin items)', { size: 18 });
   add('--------------------------------', { center: true, size: 18 });
@@ -7248,129 +7244,168 @@ async function thermalRenderCanvas(inv) {
   add('Pasaporte 5001998395', { size: 16 });
   add('Gracias por su compra', { size: 20, center: true, bold: true });
 
-  // Cargar logo encabezado térmico
+  // Logo: intentar con CORS; si falla no se usa (evita canvas "tainted")
   let logoImg = null;
   if (bannerUrl) {
     logoImg = await new Promise(function (resolve) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       let done = false;
-      const fin = function (v) { if (!done) { done = true; resolve(v || null); } };
+      const fin = function (v) { if (!done) { done = true; resolve(v); } };
       img.onload = function () { fin(img); };
       img.onerror = function () { fin(null); };
-      img.src = bannerUrl;
-      setTimeout(function () { fin(null); }, 2500);
+      img.src = bannerUrl + (bannerUrl.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+      setTimeout(function () { fin(null); }, 2000);
     });
   }
 
-  // QR
-  let qrImg = null;
+  // QR local con librería QRCode (ya cargada) — sin red, sin CORS
+  let qrCanvas = null;
   try {
-    qrImg = await new Promise(function (resolve) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      let done = false;
-      const fin = function (v) { if (!done) { done = true; resolve(v || null); } };
-      img.onload = function () { fin(img); };
-      img.onerror = function () { fin(null); };
-      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=1&data=' + encodeURIComponent(String(cod));
-      setTimeout(function () { fin(null); }, 2500);
-    });
-  } catch (e) { qrImg = null; }
-
-  const measure = document.createElement('canvas').getContext('2d');
-  let needH = pad + 10;
-  if (logoImg) {
-    const maxLogoH = 70;
-    const scale = Math.min(W / logoImg.width, maxLogoH / logoImg.height);
-    needH += Math.round(logoImg.height * scale) + 8;
-  }
-  if (qrImg) needH += 110;
-  lines.forEach(function (L) {
-    measure.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
-    const maxW = W - pad * 2;
-    const words = String(L.t).split(/\s+/);
-    let line = '';
-    let rows = 0;
-    words.forEach(function (w) {
-      const test = line ? line + ' ' + w : w;
-      if (measure.measureText(test).width > maxW && line) {
-        rows++;
-        line = w;
-      } else line = test;
-    });
-    if (line) rows++;
-    needH += Math.max(1, rows) * (L.size + 4) + 2;
-  });
-  needH += pad + 16;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = Math.max(needH, 240);
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, canvas.height);
-  ctx.fillStyle = '#000000';
-
-  let y = pad;
-
-  // Logo encabezado
-  if (logoImg) {
-    const maxLogoH = 70;
-    const scale = Math.min((W - 16) / logoImg.width, maxLogoH / logoImg.height);
-    const lw = Math.round(logoImg.width * scale);
-    const lh = Math.round(logoImg.height * scale);
-    try {
-      ctx.drawImage(logoImg, Math.round((W - lw) / 2), y, lw, lh);
-      y += lh + 6;
-    } catch (e) {
-      console.warn('[thermal] logo draw', e);
+    if (typeof QRCode !== 'undefined') {
+      qrCanvas = document.createElement('canvas');
+      await new Promise(function (resolve, reject) {
+        QRCode.toCanvas(qrCanvas, String(cod), {
+          width: 120,
+          margin: 1,
+          color: { dark: '#000000', light: '#ffffff' },
+          errorCorrectionLevel: 'M'
+        }, function (err) {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
     }
+  } catch (e) {
+    console.warn('[thermal] QR local', e);
+    qrCanvas = null;
   }
 
-  // QR centrado
-  if (qrImg) {
-    const qs = 100;
-    try {
-      ctx.drawImage(qrImg, Math.round((W - qs) / 2), y, qs, qs);
-      y += qs + 6;
-    } catch (e) {}
+  function measureHeight(withLogo, withQr) {
+    const m = document.createElement('canvas').getContext('2d');
+    let h = pad + 10;
+    if (withLogo && logoImg) {
+      const maxLogoH = 70;
+      const scale = Math.min((W - 16) / logoImg.width, maxLogoH / logoImg.height);
+      h += Math.round(logoImg.height * scale) + 8;
+    }
+    if (withQr && qrCanvas) h += 120;
+    lines.forEach(function (L) {
+      m.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
+      const maxW = W - pad * 2;
+      const words = String(L.t).split(/\s+/);
+      let line = '', rows = 0;
+      words.forEach(function (w) {
+        const test = line ? line + ' ' + w : w;
+        if (m.measureText(test).width > maxW && line) { rows++; line = w; }
+        else line = test;
+      });
+      if (line) rows++;
+      h += Math.max(1, rows) * (L.size + 4) + 2;
+    });
+    return h + pad + 16;
   }
 
-  ctx.fillStyle = '#000000';
-  lines.forEach(function (L) {
-    ctx.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
-    const maxW = W - pad * 2;
-    const words = String(L.t).split(/\s+/);
-    let line = '';
-    const wrapped = [];
-    words.forEach(function (w) {
-      const test = line ? line + ' ' + w : w;
-      if (ctx.measureText(test).width > maxW && line) {
-        wrapped.push(line);
-        line = w;
-      } else line = test;
+  function paint(withLogo, withQr) {
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = Math.max(measureHeight(withLogo, withQr), 240);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, canvas.height);
+    ctx.fillStyle = '#000000';
+    let y = pad;
+
+    if (withLogo && logoImg) {
+      try {
+        const maxLogoH = 70;
+        const scale = Math.min((W - 16) / logoImg.width, maxLogoH / logoImg.height);
+        const lw = Math.round(logoImg.width * scale);
+        const lh = Math.round(logoImg.height * scale);
+        ctx.drawImage(logoImg, Math.round((W - lw) / 2), y, lw, lh);
+        y += lh + 6;
+      } catch (e) {
+        console.warn('[thermal] logo draw fail', e);
+      }
+    }
+
+    if (withQr && qrCanvas) {
+      try {
+        const qs = 100;
+        ctx.drawImage(qrCanvas, Math.round((W - qs) / 2), y, qs, qs);
+        y += qs + 6;
+      } catch (e) {}
+    }
+
+    lines.forEach(function (L) {
+      ctx.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
+      const maxW = W - pad * 2;
+      const words = String(L.t).split(/\s+/);
+      let line = '';
+      const wrapped = [];
+      words.forEach(function (w) {
+        const test = line ? line + ' ' + w : w;
+        if (ctx.measureText(test).width > maxW && line) {
+          wrapped.push(line);
+          line = w;
+        } else line = test;
+      });
+      if (line) wrapped.push(line);
+      if (!wrapped.length) wrapped.push('');
+      wrapped.forEach(function (wl) {
+        let x = pad;
+        const tw = ctx.measureText(wl).width;
+        if (L.center) x = Math.max(0, (W - tw) / 2);
+        if (L.right) x = Math.max(pad, W - pad - tw);
+        ctx.fillText(wl, x, y + L.size);
+        y += L.size + 4;
+      });
+      y += 2;
     });
-    if (line) wrapped.push(line);
-    if (!wrapped.length) wrapped.push('');
-    wrapped.forEach(function (wl) {
-      let x = pad;
-      const tw = ctx.measureText(wl).width;
-      if (L.center) x = Math.max(0, (W - tw) / 2);
-      if (L.right) x = Math.max(pad, W - pad - tw);
-      ctx.fillText(wl, x, y + L.size);
-      y += L.size + 4;
-    });
-    y += 2;
-  });
+    return canvas;
+  }
+
+  // 1) intentar con logo + QR
+  let canvas = paint(!!logoImg, !!qrCanvas);
+  // 2) verificar que se pueda leer (si logo externo sin CORS → tainted → blanco)
+  try {
+    const test = canvas.getContext('2d').getImageData(0, 0, 8, 8);
+    // contar algo de negro en muestra
+    let dark = 0;
+    for (let i = 0; i < test.data.length; i += 4) {
+      if (test.data[i] < 200) dark++;
+    }
+    // muestra pequeña puede ser blanca arriba; probar más abajo
+    const mid = canvas.getContext('2d').getImageData(0, Math.min(40, canvas.height - 1), W, 1);
+    for (let i = 0; i < mid.data.length; i += 4) {
+      if (mid.data[i] < 200) dark++;
+    }
+    if (dark < 2 && logoImg) {
+      console.warn('[thermal] canvas sospechoso con logo, reintento sin logo');
+      canvas = paint(false, !!qrCanvas);
+    }
+  } catch (err) {
+    console.warn('[thermal] canvas tainted, reintento sin logo', err && err.message);
+    canvas = paint(false, !!qrCanvas);
+  }
+
+  // Verificar de nuevo getImageData
+  try {
+    canvas.getContext('2d').getImageData(0, 0, 4, 4);
+  } catch (err) {
+    console.warn('[thermal] still tainted, solo texto', err && err.message);
+    canvas = paint(false, false);
+  }
 
   const hold = document.getElementById('thermalPrintCanvas');
   if (hold) {
-    hold.width = canvas.width;
-    hold.height = canvas.height;
-    hold.getContext('2d').drawImage(canvas, 0, 0);
+    try {
+      hold.width = canvas.width;
+      hold.height = canvas.height;
+      hold.getContext('2d').drawImage(canvas, 0, 0);
+    } catch (e) {}
   }
-  console.log('[thermal] canvas', canvas.width, 'x', canvas.height, 'logo', !!logoImg);
+  console.log('[thermal] canvas ok', canvas.width, 'x', canvas.height, 'logo', !!logoImg);
   return canvas;
 }
 
