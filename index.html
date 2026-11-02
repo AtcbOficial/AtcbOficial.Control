@@ -798,7 +798,12 @@ details.overdue-box[open]{
           <div class="card" style="margin:0;padding:10px"><div class="label">Egresos</div><div id="homeExpense" class="stat expense">$ 0,00</div><div id="homeExpenseDetail" class="tot-detail"></div></div>
           <div class="card" style="margin:0;padding:10px"><div class="label">Resultado</div><div id="homeBalance" class="stat balance">$ 0,00</div><div id="homeBalanceDetail" class="tot-detail"></div></div>
         </div>
-        <div class="section-title" style="font-size:13px;margin-bottom:6px">Ingresos vs. egresos</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <select id="homeChartMode" style="flex:1;min-width:160px;max-width:280px;padding:6px 8px;font-size:12px">
+            <option value="ing_egr">📊 Ingresos vs. egresos</option>
+            <option value="emp_manual">🏢 Empresa y manual</option>
+          </select>
+        </div>
         <div class="chartbox"><canvas id="homeChart"></canvas></div>
       </div>
     </details>
@@ -1157,10 +1162,11 @@ details.overdue-box[open]{
     <div class="card">
       <div class="section-hdr collapsible closed" id="togRes">Componentes comprados</div>
       <div class="collapse-body hidden" id="bodyRes">
-        <p class="hint" style="margin-bottom:6px">Agrega los componentes comprados de este proyecto (manual).</p>
+        <p class="hint" style="margin-bottom:6px">Agrega los componentes comprados. Formato pega: <code>1-0001;5</code> (código;cantidad).</p>
         <div class="form-row">
-          <div class="search-wrap">
-            <input id="pResSearch" placeholder="Buscar componente..." autocomplete="off">
+          <div class="search-wrap" style="display:flex;gap:6px;align-items:stretch">
+            <input id="pResSearch" placeholder="Buscar / código o pega: codigo;cantidad" autocomplete="off" style="flex:1">
+            <button type="button" id="btnScanQrProy" class="secondary" title="Escanear QR" style="flex-shrink:0;padding:8px 12px;white-space:nowrap">📷 QR</button>
             <div id="pResDrop" class="dropdown"></div>
           </div>
         </div>
@@ -1570,8 +1576,9 @@ details.overdue-box[open]{
 
   <!-- ARCHIVO -->
   <section id="archivo" class="view">
-    <div class="card">
-      <h3 style="margin:0 0 8px;font-size:15px">📁 Archivo de datos</h3>
+    <details class="collapse" id="archDatosSec" open>
+      <summary>📁 Archivo de datos · ☁️ Firebase</summary>
+      <div class="body">
       <p class="sub">
         Los datos <strong>no se guardan en el navegador</strong>. Se leen y escriben en un archivo JSON
         que tú eliges.
@@ -1584,6 +1591,7 @@ details.overdue-box[open]{
       <div class="card" style="margin:12px 0 0;padding:12px;border-color:var(--accent)">
         <div class="section-title" style="font-size:13px;margin:0 0 6px">☁️ Firebase (nube)</div>
         <p class="hint" id="fbStatus" style="margin:0 0 8px">Sin sesión</p>
+        <p class="hint" id="authUserLabel" style="margin:0 0 8px;color:var(--text);font-weight:600"></p>
         <div class="actions" style="margin-top:6px">
           <button type="button" id="btnCloudSave" class="success">☁️ Guardar en Firebase</button>
           <button type="button" id="btnCloudLoad" class="secondary">☁️ Cargar desde Firebase</button>
@@ -1592,16 +1600,20 @@ details.overdue-box[open]{
           <button type="button" id="btnJsonToCloud" class="secondary">⬆️ JSON → Firebase</button>
           <button type="button" id="btnCloudToJson" class="secondary">⬇️ Firebase → JSON</button>
         </div>
+        <div class="actions" style="margin-top:6px">
+          <button type="button" id="btnLogout" class="danger" style="display:none">⎋ Cerrar sesión</button>
+        </div>
         <p class="hint" style="margin-top:8px">Sube tu JSON una vez. Luego usa Guardar/Cargar nube en cada dispositivo.</p>
       </div>
       <div class="actions" style="margin-top:8px">
         <button type="button" id="btnRepairJson" class="secondary">🔧 Reparar JSON dañado</button>
         <button type="button" id="btnRepairImport" class="secondary">🔧 Importar y reparar…</button>
       </div>
-      <p class="hint" style="margin-top:6px">Si al abrir sale error de JSON, usa <strong>Reparar</strong> (archivo ya abierto o pegado) o <strong>Importar y reparar</strong> para elegir el .json dañado sin perder datos.</p>
+      <p class="hint" style="margin-top:6px">Si al abrir sale error de JSON, usa <strong>Reparar</strong> o <strong>Importar y reparar</strong>.</p>
       <input id="fileRepairImport" type="file" accept=".json,application/json,text/plain" style="display:none">
       <p class="sub" style="margin-top:12px" id="fsHint"></p>
-    </div>
+      </div>
+    </details>
 
     <details class="collapse">
       <summary>💾 Exportar / Importar</summary>
@@ -1973,7 +1985,7 @@ function updateAuthUI() {
     if (btnOut) btnOut.style.display = '';
     if (btnLq) btnLq.style.display = '';
     if (lab) {
-      lab.textContent = fbUser.email || fbUser.displayName || 'Sesión';
+      lab.textContent = '👤 ' + (fbUser.email || fbUser.displayName || 'Sesión');
       lab.title = fbUser.email || '';
     }
     setFbStatus('<span class="ok">Conectado:</span> ' + String(fbUser.email || fbUser.uid).replace(/</g,'&lt;'));
@@ -2415,6 +2427,66 @@ let proveedores = [];
 let invoices = [];
 let insumos = [];
 let nextProdId = 1, nextCliId = 1, nextProvId = 1, nextInvId = 1, nextNumero = 1, nextInsId = 1;
+
+/** Numeración facturas/proyectos: f1-#### (Atcb fact), P1-#### (Atcb proy), f2-#### (Perfumes) */
+function invCodigoPrefix(isProy, empresa) {
+  if (isProy) return 'P1';
+  return (empresa === EMPRESA_PERFUMES || empresa === 'perfumes') ? 'f2' : 'f1';
+}
+function parseInvCodigo(num) {
+  const s = String(num || '').trim();
+  const m = /^(f1|f2|P1|p1)-?(\d+)$/i.exec(s);
+  if (m) return { prefix: m[1].toUpperCase() === 'P1' ? 'P1' : m[1].toLowerCase(), n: parseInt(m[2], 10) || 0, raw: s };
+  if (/^\d+$/.test(s)) return { prefix: null, n: parseInt(s, 10) || 0, raw: s };
+  return { prefix: null, n: 0, raw: s };
+}
+function formatInvCodigo(prefix, n) {
+  return prefix + '-' + String(n).padStart(4, '0');
+}
+function nextInvCodigo(isProy, empresa) {
+  const prefix = invCodigoPrefix(isProy, empresa);
+  let max = 0;
+  (invoices || []).forEach(inv => {
+    const p = parseInvCodigo(inv.numero);
+    if (p.prefix === prefix) max = Math.max(max, p.n);
+    // legado numérico: solo cuenta para f1 si no es proyecto
+    if (!p.prefix && !isProy && prefix === 'f1' && !inv.isProyecto) max = Math.max(max, p.n);
+    if (!p.prefix && isProy && prefix === 'P1' && inv.isProyecto) max = Math.max(max, p.n);
+    if (!p.prefix && prefix === 'f2' && (inv.empresa === EMPRESA_PERFUMES) && !inv.isProyecto) max = Math.max(max, p.n);
+  });
+  return formatInvCodigo(prefix, max + 1);
+}
+function invNumeroDisplay(inv) {
+  if (!inv) return '';
+  const s = String(inv.numero || '');
+  if (/^(f1|f2|P1)-\d+/i.test(s)) return s;
+  // legado
+  if (inv.isProyecto) return 'P1-' + String(inv.numero || inv.id || 0).padStart(4, '0');
+  if ((inv.empresa || EMPRESA_ATCB) === EMPRESA_PERFUMES) return 'f2-' + String(inv.numero || inv.id || 0).padStart(4, '0');
+  return 'f1-' + String(inv.numero || inv.id || 0).padStart(4, '0');
+}
+function findInvByCodigo(code) {
+  const raw = String(code || '').trim();
+  if (!raw) return null;
+  const p = parseInvCodigo(raw);
+  // exact match
+  let inv = (invoices || []).find(i => String(i.numero) === raw || String(i.numero).toLowerCase() === raw.toLowerCase());
+  if (inv) return inv;
+  if (p.prefix) {
+    const want = formatInvCodigo(p.prefix, p.n);
+    inv = (invoices || []).find(i => {
+      const d = invNumeroDisplay(i);
+      return d.toLowerCase() === want.toLowerCase() || String(i.numero) === want;
+    });
+    if (inv) return inv;
+  }
+  // legacy pure number
+  if (p.n && !p.prefix) {
+    inv = (invoices || []).find(i => +i.numero === p.n || +i.id === p.n);
+  }
+  return inv || null;
+}
+
 let labQ = [{ prod: '', g: 0, precio: 0 }];
 let labI = [{ prod: '', u: 0, precio: 0 }];
 let insEditingId = null;
@@ -3358,8 +3430,8 @@ function renderHomeContabilidad() {
   else if (diff > 0.5) diffCls = 'stat income';
   set('homeCajaDiff', diff, diffCls);
 
-  // Gráfica home
-  const labels = [], inc = [], exp = [];
+  // Gráfica home (misma lógica que Contab.)
+  const labels = [], inc = [], exp = [], atcbI = [], perfI = [], manI = [];
   for (let n = 0; n < 12; n++) {
     const d = new Date(y, n, 1);
     const k = y + '-' + String(n + 1).padStart(2, '0');
@@ -3367,19 +3439,32 @@ function renderHomeContabilidad() {
     const [ii, ee] = totalsFn(m);
     labels.push(d.toLocaleDateString('es-CO', { month: 'short' }));
     inc.push(ii); exp.push(ee);
+    try {
+      const br = contBreakdown(m);
+      atcbI.push(br.inc.atcb); perfI.push(br.inc.perfumes); manI.push(br.inc.manual);
+    } catch (e) { atcbI.push(0); perfI.push(0); manI.push(0); }
   }
   if (homeChart) { try { homeChart.destroy(); } catch (err) {} homeChart = null; }
   const canvas = document.getElementById('homeChart');
   if (canvas && typeof Chart !== 'undefined') {
+    const modeEl = document.getElementById('homeChartMode');
+    const mode = (modeEl && modeEl.value) || 'ing_egr';
+    let datasets;
+    if (mode === 'emp_manual') {
+      datasets = [
+        { label: '🧊 Atcb', data: atcbI, backgroundColor: 'rgba(77,163,255,0.8)' },
+        { label: '🧴 Perfumes', data: perfI, backgroundColor: 'rgba(255,184,77,0.8)' },
+        { label: '✍️ Manual', data: manI, backgroundColor: 'rgba(167,139,250,0.8)' }
+      ];
+    } else {
+      datasets = [
+        { label: 'Ingresos', data: inc, backgroundColor: 'rgba(53,208,127,0.75)' },
+        { label: 'Egresos', data: exp, backgroundColor: 'rgba(255,92,108,0.75)' }
+      ];
+    }
     homeChart = new Chart(canvas, {
       type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Ingresos', data: inc, backgroundColor: 'rgba(53,208,127,0.75)' },
-          { label: 'Egresos', data: exp, backgroundColor: 'rgba(255,92,108,0.75)' }
-        ]
-      },
+      data: { labels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -3479,7 +3564,7 @@ function renderStats() {
           ? ' <span class="chip" style="background:#3d2a12;color:var(--orange)">🧴 Perfumes</span>'
           : ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">🧊 Atcb</span>';
         return `<div class="list-card clickable ${overdue ? 'overdue-row' : ''}" data-inv-id="${inv.id}" onclick="goToInvGuardadas(${inv.id})">
-          <div class="title">${escapeHtml(inv.cliente)} <span class="chip ${overdue ? 'overdue' : 'pendiente'}">${tipoLabel(inv.tipo, overdue)}</span>${inv.isProyecto?' <span class="chip" style="background:#2d1f4e;color:var(--purple)">Proyecto</span>':''}${empChip} · #${inv.numero}</div>
+          <div class="title">${escapeHtml(inv.cliente)} <span class="chip ${overdue ? 'overdue' : 'pendiente'}">${tipoLabel(inv.tipo, overdue)}</span>${inv.isProyecto?' <span class="chip" style="background:#2d1f4e;color:var(--purple)">Proyecto</span>':''}${empChip} · ${invNumeroDisplay(inv)}</div>
           <div class="line">📅 ${fmtDate(inv.fecha)} · ⏱ ${dias} día(s)${inv.isProyecto && inv.proyecto ? ' · 🧊 '+escapeHtml((inv.proyecto||'').slice(0,36)) : ''}</div>
           <div class="line">💵 Venta: <strong>${money(inv.total)}</strong>${(() => {
           const c = inv.isProyecto
@@ -3517,7 +3602,7 @@ function renderStats() {
           ? ' <span class="chip" style="background:#3d2a12;color:var(--orange)">🧴 Perfumes</span>'
           : ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">🧊 Atcb</span>';
         return `<div class="list-card clickable ${overdue ? 'overdue-row' : ''}" data-inv-id="${inv.id}" onclick="goToInvGuardadas(${inv.id})">
-          <div class="title">${escapeHtml(inv.cliente)} <span class="chip ${overdue ? 'overdue' : 'cotizacion'}">${tipoLabel(inv.tipo, overdue)}</span>${inv.isProyecto?' <span class="chip" style="background:#2d1f4e;color:var(--purple)">Proyecto</span>':''}${empChip} · #${inv.numero}</div>
+          <div class="title">${escapeHtml(inv.cliente)} <span class="chip ${overdue ? 'overdue' : 'cotizacion'}">${tipoLabel(inv.tipo, overdue)}</span>${inv.isProyecto?' <span class="chip" style="background:#2d1f4e;color:var(--purple)">Proyecto</span>':''}${empChip} · ${invNumeroDisplay(inv)}</div>
           <div class="line">📅 ${fmtDate(inv.fecha)} · ⏱ ${dias} día(s)${inv.isProyecto && inv.proyecto ? ' · 🧊 '+escapeHtml((inv.proyecto||'').slice(0,36)) : ''}</div>
           <div class="line">💵 Venta: <strong>${money(inv.total)}</strong>${(() => {
           const c = inv.isProyecto
@@ -5499,17 +5584,22 @@ async function openQrScanner(mode) {
   if (typeof Html5Qrcode === 'undefined') {
     return toast('Librería QR no cargó. Revisa internet y recarga.');
   }
-  qrScanMode = mode === 'lookup' ? 'lookup' : 'fact';
+  qrScanMode = (mode === 'lookup' || mode === 'proy_res') ? mode : 'fact';
   const modal = document.getElementById('qrModal');
   if (!modal) return;
   const title = document.getElementById('qrModalTitle');
   const hint = document.getElementById('qrModalHint');
-  if (title) title.textContent = qrScanMode === 'lookup' ? '📷 Consultar QR (ficha)' : '📷 Escanear QR (factura)';
+  if (title) {
+    title.textContent = qrScanMode === 'lookup' ? '📷 Consultar QR (ficha)'
+      : (qrScanMode === 'proy_res' ? '📷 QR componentes proyecto' : '📷 Escanear QR (factura)');
+  }
   if (hint) {
     if (qrScanMode === 'lookup') {
-      hint.innerHTML = 'Escanea un código id de <strong>stock</strong> o <strong>insumo</strong>. Se abre la ficha 👀 con el detalle.';
+      hint.innerHTML = 'Escanea factura/proyecto (<code>f1-####</code>, <code>P1-####</code>, <code>f2-####</code>), stock o insumo. Se abre la ficha 👀.';
+    } else if (qrScanMode === 'proy_res') {
+      hint.innerHTML = 'Escanea producto Atcb o pega <code>1-0001;5</code> para componentes del proyecto.';
     } else {
-      hint.innerHTML = 'Apunta al QR del producto. Formatos:<br>Atcb: <code>1-0001</code> o <code>1-0001;5</code><br>Perfumes: <code>2-0001;30</code> o <code>2-0001;30;2</code><br>Insumos: <code>iq-0001</code> · <code>ii-0001</code>';
+      hint.innerHTML = 'Apunta al QR del producto. Formatos:<br>Atcb: <code>1-0001</code> o <code>1-0001;5</code><br>Perfumes: <code>2-0001;30</code> o <code>2-0001;30;2</code>';
     }
   }
   modal.classList.add('open');
@@ -5521,7 +5611,11 @@ async function openQrScanner(mode) {
     if (qrBusy) return;
     qrBusy = true;
     try {
-      if (qrScanMode === 'lookup') {
+      if (qrScanMode === 'proy_res') {
+        const ok = await addProyResFromQr(decoded);
+        if (ok) playScanBeep();
+        setTimeout(() => { qrBusy = false; }, 1200);
+      } else if (qrScanMode === 'lookup') {
         const ok = await lookupFromQrText(decoded);
         if (ok) {
           playScanBeep();
@@ -5558,14 +5652,39 @@ async function openQrScanner(mode) {
   }
 }
 
-/** Consulta global: stock (1-/2-) o insumos (iq-/ii-) → ficha 👀 */
+async function addProyResFromQr(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return false;
+  if (s.indexOf(';') >= 0 || s.indexOf('\n') >= 0) return applyBulkProyResLines(s);
+  const code = normCodigoId(s.split(/[;\t,]/)[0] || s);
+  const prod = (products || []).find(x =>
+    (x.empresa || EMPRESA_ATCB) === EMPRESA_ATCB && normCodigoId(x.codigo) === code
+  );
+  if (!prod) { toast('No hay ' + code + ' en stock Atcb'); return false; }
+  if (typeof currentProyRes === 'undefined' || !Array.isArray(window.currentProyRes) && !Array.isArray(currentProyRes)) {
+    // currentProyRes may be global
+  }
+  try {
+    if (typeof currentProyRes !== 'undefined') {
+      currentProyRes.push({ name: prod.name || code, cant: 1, costo: +prod.compra || 0, sub: +prod.compra || 0, codigo: code });
+      try { renderProyRes(); } catch (e) {}
+      try { updateProyResProfit(); } catch (e) {}
+      toast('📷 ' + (prod.name || code));
+      return true;
+    }
+  } catch (e) { console.warn(e); }
+  toast('No se pudo agregar al proyecto');
+  return false;
+}
+
+/** Consulta global: factura/proyecto, stock o insumos → ficha 👀 */
 async function lookupFromQrText(raw) {
   let s = String(raw || '').trim();
   if (!s) { toast('QR vacío'); return false; }
   try {
     if (/^https?:\/\//i.test(s)) {
       const u = new URL(s);
-      const c = u.searchParams.get('c') || u.searchParams.get('codigo') || u.searchParams.get('code');
+      const c = u.searchParams.get('c') || u.searchParams.get('codigo') || u.searchParams.get('code') || u.searchParams.get('fact');
       if (c) s = c;
       else {
         const parts = u.pathname.split('/').filter(Boolean);
@@ -5573,9 +5692,25 @@ async function lookupFromQrText(raw) {
       }
     }
   } catch (e) {}
-  // primera pieza si viene bulk
   s = s.split(/[\n\r;,\t]/)[0].trim();
   const low = s.toLowerCase();
+
+  // Factura / proyecto (f1-####, f2-####, P1-####)
+  if (/^(f1|f2|p1)-?\d+/i.test(low) || (/^\d{1,6}$/.test(low) && findInvByCodigo(s))) {
+    const inv = findInvByCodigo(s);
+    if (!inv) { toast('No hay factura/proyecto ' + s); return false; }
+    try {
+      if (inv.empresa && inv.empresa !== activeEmpresa && !inv.isProyecto) {
+        activeEmpresa = inv.empresa;
+        try { applyEmpresaUI(); } catch (e) {}
+        const sel = document.getElementById('empresaSelect');
+        if (sel) sel.value = activeEmpresa;
+      }
+      viewInvDetail(inv.id);
+    } catch (e) { console.warn(e); toast('No se pudo abrir la ficha'); return false; }
+    toast('👀 ' + invNumeroDisplay(inv));
+    return true;
+  }
 
   // Insumos
   if (/^(iq|ii)-?\d+/i.test(low)) {
@@ -5617,6 +5752,27 @@ async function closeQrScanner() {
   if (modal) modal.classList.remove('open');
 }
 
+
+(function initProyResQr(){
+  const inp = document.getElementById('pResSearch');
+  if (inp && !inp._bulkBound) {
+    inp._bulkBound = 1;
+    inp.addEventListener('paste', (e) => {
+      setTimeout(() => {
+        const v = inp.value || '';
+        if (v.indexOf(';') >= 0 || v.indexOf('\n') >= 0) {
+          if (applyBulkProyResLines(v)) {
+            inp.value = '';
+            toast('Componentes agregados desde pegado');
+          }
+        }
+      }, 0);
+    });
+  }
+  const b = document.getElementById('btnScanQrProy');
+  if (b) b.onclick = () => openQrScanner('proy_res');
+})();
+
 (function initQrScan() {
   const b = document.getElementById('btnScanQr');
   if (b) b.onclick = () => openQrScanner('fact');
@@ -5641,7 +5797,11 @@ async function closeQrScanner() {
         if (qrBusy) return;
         qrBusy = true;
         try {
-          if (qrScanMode === 'lookup') {
+          if (qrScanMode === 'proy_res') {
+            const ok = await addProyResFromQr(decoded);
+            if (ok) playScanBeep();
+            setTimeout(() => { qrBusy = false; }, 1200);
+          } else if (qrScanMode === 'lookup') {
             const ok = await lookupFromQrText(decoded);
             if (ok) { playScanBeep(); await closeQrScanner(); }
             else setTimeout(() => { qrBusy = false; }, 900);
@@ -5856,7 +6016,7 @@ async function doSaveFact(tipo) {
       invoices[i] = inv;
     }
   } else {
-    inv.id = nextInvId++; inv.numero = nextNumero++;
+    inv.id = nextInvId++; inv.numero = nextInvCodigo(false, inv.empresa || activeEmpresa);
     invoices.push(inv);
   }
   syncContFromInvoice(inv);
@@ -5868,7 +6028,7 @@ async function doSaveFact(tipo) {
   // Stock: devolver lo de la versión anterior y aplicar lo nuevo (evita doble resta al editar)
   try { applyInvoiceStockChange(prev, inv); } catch (e) {}
   await autoSave();
-  toast(editingInvId ? 'Factura actualizada' : 'Factura guardada #' + inv.numero);
+  toast(editingInvId ? 'Factura actualizada' : 'Factura guardada ' + invNumeroDisplay(inv));
   try { refreshContabilidad(); } catch (e) {}
   clearFactForm(); show('guardadas');
 }
@@ -5980,7 +6140,7 @@ function renderInvoices() {
           ? ' <span class="chip" style="background:#3d2a12;color:var(--orange)">🧴 Perfumes</span>'
           : ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">🧊 Atcb</span>';
         return `<div class="list-card ${overdue ? 'overdue-row' : ''}" data-inv-id="${inv.id}">
-          <div class="title">${escapeHtml(inv.cliente)} <span class="chip ${chipCls}">${label}</span>${isProy?' <span class="chip" style="background:#2d1f4e;color:var(--purple)">Proyecto</span>':''}${empChip} · #${inv.numero}</div>
+          <div class="title">${escapeHtml(inv.cliente)} <span class="chip ${chipCls}">${label}</span>${isProy?' <span class="chip" style="background:#2d1f4e;color:var(--purple)">Proyecto</span>':''}${empChip} · ${invNumeroDisplay(inv)}</div>
           <div class="line">📅 ${fmtDate(inv.fecha)} · ⏱ ${dias} día(s)${isProy && inv.proyecto ? ' · 🧊 '+escapeHtml((inv.proyecto||'').slice(0,40)) : ''}</div>
           <div class="line">💵 Venta: <strong>${money(inv.total)}</strong>${(() => {
           const c = inv.isProyecto
@@ -6137,8 +6297,13 @@ function viewInvDetail(id) {
     ? (inv.resulta || []).reduce((s, r) => s + (parseMoney(r.sub) || 0), 0)
     : linesCostoTotal(inv.items || []);
   const r = Math.round((parseMoney(inv.total) - c) * 100) / 100;
-  title.textContent = (isProy ? 'Proyecto' : 'Factura') + ' #' + inv.numero;
+  const codShow = invNumeroDisplay(inv);
+  title.textContent = (isProy ? 'Proyecto' : 'Factura') + ' ' + codShow;
   let html = '';
+  html += `<div style="text-align:center;margin:0 0 10px;background:#fff;border-radius:10px;padding:10px">
+    <canvas id="invDetailQrCanvas" width="180" height="180" style="max-width:180px;margin:0 auto;display:block"></canvas>
+    <div style="color:#111;font-weight:800;font-size:13px;margin-top:6px">${escapeHtml(codShow)}</div>
+  </div>`;
   html += `<div class="d-row"><strong>Estado:</strong> ${tipoLabel(inv.tipo, overdue)}</div>`;
   html += `<div class="d-row"><strong>Fecha:</strong> ${fmtDate(inv.fecha)} · ${daysAgo(inv.fecha)} día(s)</div>`;
   html += `<div class="d-row"><strong>Cliente:</strong> ${escapeHtml(inv.cliente || '')}</div>`;
@@ -6191,6 +6356,14 @@ function viewInvDetail(id) {
     if (inv.garantia) html += `<div class="d-row"><strong>Garantía:</strong> ${escapeHtml(inv.garantia)}</div>`;
   }
   body.innerHTML = html;
+  // QR del número de factura/proyecto
+  try {
+    const cvs = document.getElementById('invDetailQrCanvas');
+    if (cvs && typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+      QRCode.toCanvas(cvs, codShow, { width: 180, margin: 1, color: { dark: '#000', light: '#fff' } }).catch(()=>{});
+    }
+  } catch (e) {}
+  
   modal.classList.add('open');
 }
 function closeInvDetail() {
@@ -6517,11 +6690,8 @@ function buildPrintHtml(inv) {
   const productosHtml = prodLines + (prodLines && emptyLines ? '<br>' : '') + emptyLines;
   const obsHtml = inv.obs ? escapeHtml(inv.obs).replace(/\n/g, '<br>') : '';
   const fechaFmt = inv.fecha || '';
-  let numDisplay = inv.numero;
-  if (fechaFmt && inv.numero) {
-    const parts = fechaFmt.split('-');
-    if (parts.length === 3) numDisplay = parts[1] + parts[2] + '-' + inv.numero;
-  }
+  const numDisplay = invNumeroDisplay(inv);
+  const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=4&data=' + encodeURIComponent(numDisplay);
   const banner = e.pdfBanner || DEFAULT_PDF_BANNER;
   const hasAbonos = (inv.abonos || []).length > 0;
   const abonado = totalAbonado(inv);
@@ -6564,6 +6734,7 @@ function buildPrintHtml(inv) {
           <div><strong>Fecha</strong> &nbsp;&nbsp; ${fmtDate(fechaFmt)}</div>
           <div style="margin-top:4px"><strong>Factura natural N°</strong> &nbsp;&nbsp; ${escapeHtml(String(numDisplay))}</div>
           <div style="margin-top:4px"><strong>Tel. Adm.</strong> &nbsp;&nbsp; ${escapeHtml(e.tel || '')}</div>
+          <div style="margin-top:8px"><img src="${qrImg}" alt="QR ${escapeHtml(String(numDisplay))}" style="width:72px;height:72px;border:1px solid #ddd"/></div>
         </td>
       </tr>
     </table>
@@ -7191,19 +7362,60 @@ if(pBtnAddRes) pBtnAddRes.onclick=()=>{
   renderProyRes();
 };
 // Autocomplete stock for componentes
+function applyBulkProyResLines(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return false;
+  const lines = raw.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
+  let any = false;
+  lines.forEach(line => {
+    const parts = line.split(/[;\t]/).map(x => x.trim()).filter(Boolean);
+    if (!parts.length) return;
+    const code = normCodigoId(parts[0]);
+    const cant = parts.length >= 2 ? (parseFloat(String(parts[1]).replace(',', '.')) || 1) : 1;
+    const prod = (products || []).find(x =>
+      (x.empresa || EMPRESA_ATCB) === EMPRESA_ATCB &&
+      normCodigoId(x.codigo) === code
+    );
+    if (!prod) { toast('No hay ' + code + ' en stock Atcb'); return; }
+    if (typeof currentProyRes === 'undefined' || !Array.isArray(currentProyRes)) return;
+    currentProyRes.push({
+      name: prod.name || code,
+      cant,
+      costo: +prod.compra || 0,
+      sub: Math.round((cant * (+prod.compra || 0)) * 100) / 100,
+      codigo: code
+    });
+    any = true;
+  });
+  if (any) {
+    try { renderProyRes(); } catch (e) {}
+    try { updateProyResProfit(); } catch (e) {}
+  }
+  return any;
+}
 const pResSearch=document.getElementById("pResSearch");
 if(pResSearch){
   pResSearch.oninput=()=>{
+    const raw = pResSearch.value || '';
+    if (raw.indexOf("\n") >= 0 || (/;/.test(raw) && /\d/.test(raw))) {
+      document.getElementById("pResDrop")?.classList.remove("open");
+      return;
+    }
     const q=pResSearch.value.toLowerCase().trim();
     const drop=document.getElementById("pResDrop");
     if(!q||!drop){if(drop)drop.classList.remove("open");return}
-    const matches=(products||[]).filter(p=>(p.name||"").toLowerCase().includes(q)).slice(0,10);
+    const matches=(products||[]).filter(p=>{
+      if ((p.empresa||EMPRESA_ATCB)!==EMPRESA_ATCB) return false;
+      const name=(p.name||"").toLowerCase();
+      const cod=String(p.codigo||"").toLowerCase();
+      return name.includes(q)||cod.includes(q);
+    }).slice(0,10);
     if(!matches.length){drop.classList.remove("open");return}
-    drop.innerHTML=matches.map(p=>`<div data-id="${p.id}">${escapeHtml(p.name)} · ${money(p.venta||p.compra||0)}</div>`).join("");
+    drop.innerHTML=matches.map(p=>`<div data-id="${p.id}">${escapeHtml(p.name||"")} ${p.codigo?("· "+p.codigo):""}</div>`).join("");
     drop.classList.add("open");
     drop.querySelectorAll("div").forEach(el=>{
       el.onclick=()=>{
-        const p=products.find(x=>x.id==el.dataset.id);
+        const p=(products||[]).find(x=>+x.id===+el.dataset.id);
         if(p){pResSearch.value=p.name;document.getElementById("pResCosto").value=p.compra||p.venta||0}
         drop.classList.remove("open");
       };
@@ -7355,7 +7567,7 @@ if(pBtnSave) pBtnSave.onclick=async ()=>{
     if(i>=0){ inv.id=editingProyId; inv.numero=invoices[i].numero; inv.abonos=invoices[i].abonos||[]; invoices[i]=inv; }
   } else {
     inv.id = (typeof nextInvId!=="undefined") ? nextInvId++ : Date.now();
-    inv.numero = (typeof nextNumero!=="undefined") ? nextNumero++ : 1;
+    inv.numero = nextInvCodigo(true, EMPRESA_ATCB);
     invoices.push(inv);
   }
   // Utilidad = venta - costo resulta → contab solo si finalizada
@@ -7363,7 +7575,7 @@ if(pBtnSave) pBtnSave.onclick=async ()=>{
   inv.rentabilidad = Math.round((parseMoney(inv.total) - inv.costoTotal) * 100) / 100;
   syncContFromInvoice(inv);
   await autoSave();
-  toast((editingProyId?"Proyecto actualizado":"Proyecto guardado")+" #"+inv.numero+" · "+tipoLabel(tipo,false));
+  toast((editingProyId?"Proyecto actualizado":"Proyecto guardado")+" "+invNumeroDisplay(inv)+" · "+tipoLabel(tipo,false));
   clearProyForm();
   renderInvoices(); renderStats();
   try { refreshContabilidad(); } catch(e) {}
@@ -8165,6 +8377,8 @@ function printArchivedYear(year) {
 
 
 (function bindContChartMode() {
+  const hsel = document.getElementById('homeChartMode');
+  if (hsel) hsel.onchange = () => { try { renderHomeContabilidad(); } catch (e) {} };
   const sel = document.getElementById('contChartMode');
   if (!sel || sel._bound) return;
   sel._bound = true;
