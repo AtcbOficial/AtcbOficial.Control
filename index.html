@@ -7000,17 +7000,24 @@ function printThermalInv(id) {
 }
 
 /** --- Phomemo M110 BLE (protocolo tipo Phomymo / phomemo-tools) --- */
+/** --- Phomemo M110 BLE (mismo enfoque que Phomymo) --- */
 const PHOMEMO_BLE = {
   SERVICE: 0xff00,
   WRITE: 0xff02,
   NOTIFY: 0xff03,
-  ALT_SERVICES: [0xff00, 0xffe0, 0xae30],
+  ALT_SERVICES: [
+    0xff00,
+    0xffe0,
+    0xae30,
+    '0000ff00-0000-1000-8000-00805f9b34fb',
+    '0000ffe0-0000-1000-8000-00805f9b34fb'
+  ],
   CHUNK: 128,
-  DELAY: 25
+  DELAY: 20
 };
 
 function thermalDelay(ms) {
-  return new Promise(r => setTimeout(r, ms));
+  return new Promise(function (r) { setTimeout(r, ms); });
 }
 
 async function thermalBleConnect() {
@@ -7018,123 +7025,140 @@ async function thermalBleConnect() {
     setThermalStatus('Web Bluetooth no disponible. Usa Chrome o Edge.', false);
     return toast('Necesitas Chrome o Edge con Bluetooth');
   }
-  setThermalStatus('Elige la impresora en el selector del sistema…');
+  // Si Phomymo u otra pestaña tiene la impresora, hay que desconectarla primero
+  setThermalStatus('Cierra Phomymo/Print Master si están abiertos. Elige la impresora…');
   try {
+    // Igual que Phomymo: filtros por prefijo + optionalServices
     const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: false,
       filters: [
-        { namePrefix: 'M110' },
-        { namePrefix: 'M120' },
-        { namePrefix: 'M02' },
         { namePrefix: 'M' },
         { namePrefix: 'Q' },
+        { namePrefix: 'D' },
+        { namePrefix: 'P' },
         { namePrefix: 'Phomemo' }
       ],
-      optionalServices: [
-        0xff00, 0xffe0, 0xae30,
-        '0000ff00-0000-1000-8000-00805f9b34fb',
-        '0000ffe0-0000-1000-8000-00805f9b34fb'
-      ]
+      optionalServices: PHOMEMO_BLE.ALT_SERVICES
     });
     setThermalStatus('Conectando GATT a ' + (device.name || 'impresora') + '…');
-    if (!device.gatt) throw new Error('Sin GATT');
-    const server = await device.gatt.connect();
-    await thermalDelay(200);
+    if (!device.gatt) throw new Error('Sin GATT en el dispositivo');
 
-    // Buscar servicio
-    const serviceUuids = [0xff00, 0xffe0, 0xae30, '0000ff00-0000-1000-8000-00805f9b34fb', '0000ffe0-0000-1000-8000-00805f9b34fb'];
+    // Desconectar sesión previa en esta página
+    try {
+      if (thermalBle && thermalBle.device && thermalBle.device.gatt && thermalBle.device.gatt.connected) {
+        thermalBle.device.gatt.disconnect();
+      }
+    } catch (e) {}
+    thermalBle = null;
+
+    const server = await device.gatt.connect();
+    await thermalDelay(150); // Phomymo: delay tras GATT
+
     let service = null;
-    let usedUuid = null;
-    for (const uuid of serviceUuids) {
+    let lastErr = null;
+    for (let si = 0; si < PHOMEMO_BLE.ALT_SERVICES.length; si++) {
+      const uuid = PHOMEMO_BLE.ALT_SERVICES[si];
       try {
         service = await server.getPrimaryService(uuid);
-        usedUuid = uuid;
-        console.log('[thermal] service OK', uuid);
+        console.log('[thermal] service', uuid);
         break;
       } catch (e) {
-        console.log('[thermal] service fail', uuid, e.message);
+        lastErr = e;
+        console.log('[thermal] no service', uuid);
       }
     }
-    if (!service) {
-      // último recurso: listar servicios
-      try {
-        const all = await server.getPrimaryServices();
-        console.log('[thermal] services', all.map(s => s.uuid));
-        if (all.length) service = all[0];
-      } catch (e) {}
-    }
-    if (!service) throw new Error('No se encontró servicio BLE (0xff00). ¿Es una Phomemo encendida?');
+    if (!service) throw new Error('Servicio BLE 0xff00 no encontrado. ¿Cerraste Phomymo? ' + (lastErr && lastErr.message ? lastErr.message : ''));
 
-    // Buscar característica de escritura
+    // CRÍTICO: solo 0xff02 como Phomymo (no coger otra característica al azar)
     let writeChar = null;
-    const tryChars = [0xff02, 0xffe1, 0xae01, '0000ff02-0000-1000-8000-00805f9b34fb', '0000ffe1-0000-1000-8000-00805f9b34fb'];
-    for (const cu of tryChars) {
-      try {
-        writeChar = await service.getCharacteristic(cu);
-        console.log('[thermal] write char OK', cu, writeChar.properties);
-        break;
-      } catch (e) {}
-    }
-    if (!writeChar) {
-      try {
-        const chars = await service.getCharacteristics();
-        console.log('[thermal] chars', chars.map(c => ({ uuid: c.uuid, p: c.properties })));
-        writeChar = chars.find(c => c.properties.writeWithoutResponse || c.properties.write) || chars[0];
-      } catch (e) {}
-    }
-    if (!writeChar) throw new Error('No hay característica de escritura BLE');
-
-    const props = writeChar.properties || {};
-    const useResp = !props.writeWithoutResponse && !!props.write;
-    thermalBle = {
-      device, server, writeChar, useResp,
-      name: device.name || 'Phomemo',
-      serviceUuid: String(usedUuid)
-    };
-    device.addEventListener('gattserverdisconnected', () => {
-      thermalBle = null;
-      const b = document.getElementById('btnThermalBlePrint');
-      if (b) b.disabled = true;
-      setThermalStatus('Impresora desconectada', false);
-    });
-
-    // Prueba de vida: SPEED cmd (no imprime papel)
     try {
-      await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
-      await thermalDelay(50);
+      writeChar = await service.getCharacteristic(PHOMEMO_BLE.WRITE);
     } catch (e) {
-      console.warn('[thermal] probe write failed', e);
-      throw new Error('Conectó pero no acepta escritura: ' + (e.message || e));
+      try {
+        writeChar = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+      } catch (e2) {
+        throw new Error('No hay característica 0xff02 (escritura). No es compatible o está ocupada.');
+      }
     }
+    const props = writeChar.properties || {};
+    console.log('[thermal] write props', props.write, props.writeWithoutResponse);
+    const useResp = !props.writeWithoutResponse && !!props.write;
+
+    // Notificaciones 0xff03 (Phomymo las activa)
+    let notifyChar = null;
+    try {
+      notifyChar = await service.getCharacteristic(PHOMEMO_BLE.NOTIFY);
+      await notifyChar.startNotifications();
+      console.log('[thermal] notify ON');
+    } catch (e) {
+      try {
+        notifyChar = await service.getCharacteristic('0000ff03-0000-1000-8000-00805f9b34fb');
+        await notifyChar.startNotifications();
+      } catch (e2) {
+        console.warn('[thermal] notify no disponible', e2 && e2.message);
+      }
+    }
+
+    thermalBle = {
+      device: device,
+      server: server,
+      writeChar: writeChar,
+      notifyChar: notifyChar,
+      useResp: useResp,
+      name: device.name || 'Phomemo'
+    };
+
+    if (!device._thermalDisc) {
+      device.addEventListener('gattserverdisconnected', function () {
+        console.log('[thermal] disconnected event');
+        thermalBle = null;
+        const b = document.getElementById('btnThermalBlePrint');
+        if (b) b.disabled = true;
+        setThermalStatus('Impresora desconectada', false);
+      });
+      device._thermalDisc = true;
+    }
+
+    // Verificar que gatt.connected es true
+    if (!device.gatt.connected) throw new Error('GATT no quedó connected');
+
+    // Probe de escritura (SPEED)
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
+    await thermalDelay(80);
 
     const btnP = document.getElementById('btnThermalBlePrint');
     if (btnP) btnP.disabled = false;
-    setThermalStatus('Conectada: ' + thermalBle.name + ' · lista para imprimir', true);
-    toast('📡 ' + thermalBle.name + ' conectada');
+    setThermalStatus('Conectada: ' + thermalBle.name + ' (0xff02 OK). Ya puedes Imprimir BLE.', true);
+    toast('📡 ' + thermalBle.name + ' lista');
   } catch (e) {
-    console.error(e);
+    console.error('[thermal] connect', e);
     const msg = (e && e.message) ? e.message : String(e);
     if (/cancel|User cancelled/i.test(msg)) setThermalStatus('Conexión cancelada', false);
-    else setThermalStatus('Error: ' + msg, false);
-    toast('No se pudo conectar: ' + msg);
+    else setThermalStatus('Error conexión: ' + msg, false);
+    toast('BLE: ' + msg);
   }
 }
 
 async function thermalBleSend(bytes) {
   if (!thermalBle || !thermalBle.writeChar) throw new Error('Sin impresora');
-  const buf = bytes instanceof Uint8Array ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : bytes;
-  if (thermalBle.useResp) await thermalBle.writeChar.writeValue(buf);
-  else {
+  if (!thermalBle.device.gatt.connected) throw new Error('GATT desconectado');
+  // Copia limpia del buffer (Phomymo hace new Uint8Array(data).buffer)
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const copy = new Uint8Array(u8.length);
+  copy.set(u8);
+  const buffer = copy.buffer;
+  if (thermalBle.useResp) {
+    await thermalBle.writeChar.writeValue(buffer);
+  } else {
     try {
-      await thermalBle.writeChar.writeValueWithoutResponse(buf);
+      await thermalBle.writeChar.writeValueWithoutResponse(buffer);
     } catch (e) {
       thermalBle.useResp = true;
-      await thermalBle.writeChar.writeValue(buf);
+      await thermalBle.writeChar.writeValue(buffer);
     }
   }
 }
 
-/** Canvas → raster 1 bit (MSB first), ancho 384 px (48 bytes) para M110 */
+/** Canvas → raster 1 bit MSB, 384 px de ancho (48 bytes) M110 */
 function thermalCanvasToRaster(canvas) {
   const w = canvas.width;
   const h = canvas.height;
@@ -7145,29 +7169,27 @@ function thermalCanvasToRaster(canvas) {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
-      const gray = (img.data[i] * 0.299 + img.data[i + 1] * 0.587 + img.data[i + 2] * 0.114);
-      // negro si oscuro
+      const gray = img.data[i] * 0.299 + img.data[i + 1] * 0.587 + img.data[i + 2] * 0.114;
       if (gray < 160) {
-        const bi = y * widthBytes + (x >> 3);
-        data[bi] |= (0x80 >> (x & 7));
+        data[y * widthBytes + (x >> 3)] |= (0x80 >> (x & 7));
       }
     }
   }
-  return { data, widthBytes, heightLines: h };
+  return { data: data, widthBytes: widthBytes, heightLines: h };
 }
 
-/** Dibuja el ticket en canvas 384 px de ancho (contenido completo en altura) */
 async function thermalRenderCanvas(inv) {
   const W = 384;
   const pad = 12;
   const lines = [];
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
-  const push = (t, opt) => lines.push(Object.assign({ t: String(t || ''), size: 18, bold: false, center: false }, opt || {}));
+  const push = function (t, opt) {
+    lines.push(Object.assign({ t: String(t || ''), size: 18, bold: false, center: false }, opt || {}));
+  };
   push(e.name || e.label || 'Empresa', { size: 20, bold: true, center: true });
   if (e.nit) push('NIT ' + e.nit, { size: 14, center: true });
   if (e.tel) push('Tel. ' + e.tel, { size: 14, center: true });
-  if (e.social) push(e.social, { size: 14, center: true });
   if (e.dir) push(e.dir, { size: 13, center: true });
   push('--------------------------------', { center: true, size: 14 });
   push(cod, { size: 22, bold: true, center: true });
@@ -7176,11 +7198,10 @@ async function thermalRenderCanvas(inv) {
   push(inv.cliente || '');
   if (inv.documento) push('Doc: ' + inv.documento, { size: 14 });
   if (inv.telefono) push('Tel: ' + inv.telefono, { size: 14 });
-  if (inv.direccion) push(inv.direccion, { size: 14 });
   push('Fecha: ' + fmtDate(inv.fecha), { size: 14 });
   push('--------------------------------', { center: true, size: 14 });
   push('PRODUCTOS', { size: 15, bold: true });
-  (inv.items || []).forEach(it => {
+  (inv.items || []).forEach(function (it) {
     const cant = it.cant || 0;
     const name = it.name || '';
     const sub = money(it.sub != null ? it.sub : cant * (it.precio || 0));
@@ -7191,7 +7212,7 @@ async function thermalRenderCanvas(inv) {
   push('TOTAL  ' + money(inv.total), { size: 22, bold: true });
   if ((inv.abonos || []).length) {
     push('ABONOS', { size: 15, bold: true });
-    inv.abonos.forEach(a => {
+    inv.abonos.forEach(function (a) {
       push(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 14 });
     });
     push('Abonado ' + money(totalAbonado(inv)), { size: 15, bold: true });
@@ -7199,7 +7220,7 @@ async function thermalRenderCanvas(inv) {
   }
   if (inv.obs) {
     push('OBS.', { size: 15, bold: true });
-    String(inv.obs).split(/\n/).forEach(l => push(l, { size: 13 }));
+    String(inv.obs).split(/\n/).forEach(function (l) { push(l, { size: 13 }); });
   }
   push('--------------------------------', { center: true, size: 14 });
   push('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 12 });
@@ -7210,21 +7231,19 @@ async function thermalRenderCanvas(inv) {
   push('Ahorros 86900003930', { size: 14 });
   push('Luis Bonilla P. J.', { size: 14 });
   push('Pasaporte 5001998395', { size: 13 });
-  push('--------------------------------', { center: true, size: 14 });
   push('Gracias por su compra', { size: 16, center: true, bold: true });
 
-  // Medir altura
   const canvas = document.getElementById('thermalPrintCanvas') || document.createElement('canvas');
   canvas.width = W;
   const ctx = canvas.getContext('2d');
-  let y = pad;
-  lines.forEach(L => {
+  let y = pad + 130;
+  lines.forEach(function (L) {
     ctx.font = (L.bold ? 'bold ' : '') + L.size + 'px Arial,Helvetica,sans-serif';
     const maxW = W - pad * 2;
     const words = L.t.split(/\s+/);
     let line = '';
     const wrapped = [];
-    words.forEach(w => {
+    words.forEach(function (w) {
       const test = line ? line + ' ' + w : w;
       if (ctx.measureText(test).width > maxW && line) {
         wrapped.push(line);
@@ -7235,40 +7254,36 @@ async function thermalRenderCanvas(inv) {
     if (!wrapped.length) wrapped.push('');
     y += wrapped.length * (L.size + 4) + 2;
   });
-  y += pad + 40;
-  canvas.height = Math.max(200, y);
-  canvas.width = W;
-  // fondo blanco
+  canvas.height = Math.max(200, y + pad);
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, W, canvas.height);
   ctx.fillStyle = '#000';
   y = pad;
-  // QR simple como texto del código (imagen QR cargada si posible)
   try {
-    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=1&data=' + encodeURIComponent(cod);
-    await new Promise((resolve) => {
+    await new Promise(function (resolve) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload = () => {
+      let done = false;
+      const fin = function () { if (!done) { done = true; resolve(); } };
+      img.onload = function () {
         const qs = 120;
         ctx.drawImage(img, (W - qs) / 2, y, qs, qs);
         y += qs + 8;
-        resolve();
+        fin();
       };
-      img.onerror = () => resolve();
-      img.src = qrUrl;
-      setTimeout(resolve, 1200);
+      img.onerror = fin;
+      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=1&data=' + encodeURIComponent(cod);
+      setTimeout(fin, 1500);
     });
   } catch (e) {}
 
-  lines.forEach(L => {
+  lines.forEach(function (L) {
     ctx.font = (L.bold ? 'bold ' : '') + L.size + 'px Arial,Helvetica,sans-serif';
-    ctx.fillStyle = '#000';
     const maxW = W - pad * 2;
     const words = L.t.split(/\s+/);
     let line = '';
     const wrapped = [];
-    words.forEach(w => {
+    words.forEach(function (w) {
       const test = line ? line + ' ' + w : w;
       if (ctx.measureText(test).width > maxW && line) {
         wrapped.push(line);
@@ -7277,7 +7292,7 @@ async function thermalRenderCanvas(inv) {
     });
     if (line) wrapped.push(line);
     if (!wrapped.length) wrapped.push('');
-    wrapped.forEach(wl => {
+    wrapped.forEach(function (wl) {
       let x = pad;
       if (L.center) x = (W - ctx.measureText(wl).width) / 2;
       if (L.right) x = W - pad - ctx.measureText(wl).width;
@@ -7296,65 +7311,61 @@ async function thermalBlePrint() {
     setThermalStatus('Primero conecta la impresora', false);
     return toast('Conecta la impresora BLE');
   }
-  try {
-    if (!thermalBle.device.gatt.connected) {
-      setThermalStatus('Reconectando…');
+  if (!thermalBle.device.gatt.connected) {
+    try {
+      setThermalStatus('Reconectando GATT…');
       await thermalBle.device.gatt.connect();
-      await thermalDelay(300);
+      await thermalDelay(200);
+    } catch (e) {
+      thermalBle = null;
+      const b = document.getElementById('btnThermalBlePrint');
+      if (b) b.disabled = true;
+      return toast('Se perdió la conexión. Conecta de nuevo (y cierra Phomymo).');
     }
-  } catch (e) {
-    thermalBle = null;
-    const b = document.getElementById('btnThermalBlePrint');
-    if (b) b.disabled = true;
-    return toast('Se perdió la conexión. Vuelve a Conectar.');
   }
   const btnP = document.getElementById('btnThermalBlePrint');
   if (btnP) btnP.disabled = true;
-  setThermalStatus('Generando imagen del ticket…');
+  setThermalStatus('Generando ticket…');
   try {
     const canvas = await thermalRenderCanvas(inv);
-    console.log('[thermal] canvas', canvas.width, 'x', canvas.height);
-    const { data, widthBytes, heightLines } = thermalCanvasToRaster(canvas);
-    console.log('[thermal] raster bytes', data.length, 'wB', widthBytes, 'h', heightLines);
-    if (!data.length || heightLines < 10) throw new Error('Ticket vacío o demasiado corto');
+    const raster = thermalCanvasToRaster(canvas);
+    const data = raster.data;
+    const widthBytes = raster.widthBytes;
+    const heightLines = raster.heightLines;
+    console.log('[thermal] print', widthBytes, heightLines, data.length);
+    if (heightLines < 8) throw new Error('Ticket demasiado corto');
 
-    setThermalStatus('Enviando a ' + thermalBle.name + ' (0%)…');
-
-    // M110 protocol (Phomymo / phomemo-tools)
-    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5])); // SPEED
-    await thermalDelay(40);
-    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 12])); // DENSITY
-    await thermalDelay(40);
-    // media: 0x0a = gap labels (Phomymo default); 0x0b continuous attempt
+    setThermalStatus('Imprimiendo… 0%');
+    // printM110 de Phomymo
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
+    await thermalDelay(30);
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 12]));
+    await thermalDelay(30);
     await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0a]));
-    await thermalDelay(40);
-
-    // GS v 0 raster — width low, width high, height low, height high
-    const header = new Uint8Array([
+    await thermalDelay(30);
+    await thermalBleSend(new Uint8Array([
       0x1d, 0x76, 0x30, 0x00,
       widthBytes & 0xff, 0x00,
       heightLines & 0xff, (heightLines >> 8) & 0xff
-    ]);
-    await thermalBleSend(header);
+    ]));
 
-    const total = data.length;
-    for (let i = 0; i < total; i += PHOMEMO_BLE.CHUNK) {
-      const chunk = data.subarray(i, Math.min(i + PHOMEMO_BLE.CHUNK, total));
-      // copy chunk to fresh buffer (some BLE stacks fail on subarray)
-      await thermalBleSend(new Uint8Array(chunk));
+    for (let i = 0; i < data.length; i += PHOMEMO_BLE.CHUNK) {
+      const end = Math.min(i + PHOMEMO_BLE.CHUNK, data.length);
+      const chunk = data.subarray(i, end);
+      await thermalBleSend(chunk);
       await thermalDelay(PHOMEMO_BLE.DELAY);
-      if (i % (PHOMEMO_BLE.CHUNK * 15) === 0) {
-        setThermalStatus('Imprimiendo… ' + Math.min(99, Math.round(i / total * 100)) + '%');
+      if (i % (PHOMEMO_BLE.CHUNK * 12) === 0) {
+        setThermalStatus('Imprimiendo… ' + Math.min(99, Math.round(i / data.length * 100)) + '%');
       }
     }
-    await thermalDelay(350);
-    await thermalBleSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00])); // FOOTER
+    await thermalDelay(300);
+    await thermalBleSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00]));
     await thermalDelay(500);
-    setThermalStatus('Enviado a ' + thermalBle.name + '. Si no sale papel, revisa que esté encendida y con papel.', true);
-    toast('🖨️ Datos enviados a la impresora');
+    setThermalStatus('Enviado. Si no sale papel: cierra Phomymo, reconecta aquí e intenta otra vez.', true);
+    toast('🖨️ Enviado a ' + thermalBle.name);
   } catch (e) {
     console.error('[thermal] print', e);
-    setThermalStatus('Error al imprimir: ' + (e.message || e), false);
+    setThermalStatus('Error: ' + (e.message || e), false);
     toast('Error BLE: ' + (e.message || e));
   } finally {
     if (btnP && thermalBle) btnP.disabled = false;
