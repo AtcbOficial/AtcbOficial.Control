@@ -6858,8 +6858,7 @@ function buildThermalHtml(inv) {
   const items = (inv.items || []).map(function (it) {
     const cant = it.cant || 0;
     const name = escapeHtml(it.name || '');
-    const sub = money(it.sub != null ? it.sub : (cant * (it.precio || 0)));
-    return '<div class="row"><span class="ti">' + cant + ' x ' + name + '</span><span class="tr">' + sub + '</span></div>';
+    return '<div class="row"><span class="ti">' + cant + ' ' + name + '</span></div>';
   }).join('');
   let abonosHtml = '';
   const abonos = inv.abonos || [];
@@ -7206,9 +7205,8 @@ async function thermalRenderCanvas(inv) {
   (inv.items || []).forEach(function (it) {
     const cant = it.cant || 0;
     const name = it.name || '';
-    const sub = money(it.sub != null ? it.sub : cant * (it.precio || 0));
-    add(cant + ' x ' + name, { size: 18 });
-    add(sub, { size: 18, right: true });
+    // Solo cantidad + nombre (sin precios unitarios ni subtotales por línea)
+    add(cant + ' ' + name, { size: 18 });
   });
   if (!(inv.items || []).length) add('(sin items)', { size: 18 });
   add('--------------------------------', { center: true, size: 16 });
