@@ -6853,7 +6853,7 @@ function printInv(id) {
 function buildThermalHtml(inv) {
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
-  const banner = normImgUrl(e.thermalBanner || e.pdfBanner || '') || '';
+  const banner = ''; // sin encabezado gráfico (solo QR + texto)
   const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=2&data=' + encodeURIComponent(String(cod));
   const items = (inv.items || []).map(function (it) {
     const cant = it.cant || 0;
@@ -6874,7 +6874,7 @@ function buildThermalHtml(inv) {
   const nota = 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO';
   const obs = inv.obs ? String(inv.obs) : '';
   const obsHtml = obs ? ('<div class="line"></div><div class="sec">Obs.</div><div class="small">' + escapeHtml(obs).replace(/\n/g, '<br>') + '</div>') : '';
-  const bannerHtml = banner ? ('<img class="banner" src="' + escapeHtml(banner) + '" alt="">') : '';
+  const bannerHtml = '';
   return [
     '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
     '<title>Ticket ' + escapeHtml(cod) + '</title>',
@@ -6949,13 +6949,27 @@ function openThermalModal(id) {
     const full = buildThermalHtml(inv);
     const bodyMatch = full.match(/<body[^>]*>([\s\S]*)<\/body>/i);
     wrap.innerHTML = bodyMatch ? bodyMatch[1] : full;
-    wrap.querySelectorAll('img').forEach(function (im) {
-      im.style.maxHeight = '72px';
+    // Solo dejar el QR en la vista previa (quitar logo/banner)
+    const imgs = wrap.querySelectorAll('img');
+    imgs.forEach(function (im, idx) {
+      const src = (im.getAttribute('src') || '');
+      const isQr = /qrserver|qr|create-qr/i.test(src) || (im.width > 0 && im.width <= 200 && idx > 0);
+      if (/banner|logo|encabezado/i.test(src) || (!isQr && idx === 0 && imgs.length > 1)) {
+        im.remove();
+        return;
+      }
+      // QR: tamaño moderado
+      im.style.maxHeight = '110px';
       im.style.width = 'auto';
-      im.style.maxWidth = '100%';
+      im.style.maxWidth = '110px';
       im.style.objectFit = 'contain';
       im.style.display = 'block';
-      im.style.margin = '0 auto 6px';
+      im.style.margin = '4px auto';
+    });
+    // Si queda una sola img grande tipo logo, quitarla
+    wrap.querySelectorAll('img').forEach(function (im) {
+      const src = (im.getAttribute('src') || '');
+      if (!/qrserver|create-qr-code/i.test(src)) im.remove();
     });
   } catch (e) {
     console.error(e);
@@ -7169,7 +7183,7 @@ function thermalCanvasToRaster(canvas) {
 /** Dibuja ticket en canvas 384×H con texto nítido negro sobre blanco */
 async function thermalRenderCanvas(inv) {
   const W = 384;
-  const pad = 8;
+  const pad = 6;
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
 
@@ -7177,55 +7191,53 @@ async function thermalRenderCanvas(inv) {
   function add(t, o) {
     lines.push(Object.assign({ t: String(t == null ? '' : t), size: 22, bold: false, center: false, right: false }, o || {}));
   }
-  // Texto ~50% más grande; sin logo (evita papel en blanco por CORS)
-  add(e.name || e.label || 'Empresa', { size: 26, bold: true, center: true });
-  if (e.nit) add('NIT ' + e.nit, { size: 18, center: true });
-  if (e.tel) add('Tel. ' + e.tel, { size: 18, center: true });
-  if (e.dir) add(e.dir, { size: 16, center: true });
-  add('--------------------------------', { center: true, size: 18 });
-  add(String(cod), { size: 28, bold: true, center: true });
-  add('--------------------------------', { center: true, size: 18 });
-  add('CLIENTE', { size: 20, bold: true });
-  add(inv.cliente || '-', { size: 22 });
-  if (inv.documento) add('Doc: ' + inv.documento, { size: 18 });
-  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 18 });
-  if (inv.direccion) add(inv.direccion, { size: 17 });
-  add('Fecha: ' + fmtDate(inv.fecha), { size: 18 });
-  add('--------------------------------', { center: true, size: 18 });
-  add('PRODUCTOS', { size: 20, bold: true });
+  // Sin logo: solo QR + texto (estable)
+  add(e.name || e.label || 'Empresa', { size: 24, bold: true, center: true });
+  if (e.nit) add('NIT ' + e.nit, { size: 17, center: true });
+  if (e.tel) add('Tel. ' + e.tel, { size: 17, center: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add(String(cod), { size: 26, bold: true, center: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add('CLIENTE', { size: 18, bold: true });
+  add(inv.cliente || '-', { size: 20 });
+  if (inv.documento) add('Doc: ' + inv.documento, { size: 17 });
+  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 17 });
+  if (inv.direccion) add(inv.direccion, { size: 16 });
+  add('Fecha: ' + fmtDate(inv.fecha), { size: 17 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('PRODUCTOS', { size: 18, bold: true });
   (inv.items || []).forEach(function (it) {
-    // Solo cantidad + nombre (sin precios unitarios)
-    add((it.cant || 0) + ' ' + (it.name || ''), { size: 20 });
+    add((it.cant || 0) + ' ' + (it.name || ''), { size: 19 });
   });
-  if (!(inv.items || []).length) add('(sin items)', { size: 18 });
-  add('--------------------------------', { center: true, size: 18 });
-  add('TOTAL  ' + money(inv.total), { size: 26, bold: true });
+  if (!(inv.items || []).length) add('(sin items)', { size: 17 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('TOTAL  ' + money(inv.total), { size: 24, bold: true });
   if ((inv.abonos || []).length) {
-    add('ABONOS', { size: 20, bold: true });
+    add('ABONOS', { size: 18, bold: true });
     inv.abonos.forEach(function (a) {
-      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 17 });
-      if (a.nota) add(String(a.nota), { size: 15 });
+      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 16 });
+      if (a.nota) add(String(a.nota), { size: 14 });
     });
-    add('Abonado ' + money(totalAbonado(inv)), { size: 19, bold: true });
-    add('Saldo ' + money(saldoPendiente(inv)), { size: 19, bold: true });
+    add('Abonado ' + money(totalAbonado(inv)), { size: 18, bold: true });
+    add('Saldo ' + money(saldoPendiente(inv)), { size: 18, bold: true });
   }
   if (inv.obs) {
-    add('OBS.', { size: 20, bold: true });
-    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 17 }); });
+    add('OBS.', { size: 18, bold: true });
+    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 16 }); });
   }
-  add('--------------------------------', { center: true, size: 18 });
-  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 15 });
-  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 15 });
-  add('--------------------------------', { center: true, size: 18 });
-  add('MEDIO DE PAGO', { size: 20, bold: true });
-  add('Bancolombia', { size: 18 });
-  add('Llave BRE-B @bonilla8395', { size: 18, bold: true });
-  add('Ahorros 86900003930', { size: 18 });
-  add('Luis Bonilla P. J.', { size: 17 });
-  add('Pasaporte 5001998395', { size: 16 });
-  add('Gracias por su compra', { size: 20, center: true, bold: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 14 });
+  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 14 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('MEDIO DE PAGO', { size: 18, bold: true });
+  add('Bancolombia', { size: 17 });
+  add('Llave BRE-B @bonilla8395', { size: 17, bold: true });
+  add('Ahorros 86900003930', { size: 17 });
+  add('Luis Bonilla P. J.', { size: 16 });
+  add('Pasaporte 5001998395', { size: 15 });
+  add('Gracias por su compra', { size: 18, center: true, bold: true });
 
-  // QR local (sin red / sin CORS)
+  // QR local — siempre incluido en la impresión
   let qrCanvas = null;
   try {
     if (typeof QRCode !== 'undefined') {
@@ -7244,7 +7256,7 @@ async function thermalRenderCanvas(inv) {
   }
 
   const measure = document.createElement('canvas').getContext('2d');
-  let needH = pad + 10 + (qrCanvas ? 120 : 0);
+  let needH = pad + 4 + (qrCanvas ? 108 : 0);
   lines.forEach(function (L) {
     measure.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
     const maxW = W - pad * 2;
@@ -7256,13 +7268,13 @@ async function thermalRenderCanvas(inv) {
       else line = test;
     });
     if (line) rows++;
-    needH += Math.max(1, rows) * (L.size + 4) + 2;
+    needH += Math.max(1, rows) * (L.size + 3) + 1;
   });
-  needH += pad + 16;
+  needH += 8; // pie mínimo (sin hueco grande)
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
-  canvas.height = Math.max(needH, 240);
+  canvas.height = Math.max(needH, 120);
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, canvas.height);
@@ -7273,7 +7285,7 @@ async function thermalRenderCanvas(inv) {
     try {
       const qs = 100;
       ctx.drawImage(qrCanvas, Math.round((W - qs) / 2), y, qs, qs);
-      y += qs + 6;
+      y += qs + 4;
     } catch (e) {}
   }
 
@@ -7298,20 +7310,32 @@ async function thermalRenderCanvas(inv) {
       if (L.center) x = Math.max(0, (W - tw) / 2);
       if (L.right) x = Math.max(pad, W - pad - tw);
       ctx.fillText(wl, x, y + L.size);
-      y += L.size + 4;
+      y += L.size + 3;
     });
-    y += 2;
+    y += 1;
   });
 
-  const hold = document.getElementById('thermalPrintCanvas');
-  if (hold) {
-    try {
-      hold.width = canvas.width;
-      hold.height = canvas.height;
-      hold.getContext('2d').drawImage(canvas, 0, 0);
-    } catch (e) {}
-  }
-  console.log('[thermal] canvas', canvas.width, 'x', canvas.height);
+  // Recortar filas blancas al final (ahorra papel)
+  try {
+    const img = ctx.getImageData(0, 0, W, canvas.height);
+    let lastY = canvas.height - 1;
+    outer: for (; lastY > 0; lastY--) {
+      for (let x = 0; x < W; x++) {
+        const i = (lastY * W + x) * 4;
+        if (img.data[i] < 250 || img.data[i + 1] < 250 || img.data[i + 2] < 250) break outer;
+      }
+    }
+    const trimH = Math.min(canvas.height, lastY + 6);
+    if (trimH > 40 && trimH < canvas.height) {
+      const c2 = document.createElement('canvas');
+      c2.width = W;
+      c2.height = trimH;
+      c2.getContext('2d').drawImage(canvas, 0, 0);
+      console.log('[thermal] trim', canvas.height, '->', trimH);
+      return c2;
+    }
+  } catch (e) {}
+
   return canvas;
 }
 
