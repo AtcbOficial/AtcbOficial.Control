@@ -7129,23 +7129,68 @@ async function thermalBleConnect() {
   }
 }
 
+/** Re-obtiene service/writeChar si hace falta (impresiones 2, 3…) */
+async function thermalBleEnsure() {
+  if (!thermalBle || !thermalBle.device) throw new Error('Sin impresora. Pulsa Conectar.');
+  if (!thermalBle.device.gatt) throw new Error('Sin GATT');
+  if (!thermalBle.device.gatt.connected) {
+    console.log('[thermal] ensure: reconnect GATT');
+    await thermalBle.device.gatt.connect();
+    await thermalDelay(200);
+  }
+  // Re-obtener característica de escritura (evita canal “muerto” tras 1ª impresión)
+  try {
+    let service = null;
+    for (let si = 0; si < PHOMEMO_BLE.ALT_SERVICES.length; si++) {
+      try {
+        service = await thermalBle.device.gatt.getPrimaryService(PHOMEMO_BLE.ALT_SERVICES[si]);
+        break;
+      } catch (e) {}
+    }
+    if (!service) throw new Error('Servicio BLE perdido');
+    let writeChar = null;
+    try {
+      writeChar = await service.getCharacteristic(PHOMEMO_BLE.WRITE);
+    } catch (e) {
+      writeChar = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+    }
+    thermalBle.writeChar = writeChar;
+    thermalBle.server = thermalBle.device.gatt;
+    const props = writeChar.properties || {};
+    thermalBle.useResp = !props.writeWithoutResponse && !!props.write;
+  } catch (e) {
+    console.warn('[thermal] ensure char', e);
+    throw new Error('No se pudo reabrir el canal BLE. Conecta de nuevo.');
+  }
+}
+
 async function thermalBleSend(bytes) {
   if (!thermalBle || !thermalBle.writeChar) throw new Error('Sin impresora');
   if (!thermalBle.device.gatt.connected) throw new Error('GATT desconectado');
-  // Copia limpia del buffer (Phomymo hace new Uint8Array(data).buffer)
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const copy = new Uint8Array(u8.length);
   copy.set(u8);
   const buffer = copy.buffer;
-  if (thermalBle.useResp) {
-    await thermalBle.writeChar.writeValue(buffer);
-  } else {
-    try {
-      await thermalBle.writeChar.writeValueWithoutResponse(buffer);
-    } catch (e) {
-      thermalBle.useResp = true;
+  const doWrite = async function () {
+    if (thermalBle.useResp) {
       await thermalBle.writeChar.writeValue(buffer);
+    } else {
+      try {
+        await thermalBle.writeChar.writeValueWithoutResponse(buffer);
+      } catch (e) {
+        thermalBle.useResp = true;
+        await thermalBle.writeChar.writeValue(buffer);
+      }
     }
+  };
+  try {
+    await doWrite();
+  } catch (e) {
+    // Reintento: reabrir canal y volver a escribir (típico en 2ª impresión)
+    console.warn('[thermal] send fail, retry ensure', e && e.message);
+    await thermalBleEnsure();
+    await thermalDelay(80);
+    await doWrite();
   }
 }
 
@@ -7336,12 +7381,13 @@ async function thermalBlePrint() {
     try {
       setThermalStatus('Reconectando GATT…');
       await thermalBle.device.gatt.connect();
-      await thermalDelay(200);
+      await thermalDelay(250);
+      await thermalBleEnsure();
     } catch (e) {
       thermalBle = null;
       const b = document.getElementById('btnThermalBlePrint');
       if (b) b.disabled = true;
-      return toast('Se perdió la conexión. Conecta de nuevo (y cierra Phomymo).');
+      return toast('Se perdió la conexión. Pulsa Conectar impresora.');
     }
   }
   const btnP = document.getElementById('btnThermalBlePrint');
@@ -7365,35 +7411,42 @@ async function thermalBlePrint() {
     console.log('[thermal] blackBits', blackBits, 'of', data.length * 8);
     if (blackBits < 50) throw new Error('Imagen casi blanca (' + blackBits + ' px). Reintenta.');
 
+    // Asegurar canal vivo (impresiones 2, 3… sin apagar impresora)
+    await thermalBleEnsure();
+    await thermalDelay(100);
+
     setThermalStatus('Imprimiendo… 0% (' + blackBits + ' px negros)');
-    // printM110 Phomymo
-    await thermalBleSend(new Uint8Array([0x1b, 0x40])); // ESC @ init
-    await thermalDelay(50);
+    // printM110 (Phomymo): SPEED + DENSITY + MEDIA continuous + raster + FOOTER
+    // Sin ESC @ entre trabajos (deja el buffer en mal estado en 2ª impresión)
     await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5])); // SPEED
-    await thermalDelay(30);
-    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 14])); // DENSITY fuerte
-    await thermalDelay(30);
-    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0a])); // media gap/label
-    await thermalDelay(30);
+    await thermalDelay(40);
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 12])); // DENSITY
+    await thermalDelay(40);
+    // 0x0b = continuous (papel continuo); 0x0a = etiquetas con gap
+    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0b]));
+    await thermalDelay(40);
     await thermalBleSend(new Uint8Array([
       0x1d, 0x76, 0x30, 0x00,
       widthBytes & 0xff, 0x00,
       heightLines & 0xff, (heightLines >> 8) & 0xff
     ]));
 
-    for (let i = 0; i < data.length; i += PHOMEMO_BLE.CHUNK) {
-      const end = Math.min(i + PHOMEMO_BLE.CHUNK, data.length);
-      const chunk = data.subarray(i, end);
+    const chunkSize = 128;
+    for (let i = 0; i < data.length; i += chunkSize) {
+      const end = Math.min(i + chunkSize, data.length);
+      // Copia del slice (evita problemas de buffer compartido)
+      const chunk = data.slice(i, end);
       await thermalBleSend(chunk);
-      await thermalDelay(PHOMEMO_BLE.DELAY);
-      if (i % (PHOMEMO_BLE.CHUNK * 12) === 0) {
+      await thermalDelay(25);
+      if (i % (chunkSize * 10) === 0) {
         setThermalStatus('Imprimiendo… ' + Math.min(99, Math.round(i / data.length * 100)) + '%');
       }
     }
-    await thermalDelay(300);
+    await thermalDelay(350);
+    // FOOTER Phomymo — cierra el trabajo para poder imprimir el siguiente
     await thermalBleSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00]));
-    await thermalDelay(500);
-    setThermalStatus('Enviado. Si no sale papel: cierra Phomymo, reconecta aquí e intenta otra vez.', true);
+    await thermalDelay(800); // dejar que la impresora termine antes del siguiente ticket
+    setThermalStatus('Listo. Puedes imprimir otra factura sin reconectar.', true);
     toast('🖨️ Enviado a ' + thermalBle.name);
   } catch (e) {
     console.error('[thermal] print', e);
