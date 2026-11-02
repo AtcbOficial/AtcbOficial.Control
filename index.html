@@ -7130,38 +7130,55 @@ async function thermalBleConnect() {
 }
 
 /** Re-obtiene service/writeChar si hace falta (impresiones 2, 3…) */
+/** Solo reconecta si hace falta; no toca el canal si ya está vivo */
 async function thermalBleEnsure() {
   if (!thermalBle || !thermalBle.device) throw new Error('Sin impresora. Pulsa Conectar.');
   if (!thermalBle.device.gatt) throw new Error('Sin GATT');
   if (!thermalBle.device.gatt.connected) {
     console.log('[thermal] ensure: reconnect GATT');
+    setThermalStatus('Reconectando GATT…');
     await thermalBle.device.gatt.connect();
-    await thermalDelay(200);
+    await thermalDelay(300);
+    await thermalBleDiscoverChars(thermalBle.device);
+  } else if (!thermalBle.writeChar) {
+    await thermalBleDiscoverChars(thermalBle.device);
   }
-  // Re-obtener característica de escritura (evita canal “muerto” tras 1ª impresión)
-  try {
-    let service = null;
-    for (let si = 0; si < PHOMEMO_BLE.ALT_SERVICES.length; si++) {
-      try {
-        service = await thermalBle.device.gatt.getPrimaryService(PHOMEMO_BLE.ALT_SERVICES[si]);
-        break;
-      } catch (e) {}
-    }
-    if (!service) throw new Error('Servicio BLE perdido');
-    let writeChar = null;
+}
+
+async function thermalBleDiscoverChars(device) {
+  const server = device.gatt;
+  let service = null;
+  const uuids = [
+    0xff00,
+    '0000ff00-0000-1000-8000-00805f9b34fb',
+    0xffe0,
+    '0000ffe0-0000-1000-8000-00805f9b34fb'
+  ];
+  for (let i = 0; i < uuids.length; i++) {
     try {
-      writeChar = await service.getCharacteristic(PHOMEMO_BLE.WRITE);
-    } catch (e) {
-      writeChar = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
-    }
-    thermalBle.writeChar = writeChar;
-    thermalBle.server = thermalBle.device.gatt;
-    const props = writeChar.properties || {};
-    thermalBle.useResp = !props.writeWithoutResponse && !!props.write;
-  } catch (e) {
-    console.warn('[thermal] ensure char', e);
-    throw new Error('No se pudo reabrir el canal BLE. Conecta de nuevo.');
+      service = await server.getPrimaryService(uuids[i]);
+      console.log('[thermal] service ok', uuids[i]);
+      break;
+    } catch (e) {}
   }
+  if (!service) throw new Error('Servicio BLE no encontrado');
+  let writeChar = null;
+  const writeIds = [0xff02, '0000ff02-0000-1000-8000-00805f9b34fb'];
+  for (let i = 0; i < writeIds.length; i++) {
+    try {
+      writeChar = await service.getCharacteristic(writeIds[i]);
+      break;
+    } catch (e) {}
+  }
+  if (!writeChar) throw new Error('Característica 0xff02 no encontrada');
+  const props = writeChar.properties || {};
+  thermalBle = thermalBle || {};
+  thermalBle.device = device;
+  thermalBle.server = server;
+  thermalBle.writeChar = writeChar;
+  thermalBle.useResp = !props.writeWithoutResponse && !!props.write;
+  thermalBle.name = device.name || thermalBle.name || 'Phomemo';
+  console.log('[thermal] writeChar ok', 'useResp', thermalBle.useResp, props);
 }
 
 async function thermalBleSend(bytes) {
@@ -7171,26 +7188,16 @@ async function thermalBleSend(bytes) {
   const copy = new Uint8Array(u8.length);
   copy.set(u8);
   const buffer = copy.buffer;
-  const doWrite = async function () {
-    if (thermalBle.useResp) {
+  if (thermalBle.useResp) {
+    await thermalBle.writeChar.writeValue(buffer);
+  } else {
+    try {
+      await thermalBle.writeChar.writeValueWithoutResponse(buffer);
+    } catch (e) {
+      console.warn('[thermal] withoutResponse fail → withResponse', e && e.message);
+      thermalBle.useResp = true;
       await thermalBle.writeChar.writeValue(buffer);
-    } else {
-      try {
-        await thermalBle.writeChar.writeValueWithoutResponse(buffer);
-      } catch (e) {
-        thermalBle.useResp = true;
-        await thermalBle.writeChar.writeValue(buffer);
-      }
     }
-  };
-  try {
-    await doWrite();
-  } catch (e) {
-    // Reintento: reabrir canal y volver a escribir (típico en 2ª impresión)
-    console.warn('[thermal] send fail, retry ensure', e && e.message);
-    await thermalBleEnsure();
-    await thermalDelay(80);
-    await doWrite();
   }
 }
 
@@ -7387,58 +7394,53 @@ async function thermalRenderCanvas(inv) {
 async function thermalBlePrint() {
   const inv = getInv(thermalInvId);
   if (!inv) return toast('Sin factura');
-  if (!thermalBle || !thermalBle.writeChar) {
+  if (!thermalBle || !thermalBle.device) {
     setThermalStatus('Primero conecta la impresora', false);
     return toast('Conecta la impresora BLE');
   }
-  if (!thermalBle.device.gatt.connected) {
-    try {
-      setThermalStatus('Reconectando GATT…');
-      await thermalBle.device.gatt.connect();
-      await thermalDelay(250);
-      await thermalBleEnsure();
-    } catch (e) {
-      thermalBle = null;
-      const b = document.getElementById('btnThermalBlePrint');
-      if (b) b.disabled = true;
-      return toast('Se perdió la conexión. Pulsa Conectar impresora.');
-    }
-  }
   const btnP = document.getElementById('btnThermalBlePrint');
   if (btnP) btnP.disabled = true;
-  setThermalStatus('Generando ticket…');
   try {
+    setThermalStatus('Comprobando conexión…');
+    await thermalBleEnsure();
+    // Probe: comando SPEED corto — si falla, redescubrir canal
+    try {
+      await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
+      await thermalDelay(50);
+    } catch (e1) {
+      console.warn('[thermal] probe fail', e1);
+      setThermalStatus('Reabriendo canal BLE…');
+      await thermalBleDiscoverChars(thermalBle.device);
+      await thermalDelay(100);
+      await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
+      await thermalDelay(50);
+    }
+
+    setThermalStatus('Generando ticket…');
     const canvas = await thermalRenderCanvas(inv);
     const raster = thermalCanvasToRaster(canvas);
     const data = raster.data;
     const widthBytes = raster.widthBytes;
     const heightLines = raster.heightLines;
-    console.log('[thermal] print', widthBytes, heightLines, data.length);
+    console.log('[thermal] print', widthBytes, 'x', heightLines, 'bytes', data.length);
     if (heightLines < 8) throw new Error('Ticket demasiado corto');
 
-    // Contar bits negros (si 0 → imagen blanca)
     let blackBits = 0;
     for (let bi = 0; bi < data.length; bi++) {
       let v = data[bi];
       while (v) { blackBits += v & 1; v >>= 1; }
     }
-    console.log('[thermal] blackBits', blackBits, 'of', data.length * 8);
+    console.log('[thermal] blackBits', blackBits);
     if (blackBits < 50) throw new Error('Imagen casi blanca (' + blackBits + ' px). Reintenta.');
 
-    // Asegurar canal vivo (impresiones 2, 3… sin apagar impresora)
-    await thermalBleEnsure();
-    await thermalDelay(100);
-
-    setThermalStatus('Imprimiendo… 0% (' + blackBits + ' px negros)');
-    // printM110 (Phomymo): SPEED + DENSITY + MEDIA continuous + raster + FOOTER
-    // Sin ESC @ entre trabajos (deja el buffer en mal estado en 2ª impresión)
+    setThermalStatus('Enviando a impresora… 0%');
+    // Protocolo M110 Phomymo (probado)
     await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5])); // SPEED
-    await thermalDelay(40);
-    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 13])); // DENSITY
-    await thermalDelay(40);
-    // 0x0b = continuous (papel continuo); 0x0a = etiquetas con gap
-    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0b]));
-    await thermalDelay(40);
+    await thermalDelay(30);
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 12])); // DENSITY
+    await thermalDelay(30);
+    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0b])); // continuous
+    await thermalDelay(30);
     await thermalBleSend(new Uint8Array([
       0x1d, 0x76, 0x30, 0x00,
       widthBytes & 0xff, 0x00,
@@ -7447,25 +7449,24 @@ async function thermalBlePrint() {
 
     const chunkSize = 128;
     for (let i = 0; i < data.length; i += chunkSize) {
-      const end = Math.min(i + chunkSize, data.length);
-      // Copia del slice (evita problemas de buffer compartido)
-      const chunk = data.slice(i, end);
+      const chunk = data.slice(i, Math.min(i + chunkSize, data.length));
       await thermalBleSend(chunk);
-      await thermalDelay(25);
-      if (i % (chunkSize * 10) === 0) {
-        setThermalStatus('Imprimiendo… ' + Math.min(99, Math.round(i / data.length * 100)) + '%');
+      await thermalDelay(20);
+      if (i % (chunkSize * 8) === 0) {
+        const pct = Math.min(99, Math.round(i / data.length * 100));
+        setThermalStatus('Enviando datos… ' + pct + '%');
       }
     }
-    await thermalDelay(350);
-    // FOOTER Phomymo — cierra el trabajo para poder imprimir el siguiente
-    await thermalBleSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00]));
-    await thermalDelay(800); // dejar que la impresora termine antes del siguiente ticket
-    setThermalStatus('Listo. Puedes imprimir otra factura sin reconectar.', true);
-    toast('🖨️ Enviado a ' + thermalBle.name);
+    await thermalDelay(300);
+    await thermalBleSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00])); // FOOTER
+    await thermalDelay(600);
+    setThermalStatus('Enviado OK. Si la impresora no reacciona, apaga/enciende y Conecta de nuevo.', true);
+    toast('🖨️ Datos enviados a ' + (thermalBle.name || 'impresora'));
   } catch (e) {
     console.error('[thermal] print', e);
-    setThermalStatus('Error: ' + (e.message || e), false);
-    toast('Error BLE: ' + (e.message || e));
+    const msg = (e && e.message) ? e.message : String(e);
+    setThermalStatus('Error: ' + msg, false);
+    toast('Error BLE: ' + msg);
   } finally {
     if (btnP && thermalBle) btnP.disabled = false;
   }
