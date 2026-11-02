@@ -7225,65 +7225,70 @@ function thermalCanvasToRaster(canvas) {
 /** Dibuja ticket en canvas 384×H con texto nítido negro sobre blanco */
 async function thermalRenderCanvas(inv) {
   const W = 384;
-  const pad = 10;
+  const pad = 8;
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
 
-  // Texto agrandado; QR se mantiene en 96px (no tocar)
+  // Legibilidad térmica: texto más grande + más aire entre líneas.
+  // QR se mantiene en 96px (no tocar).
   const lines = [];
   function add(t, o) {
-    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 22, bold: false, center: false, right: false }, o || {}));
+    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 21, bold: false, center: false, right: false }, o || {}));
   }
-  add(e.name || e.label || 'Empresa', { size: 26, bold: true, center: true });
-  if (e.nit) add('NIT ' + e.nit, { size: 18, center: true });
-  if (e.tel) add('Tel. ' + e.tel, { size: 18, center: true });
-  add('--------------------------------', { center: true, size: 16 });
-  add(String(cod), { size: 28, bold: true, center: true });
-  add('--------------------------------', { center: true, size: 16 });
-  add('CLIENTE', { size: 20, bold: true });
-  add(inv.cliente || '-', { size: 22 });
-  if (inv.documento) add('Doc: ' + inv.documento, { size: 18 });
-  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 18 });
-  add('Fecha: ' + fmtDate(inv.fecha), { size: 18 });
-  add('--------------------------------', { center: true, size: 16 });
-  add('PRODUCTOS', { size: 20, bold: true });
+  add(e.name || e.label || 'Empresa', { size: 27, bold: true, center: true });
+  if (e.nit) add('NIT ' + e.nit, { size: 19, center: true });
+  if (e.tel) add('Tel. ' + e.tel, { size: 19, center: true });
+  add('--------------------------------', { center: true, size: 17 });
+  add(String(cod), { size: 30, bold: true, center: true });
+  add('--------------------------------', { center: true, size: 17 });
+  add('CLIENTE', { size: 21, bold: true });
+  add(inv.cliente || '-', { size: 23, bold: true });
+  if (inv.documento) add('Doc: ' + inv.documento, { size: 19 });
+  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 19 });
+  if (inv.direccion) add(inv.direccion, { size: 18 });
+  add('Fecha: ' + fmtDate(inv.fecha), { size: 19 });
+  add('--------------------------------', { center: true, size: 17 });
+  add('PRODUCTOS', { size: 21, bold: true });
   (inv.items || []).forEach(function (it) {
     const cant = it.cant || 0;
     const name = it.name || '';
-    // Solo cantidad + nombre (sin precios unitarios ni subtotales por línea)
-    add(cant + ' ' + name, { size: 18 });
+    add(cant + ' ' + name, { size: 20 });
   });
-  if (!(inv.items || []).length) add('(sin items)', { size: 18 });
-  add('--------------------------------', { center: true, size: 16 });
-  add('TOTAL  ' + money(inv.total), { size: 26, bold: true });
+  if (!(inv.items || []).length) add('(sin items)', { size: 19 });
+  add('--------------------------------', { center: true, size: 17 });
+  add('TOTAL  ' + money(inv.total), { size: 28, bold: true });
   if ((inv.abonos || []).length) {
-    add('ABONOS', { size: 20, bold: true });
+    add('ABONOS', { size: 21, bold: true });
     inv.abonos.forEach(function (a) {
-      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 17 });
+      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 19 });
+      if (a.nota) add(String(a.nota), { size: 17 });
     });
-    add('Abonado ' + money(totalAbonado(inv)), { size: 18, bold: true });
-    add('Saldo ' + money(saldoPendiente(inv)), { size: 18, bold: true });
+    add('Abonado ' + money(totalAbonado(inv)), { size: 20, bold: true });
+    add('Saldo ' + money(saldoPendiente(inv)), { size: 20, bold: true });
   }
   if (inv.obs) {
-    add('OBS.', { size: 20, bold: true });
-    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 17 }); });
+    add('OBS.', { size: 21, bold: true });
+    String(inv.obs).split(/\n/).forEach(function (l) {
+      const t = String(l || '').trim();
+      if (t) add(t, { size: 18 });
+    });
   }
-  add('--------------------------------', { center: true, size: 16 });
-  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 15 });
-  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 15 });
-  add('--------------------------------', { center: true, size: 16 });
-  add('MEDIO DE PAGO', { size: 20, bold: true });
-  add('Bancolombia', { size: 18 });
-  add('Llave BRE-B @bonilla8395', { size: 18, bold: true });
-  add('Ahorros 86900003930', { size: 18 });
-  add('Luis Bonilla P. J.', { size: 17 });
-  add('Pasaporte 5001998395', { size: 16 });
-  add('Gracias por su compra', { size: 20, center: true, bold: true });
+  add('--------------------------------', { center: true, size: 17 });
+  add('REPUESTOS ELECTRICO-MECANICOS', { size: 17 });
+  add('NO POSEE GARANTIA.', { size: 17 });
+  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 17 });
+  add('--------------------------------', { center: true, size: 17 });
+  add('MEDIO DE PAGO', { size: 21, bold: true });
+  add('Bancolombia', { size: 20 });
+  add('Llave BRE-B @bonilla8395', { size: 19, bold: true });
+  add('Ahorros 86900003930', { size: 19 });
+  add('Luis Bonilla P. J.', { size: 18 });
+  add('Pasaporte 5001998395', { size: 18 });
+  add('Gracias por su compra', { size: 22, center: true, bold: true });
 
   const measure = document.createElement('canvas').getContext('2d');
   let needH = pad + 8;
-  // espacio QR 96px (mismo tamaño que el respaldo que imprime bien)
-  needH += 8 + 96 + 8;
+  needH += 8 + 96 + 8; // QR 96px fijo
   lines.forEach(function (L) {
     measure.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
     const maxW = W - pad * 2;
@@ -7298,9 +7303,9 @@ async function thermalRenderCanvas(inv) {
       } else line = test;
     });
     if (line) rows++;
-    needH += Math.max(1, rows) * (L.size + 3) + 1;
+    needH += Math.max(1, rows) * (L.size + 5) + 2;
   });
-  needH += pad + 16;
+  needH += pad + 12;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -7309,10 +7314,13 @@ async function thermalRenderCanvas(inv) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, canvas.height);
   ctx.fillStyle = '#000000';
+  // Texto más nítido en raster (menos antialias gris)
+  try { ctx.imageSmoothingEnabled = false; } catch (e) {}
+  try { ctx.textRendering = 'geometricPrecision'; } catch (e) {}
 
   let y = pad;
 
-  // QR — MISMO método y tamaño 96 que el respaldo que imprime bien
+  // QR — MISMO método y tamaño 96 que imprime bien
   try {
     await new Promise(function (resolve) {
       const img = new Image();
@@ -7323,7 +7331,7 @@ async function thermalRenderCanvas(inv) {
         try {
           const qs = 96;
           ctx.drawImage(img, (W - qs) / 2, y, qs, qs);
-          y += qs + 6;
+          y += qs + 8;
         } catch (e) {}
         fin();
       };
@@ -7354,10 +7362,16 @@ async function thermalRenderCanvas(inv) {
       const tw = ctx.measureText(wl).width;
       if (L.center) x = Math.max(0, (W - tw) / 2);
       if (L.right) x = Math.max(pad, W - pad - tw);
-      ctx.fillText(wl, x, y + L.size);
-      y += L.size + 3;
+      // Faux-bold: doble trazo en negrita para térmica (mejor contraste)
+      if (L.bold) {
+        ctx.fillText(wl, x, y + L.size);
+        ctx.fillText(wl, x + 1, y + L.size);
+      } else {
+        ctx.fillText(wl, x, y + L.size);
+      }
+      y += L.size + 5;
     });
-    y += 1;
+    y += 2;
   });
 
   const hold = document.getElementById('thermalPrintCanvas');
@@ -7420,7 +7434,7 @@ async function thermalBlePrint() {
     // Sin ESC @ entre trabajos (deja el buffer en mal estado en 2ª impresión)
     await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5])); // SPEED
     await thermalDelay(40);
-    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 12])); // DENSITY
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 13])); // DENSITY
     await thermalDelay(40);
     // 0x0b = continuous (papel continuo); 0x0a = etiquetas con gap
     await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0b]));
