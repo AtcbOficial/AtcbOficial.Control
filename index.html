@@ -6966,10 +6966,17 @@ function openThermalModal(id) {
   const modal = document.getElementById('thermalModal');
   if (!wrap || !modal) return toast('Modal térmico no encontrado');
   try {
-    // Preview sin <html> completo: solo cuerpo legible
     const full = buildThermalHtml(inv);
     const bodyMatch = full.match(/<body[^>]*>([\s\S]*)<\/body>/i);
     wrap.innerHTML = bodyMatch ? bodyMatch[1] : full;
+    wrap.querySelectorAll('img').forEach(function (im) {
+      im.style.maxHeight = '72px';
+      im.style.width = 'auto';
+      im.style.maxWidth = '100%';
+      im.style.objectFit = 'contain';
+      im.style.display = 'block';
+      im.style.margin = '0 auto 6px';
+    });
   } catch (e) {
     console.error(e);
     wrap.innerHTML = '<p style="color:red">Error vista previa</p>';
@@ -7014,43 +7021,95 @@ async function thermalBleConnect() {
   setThermalStatus('Elige la impresora en el selector del sistema…');
   try {
     const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: false,
       filters: [
         { namePrefix: 'M110' },
         { namePrefix: 'M120' },
+        { namePrefix: 'M02' },
         { namePrefix: 'M' },
         { namePrefix: 'Q' },
         { namePrefix: 'Phomemo' }
       ],
-      optionalServices: [0xff00, 0xffe0, 0xae30, '0000ff00-0000-1000-8000-00805f9b34fb']
+      optionalServices: [
+        0xff00, 0xffe0, 0xae30,
+        '0000ff00-0000-1000-8000-00805f9b34fb',
+        '0000ffe0-0000-1000-8000-00805f9b34fb'
+      ]
     });
-    setThermalStatus('Conectando a ' + (device.name || 'impresora') + '…');
+    setThermalStatus('Conectando GATT a ' + (device.name || 'impresora') + '…');
+    if (!device.gatt) throw new Error('Sin GATT');
     const server = await device.gatt.connect();
+    await thermalDelay(200);
+
+    // Buscar servicio
+    const serviceUuids = [0xff00, 0xffe0, 0xae30, '0000ff00-0000-1000-8000-00805f9b34fb', '0000ffe0-0000-1000-8000-00805f9b34fb'];
     let service = null;
-    for (const uuid of PHOMEMO_BLE.ALT_SERVICES) {
+    let usedUuid = null;
+    for (const uuid of serviceUuids) {
       try {
         service = await server.getPrimaryService(uuid);
+        usedUuid = uuid;
+        console.log('[thermal] service OK', uuid);
+        break;
+      } catch (e) {
+        console.log('[thermal] service fail', uuid, e.message);
+      }
+    }
+    if (!service) {
+      // último recurso: listar servicios
+      try {
+        const all = await server.getPrimaryServices();
+        console.log('[thermal] services', all.map(s => s.uuid));
+        if (all.length) service = all[0];
+      } catch (e) {}
+    }
+    if (!service) throw new Error('No se encontró servicio BLE (0xff00). ¿Es una Phomemo encendida?');
+
+    // Buscar característica de escritura
+    let writeChar = null;
+    const tryChars = [0xff02, 0xffe1, 0xae01, '0000ff02-0000-1000-8000-00805f9b34fb', '0000ffe1-0000-1000-8000-00805f9b34fb'];
+    for (const cu of tryChars) {
+      try {
+        writeChar = await service.getCharacteristic(cu);
+        console.log('[thermal] write char OK', cu, writeChar.properties);
         break;
       } catch (e) {}
     }
-    if (!service) {
+    if (!writeChar) {
       try {
-        service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
+        const chars = await service.getCharacteristics();
+        console.log('[thermal] chars', chars.map(c => ({ uuid: c.uuid, p: c.properties })));
+        writeChar = chars.find(c => c.properties.writeWithoutResponse || c.properties.write) || chars[0];
       } catch (e) {}
     }
-    if (!service) throw new Error('No se encontró servicio BLE de la impresora');
-    const writeChar = await service.getCharacteristic(PHOMEMO_BLE.WRITE);
+    if (!writeChar) throw new Error('No hay característica de escritura BLE');
+
     const props = writeChar.properties || {};
     const useResp = !props.writeWithoutResponse && !!props.write;
-    thermalBle = { device, server, writeChar, useResp, name: device.name || 'M110' };
+    thermalBle = {
+      device, server, writeChar, useResp,
+      name: device.name || 'Phomemo',
+      serviceUuid: String(usedUuid)
+    };
     device.addEventListener('gattserverdisconnected', () => {
       thermalBle = null;
       const b = document.getElementById('btnThermalBlePrint');
       if (b) b.disabled = true;
       setThermalStatus('Impresora desconectada', false);
     });
+
+    // Prueba de vida: SPEED cmd (no imprime papel)
+    try {
+      await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
+      await thermalDelay(50);
+    } catch (e) {
+      console.warn('[thermal] probe write failed', e);
+      throw new Error('Conectó pero no acepta escritura: ' + (e.message || e));
+    }
+
     const btnP = document.getElementById('btnThermalBlePrint');
     if (btnP) btnP.disabled = false;
-    setThermalStatus('Conectada: ' + thermalBle.name + ' · papel continuo listo', true);
+    setThermalStatus('Conectada: ' + thermalBle.name + ' · lista para imprimir', true);
     toast('📡 ' + thermalBle.name + ' conectada');
   } catch (e) {
     console.error(e);
@@ -7237,53 +7296,68 @@ async function thermalBlePrint() {
     setThermalStatus('Primero conecta la impresora', false);
     return toast('Conecta la impresora BLE');
   }
-  if (!thermalBle.device.gatt.connected) {
-    try {
+  try {
+    if (!thermalBle.device.gatt.connected) {
+      setThermalStatus('Reconectando…');
       await thermalBle.device.gatt.connect();
-    } catch (e) {
-      thermalBle = null;
-      return toast('Reconecta la impresora');
+      await thermalDelay(300);
     }
+  } catch (e) {
+    thermalBle = null;
+    const b = document.getElementById('btnThermalBlePrint');
+    if (b) b.disabled = true;
+    return toast('Se perdió la conexión. Vuelve a Conectar.');
   }
-  setThermalStatus('Generando ticket…');
+  const btnP = document.getElementById('btnThermalBlePrint');
+  if (btnP) btnP.disabled = true;
+  setThermalStatus('Generando imagen del ticket…');
   try {
     const canvas = await thermalRenderCanvas(inv);
+    console.log('[thermal] canvas', canvas.width, 'x', canvas.height);
     const { data, widthBytes, heightLines } = thermalCanvasToRaster(canvas);
-    setThermalStatus('Enviando a ' + thermalBle.name + '…');
-    // Protocolo M110 (Phomymo)
-    // SPEED
-    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
-    await thermalDelay(30);
-    // DENSITY ~12
-    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 12]));
-    await thermalDelay(30);
-    // MEDIA continuous-ish (0x0b) — papel continuo
-    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0b]));
-    await thermalDelay(30);
-    // Raster header GS v 0
+    console.log('[thermal] raster bytes', data.length, 'wB', widthBytes, 'h', heightLines);
+    if (!data.length || heightLines < 10) throw new Error('Ticket vacío o demasiado corto');
+
+    setThermalStatus('Enviando a ' + thermalBle.name + ' (0%)…');
+
+    // M110 protocol (Phomymo / phomemo-tools)
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5])); // SPEED
+    await thermalDelay(40);
+    await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 12])); // DENSITY
+    await thermalDelay(40);
+    // media: 0x0a = gap labels (Phomymo default); 0x0b continuous attempt
+    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0a]));
+    await thermalDelay(40);
+
+    // GS v 0 raster — width low, width high, height low, height high
     const header = new Uint8Array([
       0x1d, 0x76, 0x30, 0x00,
-      widthBytes & 0xff, (widthBytes >> 8) & 0xff,
+      widthBytes & 0xff, 0x00,
       heightLines & 0xff, (heightLines >> 8) & 0xff
     ]);
     await thermalBleSend(header);
-    for (let i = 0; i < data.length; i += PHOMEMO_BLE.CHUNK) {
-      const chunk = data.subarray(i, Math.min(i + PHOMEMO_BLE.CHUNK, data.length));
-      await thermalBleSend(chunk);
+
+    const total = data.length;
+    for (let i = 0; i < total; i += PHOMEMO_BLE.CHUNK) {
+      const chunk = data.subarray(i, Math.min(i + PHOMEMO_BLE.CHUNK, total));
+      // copy chunk to fresh buffer (some BLE stacks fail on subarray)
+      await thermalBleSend(new Uint8Array(chunk));
       await thermalDelay(PHOMEMO_BLE.DELAY);
-      if (i % (PHOMEMO_BLE.CHUNK * 20) === 0) {
-        setThermalStatus('Imprimiendo… ' + Math.min(100, Math.round(i / data.length * 100)) + '%');
+      if (i % (PHOMEMO_BLE.CHUNK * 15) === 0) {
+        setThermalStatus('Imprimiendo… ' + Math.min(99, Math.round(i / total * 100)) + '%');
       }
     }
-    await thermalDelay(300);
-    await thermalBleSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00]));
-    await thermalDelay(400);
-    setThermalStatus('Impresión enviada a ' + thermalBle.name, true);
-    toast('🖨️ Ticket enviado a la impresora');
+    await thermalDelay(350);
+    await thermalBleSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00])); // FOOTER
+    await thermalDelay(500);
+    setThermalStatus('Enviado a ' + thermalBle.name + '. Si no sale papel, revisa que esté encendida y con papel.', true);
+    toast('🖨️ Datos enviados a la impresora');
   } catch (e) {
-    console.error(e);
+    console.error('[thermal] print', e);
     setThermalStatus('Error al imprimir: ' + (e.message || e), false);
     toast('Error BLE: ' + (e.message || e));
+  } finally {
+    if (btnP && thermalBle) btnP.disabled = false;
   }
 }
 
