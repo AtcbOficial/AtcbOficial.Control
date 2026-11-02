@@ -1725,6 +1725,24 @@ details.overdue-box[open]{
       </div>
     </details>
 
+    <details class="collapse">
+      <summary>🧾 Encabezado ticket térmico</summary>
+      <div class="body">
+        <p class="sub">Imagen angosta para Phomemo / ticket 🧾. Si no pones link, usa el encabezado del PDF.</p>
+        <div style="background:#fff;border-radius:8px;padding:6px;margin-bottom:10px">
+          <img id="thermalBannerPreview" alt="Banner térmico" style="width:100%;max-height:80px;object-fit:contain;display:block;border-radius:4px">
+        </div>
+        <label class="label">Link del banner térmico</label>
+        <input id="thermalBannerUrl" type="url" placeholder="https://… imagen pública (angosta)" style="margin-bottom:8px">
+        <p class="hint" style="margin:0 0 8px">Recomendado: logo simple, fondo claro, poco detalle (papel ~50 mm).</p>
+        <div class="actions">
+          <button type="button" id="btnApplyThermalUrl" class="success">Aplicar link</button>
+          <button type="button" id="btnClearThermal" class="secondary">Quitar (usar PDF)</button>
+          <button type="button" id="btnSaveThermal">💾 Guardar</button>
+        </div>
+      </div>
+    </details>
+
     <details class="collapse" data-emp="perfumes" id="archivoCaps">
       <summary>🧴 Capacidades de laboratorio (ml)</summary>
       <div class="body">
@@ -2327,7 +2345,7 @@ function defaultEmpresaAtcb() {
     banks: DEFAULT_BANKS, waFact: DEFAULT_WA_FACT, waCxc: DEFAULT_WA_CXC,
     waMotivar: DEFAULT_WA_MOTIVAR, waProy: DEFAULT_WA_PROY,
     proyAplicacion: 'PROYECTO:  COTIZACION,  SUMINISTRO E INSTALACION DE  UN CAMARA FRIGORIFICA',
-    pdfBanner: DEFAULT_PDF_BANNER, proyTiempo: 'Veinte (20) Días', proyValidez: 'Quince (15) Días',
+    pdfBanner: DEFAULT_PDF_BANNER, thermalBanner: '', proyTiempo: 'Veinte (20) Días', proyValidez: 'Quince (15) Días',
     proyFormaPago: '70% al Contratar, 25% a mitad de obra, y 5% a la entrega',
     proyGarantia: 'tres (3) Meses por calidad, excepto situacion de fuerza mayor o caso fortuito que afecten parcial o totalmente el proyecto. Es de aclarar que para tener derecho de esta garantia se debe demostrar que no se ha dado mal uso al objeto a negociar y que este ha sido sometido a un adecuado uso y mantenimiento preventivo.',
     proyNota: 'NO INCLUYE: manposteria (tuberias en acero ni galvanizada), obra civil (pisos, enchapes, muros, etc)',
@@ -2351,7 +2369,7 @@ function defaultEmpresaPerfumes() {
     email: '', dir: 'Ibague, Tolima, Colombia',
     banks: DEFAULT_BANKS, waFact: DEFAULT_WA_FACT, waCxc: DEFAULT_WA_CXC,
     waMotivar: DEFAULT_WA_MOTIVAR, waProy: DEFAULT_WA_PROY,
-    proyAplicacion: '', pdfBanner: DEFAULT_PDF_BANNER,
+    proyAplicacion: '', pdfBanner: DEFAULT_PDF_BANNER, thermalBanner: '',
     proyTiempo: '', proyValidez: '', proyFormaPago: '', proyGarantia: '', proyNota: '', proyIntro: '', proyTitulo: '',
     daysPendiente: 7, daysCotizacion: 7, daysVencidas: 7, daysStock: 30
   };
@@ -2371,7 +2389,7 @@ function empCfg(empId) {
 function syncFlatSettingsFromEmp() {
   const e = empCfg();
   ['name','nit','tel','social','note','email','dir','banks','waFact','waCxc','waMotivar','waProy',
-   'proyAplicacion','pdfBanner','proyTiempo','proyValidez','proyFormaPago','proyGarantia','proyNota','proyIntro','proyTitulo'
+   'proyAplicacion','pdfBanner','thermalBanner','proyTiempo','proyValidez','proyFormaPago','proyGarantia','proyNota','proyIntro','proyTitulo'
   ].forEach(k => { settings[k] = e[k]; });
 }
 function applyEmpresaUI() {
@@ -2856,6 +2874,7 @@ function loadFromObj(obj) {
     waProy: s.waProy || atcb0.waProy,
     proyAplicacion: s.proyAplicacion || atcb0.proyAplicacion,
     pdfBanner: s.pdfBanner || atcb0.pdfBanner,
+    thermalBanner: s.thermalBanner || '',
     proyTiempo: s.proyTiempo || atcb0.proyTiempo,
     proyValidez: s.proyValidez || atcb0.proyValidez,
     proyFormaPago: s.proyFormaPago || atcb0.proyFormaPago,
@@ -6833,116 +6852,107 @@ function printInv(id) {
 function buildThermalHtml(inv) {
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
-  const banner = e.pdfBanner || '';
-  const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=2&data=' + encodeURIComponent(cod);
-  const items = (inv.items || []).map(it => {
+  const banner = normImgUrl(e.thermalBanner || e.pdfBanner || '') || '';
+  const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=2&data=' + encodeURIComponent(String(cod));
+  const items = (inv.items || []).map(function (it) {
     const cant = it.cant || 0;
     const name = escapeHtml(it.name || '');
     const sub = money(it.sub != null ? it.sub : (cant * (it.precio || 0)));
-    return `<div class="ti">${cant} × ${name}</div><div class="tr">${sub}</div>`;
+    return '<div class="row"><span class="ti">' + cant + ' x ' + name + '</span><span class="tr">' + sub + '</span></div>';
   }).join('');
   let abonosHtml = '';
   const abonos = inv.abonos || [];
   if (abonos.length) {
     const abonado = totalAbonado(inv);
     const saldo = saldoPendiente(inv);
-    abonosHtml = `<div class="sec">ABONOS</div>` +
-      abonos.map(a => `<div class="ti">${fmtDate(a.fecha)} ${a.nota ? '· ' + escapeHtml(a.nota) : ''}</div><div class="tr">${money(a.monto)}</div>`).join('') +
-      `<div class="ti"><strong>Abonado</strong></div><div class="tr"><strong>${money(abonado)}</strong></div>` +
-      `<div class="ti"><strong>Saldo</strong></div><div class="tr"><strong>${money(saldo)}</strong></div>`;
+    abonosHtml = '<div class="sec">ABONOS</div>' + abonos.map(function (a) {
+      return '<div class="row"><span class="ti">' + fmtDate(a.fecha) + (a.nota ? ' · ' + escapeHtml(a.nota) : '') + '</span><span class="tr">' + money(a.monto) + '</span></div>';
+    }).join('') +
+      '<div class="row"><span class="ti"><strong>Abonado</strong></span><span class="tr"><strong>' + money(abonado) + '</strong></span></div>' +
+      '<div class="row"><span class="ti"><strong>Saldo</strong></span><span class="tr"><strong>' + money(saldo) + '</strong></span></div>';
   }
   const nota = 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO';
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ticket ${escapeHtml(cod)}</title>
-<style>
-  @page { size: 58mm auto; margin: 2mm; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 4px 6px 12px;
-    width: 58mm; max-width: 58mm;
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 11px; line-height: 1.25; color: #000; background: #fff;
-  }
-  .center { text-align: center; }
-  .banner { width: 100%; max-height: 28mm; object-fit: contain; display: block; margin: 0 auto 4px; }
-  .qr { width: 28mm; height: 28mm; display: block; margin: 4px auto 2px; }
-  .cod { font-weight: 800; font-size: 13px; margin-bottom: 6px; }
-  .line { border-top: 1px dashed #000; margin: 6px 0; }
-  .sec { font-weight: 800; font-size: 10px; margin: 6px 0 2px; text-transform: uppercase; }
-  .ti { float: left; width: 62%; clear: both; padding: 1px 0; word-break: break-word; }
-  .tr { float: right; width: 36%; text-align: right; padding: 1px 0; }
-  .row::after { content: ""; display: table; clear: both; }
-  .block { overflow: hidden; }
-  .total { font-size: 14px; font-weight: 800; margin-top: 4px; }
-  .small { font-size: 9px; line-height: 1.3; }
-  .pay { font-size: 10px; line-height: 1.35; margin-top: 4px; }
-  @media print {
-    body { width: 58mm; max-width: 58mm; }
-    .noprint { display: none !important; }
-  }
-</style></head><body>
-  <div class="center">
-    ${banner ? `<img class="banner" src="${banner}" alt="">` : ''}
-    <img class="qr" src="${qrImg}" alt="QR ${escapeHtml(cod)}">
-    <div class="cod">${escapeHtml(cod)}</div>
-  </div>
-  <div class="small center">
-    <strong>${escapeHtml(e.name || e.label || '')}</strong><br>
-    ${e.nit ? 'NIT ' + escapeHtml(e.nit) + '<br>' : ''}
-    ${e.tel ? 'Tel. ' + escapeHtml(e.tel) + '<br>' : ''}
-    ${e.social ? escapeHtml(e.social) + '<br>' : ''}
-    ${e.dir ? escapeHtml(e.dir) : ''}
-  </div>
-  <div class="line"></div>
-  <div class="sec">Cliente</div>
-  <div class="small">
-    ${escapeHtml(inv.cliente || '')}<br>
-    ${inv.documento ? 'Doc: ' + escapeHtml(inv.documento) + '<br>' : ''}
-    ${inv.telefono ? 'Tel: ' + escapeHtml(inv.telefono) + '<br>' : ''}
-    ${inv.direccion ? escapeHtml(inv.direccion) + '<br>' : ''}
-    Fecha: ${fmtDate(inv.fecha)}
-  </div>
-  <div class="line"></div>
-  <div class="sec">Productos / servicios</div>
-  <div class="block">${items || '<div class="small">Sin ítems</div>'}</div>
-  <div class="line"></div>
-  <div class="block total">
-    <div class="ti">TOTAL</div>
-    <div class="tr">${money(inv.total)}</div>
-  </div>
-  ${abonosHtml ? '<div class="line"></div><div class="block">' + abonosHtml + '</div>' : ''}
-  ${inv.obs ? '<div class="line"></div><div class="sec">Obs.</div><div class="small">' + escapeHtml(inv.obs).replace(/\n/g, '<br>') + '</div>' : ''}
-  <div class="line"></div>
-  <div class="small">${escapeHtml(nota)}</div>
-  <div class="line"></div>
-  <div class="sec">Medio de pago</div>
-  <div class="pay">
-    🏦 Bancolombia<br>
-    🔑 Llave BRE-B <strong>@bonilla8395</strong><br>
-    Cuenta de ahorros<br>
-    Nro. <strong>86900003930</strong><br>
-    Sr. Luis Bonilla P. J.<br>
-    Pasaporte: 5001998395
-  </div>
-  <div class="line"></div>
-  <div class="center small" style="margin-top:8px">Gracias por su compra</div>
-</body></html>`;
+  const obs = inv.obs ? String(inv.obs) : '';
+  const obsHtml = obs ? ('<div class="line"></div><div class="sec">Obs.</div><div class="small">' + escapeHtml(obs).replace(/\n/g, '<br>') + '</div>') : '';
+  const bannerHtml = banner ? ('<img class="banner" src="' + escapeHtml(banner) + '" alt="">') : '';
+  return [
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
+    '<title>Ticket ' + escapeHtml(cod) + '</title>',
+    '<style>',
+    '@page{size:58mm auto;margin:2mm}',
+    'body{margin:0;padding:6px 8px 14px;width:58mm;max-width:58mm;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.3;color:#000;background:#fff}',
+    '.center{text-align:center}',
+    '.banner{width:100%;max-height:28mm;object-fit:contain;display:block;margin:0 auto 4px}',
+    '.qr{width:28mm;height:28mm;display:block;margin:4px auto 2px}',
+    '.cod{font-weight:800;font-size:13px;margin-bottom:6px}',
+    '.line{border-top:1px dashed #000;margin:6px 0}',
+    '.sec{font-weight:800;font-size:10px;margin:6px 0 2px;text-transform:uppercase}',
+    '.row{display:flex;justify-content:space-between;gap:6px;padding:1px 0}',
+    '.ti{flex:1;word-break:break-word}',
+    '.tr{flex-shrink:0;text-align:right;white-space:nowrap}',
+    '.total{font-size:14px;font-weight:800;margin-top:4px}',
+    '.small{font-size:9px;line-height:1.35}',
+    '.pay{font-size:10px;line-height:1.4;margin-top:4px}',
+    '</style></head><body>',
+    '<div class="center">' + bannerHtml +
+    '<img class="qr" src="' + qrImg + '" alt="QR">' +
+    '<div class="cod">' + escapeHtml(cod) + '</div></div>',
+    '<div class="small center"><strong>' + escapeHtml(e.name || e.label || '') + '</strong><br>',
+    (e.nit ? ('NIT ' + escapeHtml(e.nit) + '<br>') : ''),
+    (e.tel ? ('Tel. ' + escapeHtml(e.tel) + '<br>') : ''),
+    (e.social ? (escapeHtml(e.social) + '<br>') : ''),
+    (e.dir ? escapeHtml(e.dir) : ''),
+    '</div><div class="line"></div>',
+    '<div class="sec">Cliente</div><div class="small">',
+    escapeHtml(inv.cliente || '') + '<br>',
+    (inv.documento ? ('Doc: ' + escapeHtml(inv.documento) + '<br>') : ''),
+    (inv.telefono ? ('Tel: ' + escapeHtml(inv.telefono) + '<br>') : ''),
+    (inv.direccion ? (escapeHtml(inv.direccion) + '<br>') : ''),
+    'Fecha: ' + fmtDate(inv.fecha),
+    '</div><div class="line"></div>',
+    '<div class="sec">Productos / servicios</div>',
+    items || '<div class="small">Sin items</div>',
+    '<div class="line"></div>',
+    '<div class="row total"><span class="ti">TOTAL</span><span class="tr">' + money(inv.total) + '</span></div>',
+    abonosHtml ? ('<div class="line"></div>' + abonosHtml) : '',
+    obsHtml,
+    '<div class="line"></div><div class="small">' + escapeHtml(nota) + '</div>',
+    '<div class="line"></div><div class="sec">Medio de pago</div>',
+    '<div class="pay">Bancolombia<br>Llave BRE-B <strong>@bonilla8395</strong><br>',
+    'Cuenta de ahorros<br>Nro. <strong>86900003930</strong><br>',
+    'Sr. Luis Bonilla P. J.<br>Pasaporte: 5001998395</div>',
+    '<div class="line"></div><div class="center small" style="margin-top:8px">Gracias por su compra</div>',
+    '</body></html>'
+  ].join('');
 }
 
 function printThermalInv(id) {
   const inv = getInv(id);
   if (!inv) return toast('Factura no encontrada');
-  if (inv.isProyecto) return toast('Ticket térmico: usa facturas (proyectos siguen en PDF 🖨️)');
-  const html = buildThermalHtml(inv);
-  const w = window.open('', '_blank', 'noopener,noreferrer,width=360,height=720');
-  if (!w) return toast('Permite ventanas emergentes para imprimir el ticket');
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  // Espera a que carguen banner/QR y abre diálogo de impresión
-  setTimeout(() => {
-    try { w.focus(); w.print(); } catch (e) {}
-  }, 600);
+  if (inv.isProyecto) return toast('Ticket termico: usa facturas (proyectos siguen en PDF)');
+  let html = '';
+  try {
+    html = buildThermalHtml(inv);
+  } catch (err) {
+    console.error(err);
+    return toast('Error al armar ticket: ' + (err && err.message ? err.message : err));
+  }
+  if (!html) return toast('Ticket vacio');
+  // Sin noopener: si no, Edge/Chrome a veces no permite document.write
+  const w = window.open('', '_blank', 'width=380,height=740');
+  if (!w) return toast('Permite ventanas emergentes para el ticket');
+  try {
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(function () {
+      try { w.print(); } catch (e) {}
+    }, 700);
+  } catch (err) {
+    console.error(err);
+    toast('No se pudo abrir el ticket');
+  }
 }
 
 function printCurrent() {
@@ -7272,6 +7282,36 @@ btnSaveBanner.onclick = async () => {
   await autoSave();
   toast('Banner PDF de ' + (e.label || activeEmpresa) + ' guardado');
 };
+
+(function initThermalBanner() {
+  const applyT = async () => {
+    const url = normImgUrl((document.getElementById('thermalBannerUrl') || {}).value);
+    if (!url) return toast('Pega un link https de la imagen térmica');
+    const e = empCfg();
+    e.thermalBanner = url;
+    settings.empresas = settings.empresas || {};
+    settings.empresas[activeEmpresa] = e;
+    try { syncSettingsUI(); } catch (err) {}
+    toast('Banner térmico aplicado');
+    await autoSave();
+  };
+  const bA = document.getElementById('btnApplyThermalUrl');
+  if (bA) bA.onclick = applyT;
+  const bS = document.getElementById('btnSaveThermal');
+  if (bS) bS.onclick = applyT;
+  const bC = document.getElementById('btnClearThermal');
+  if (bC) bC.onclick = async () => {
+    const e = empCfg();
+    e.thermalBanner = '';
+    settings.empresas = settings.empresas || {};
+    settings.empresas[activeEmpresa] = e;
+    const tbu = document.getElementById('thermalBannerUrl');
+    if (tbu) tbu.value = '';
+    try { syncSettingsUI(); } catch (err) {}
+    toast('Térmico: usará el encabezado del PDF');
+    await autoSave();
+  };
+})();
 
 function refreshAll() {
   renderStats(); renderProducts(); renderClients(); renderInvoices(); renderLines(); syncSettingsUI();
