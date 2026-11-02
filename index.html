@@ -3598,7 +3598,8 @@ function renderStats() {
           <div class="row-actions" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap" onclick="event.stopPropagation()">
             <button type="button" class="sm success" onclick="sendCxc(${inv.id})">📲 CxC</button>
             <button type="button" class="sm secondary" onclick="editInv(${inv.id})">✏️</button>
-            <button type="button" class="sm" onclick="printInv(${inv.id})">🖨️</button>
+            <button type="button" class="sm" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
+            <button type="button" class="sm secondary" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
             <button type="button" class="sm success" onclick="waInv(${inv.id})">📲</button>
           </div>
         </div>`;
@@ -3631,7 +3632,8 @@ function renderStats() {
           <div class="row-actions" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap" onclick="event.stopPropagation()">
             <button type="button" class="sm success" onclick="motivarCotiz(${inv.id})">💬 Motivar</button>
             <button type="button" class="sm secondary" onclick="editInv(${inv.id})">✏️</button>
-            <button type="button" class="sm" onclick="printInv(${inv.id})">🖨️</button>
+            <button type="button" class="sm" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
+            <button type="button" class="sm secondary" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
             <button type="button" class="sm success" onclick="waInv(${inv.id})">📲</button>
             <button type="button" class="sm danger" onclick="delInv(${inv.id})">🗑️</button>
           </div>
@@ -6212,7 +6214,8 @@ function renderInvoices() {
             ${inv.tipo==='cotizacion' ? `<button type="button" class="sm success" onclick="motivarCotiz(${inv.id})">💬 Motivar</button>` : ''}
             <button type="button" class="sm secondary" onclick="viewInvDetail(${inv.id})">👀</button>
             ${inv.tipo !== 'cobrada' ? `<button type="button" class="sm secondary" onclick="editInv(${inv.id})">✏️</button>` : ''}
-            <button type="button" class="sm" onclick="printInv(${inv.id})">🖨️</button>
+            <button type="button" class="sm" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
+            <button type="button" class="sm secondary" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
             <button type="button" class="sm success" onclick="waInv(${inv.id})">📲</button>
             <button type="button" class="sm danger" onclick="delInv(${inv.id})">🗑️</button>
           </div>
@@ -6825,6 +6828,123 @@ function printInv(id) {
   if (inv.isProyecto) { printProyInv(inv); return; }
   doPrint(inv);
 }
+
+/** Ticket térmico angosto (Phomemo M110 ~48–58 mm). No toca el PDF. */
+function buildThermalHtml(inv) {
+  const e = empCfg(inv.empresa || activeEmpresa);
+  const cod = invNumeroDisplay(inv);
+  const banner = e.pdfBanner || '';
+  const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=2&data=' + encodeURIComponent(cod);
+  const items = (inv.items || []).map(it => {
+    const cant = it.cant || 0;
+    const name = escapeHtml(it.name || '');
+    const sub = money(it.sub != null ? it.sub : (cant * (it.precio || 0)));
+    return `<div class="ti">${cant} × ${name}</div><div class="tr">${sub}</div>`;
+  }).join('');
+  let abonosHtml = '';
+  const abonos = inv.abonos || [];
+  if (abonos.length) {
+    const abonado = totalAbonado(inv);
+    const saldo = saldoPendiente(inv);
+    abonosHtml = `<div class="sec">ABONOS</div>` +
+      abonos.map(a => `<div class="ti">${fmtDate(a.fecha)} ${a.nota ? '· ' + escapeHtml(a.nota) : ''}</div><div class="tr">${money(a.monto)}</div>`).join('') +
+      `<div class="ti"><strong>Abonado</strong></div><div class="tr"><strong>${money(abonado)}</strong></div>` +
+      `<div class="ti"><strong>Saldo</strong></div><div class="tr"><strong>${money(saldo)}</strong></div>`;
+  }
+  const nota = 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ticket ${escapeHtml(cod)}</title>
+<style>
+  @page { size: 58mm auto; margin: 2mm; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 4px 6px 12px;
+    width: 58mm; max-width: 58mm;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px; line-height: 1.25; color: #000; background: #fff;
+  }
+  .center { text-align: center; }
+  .banner { width: 100%; max-height: 28mm; object-fit: contain; display: block; margin: 0 auto 4px; }
+  .qr { width: 28mm; height: 28mm; display: block; margin: 4px auto 2px; }
+  .cod { font-weight: 800; font-size: 13px; margin-bottom: 6px; }
+  .line { border-top: 1px dashed #000; margin: 6px 0; }
+  .sec { font-weight: 800; font-size: 10px; margin: 6px 0 2px; text-transform: uppercase; }
+  .ti { float: left; width: 62%; clear: both; padding: 1px 0; word-break: break-word; }
+  .tr { float: right; width: 36%; text-align: right; padding: 1px 0; }
+  .row::after { content: ""; display: table; clear: both; }
+  .block { overflow: hidden; }
+  .total { font-size: 14px; font-weight: 800; margin-top: 4px; }
+  .small { font-size: 9px; line-height: 1.3; }
+  .pay { font-size: 10px; line-height: 1.35; margin-top: 4px; }
+  @media print {
+    body { width: 58mm; max-width: 58mm; }
+    .noprint { display: none !important; }
+  }
+</style></head><body>
+  <div class="center">
+    ${banner ? `<img class="banner" src="${banner}" alt="">` : ''}
+    <img class="qr" src="${qrImg}" alt="QR ${escapeHtml(cod)}">
+    <div class="cod">${escapeHtml(cod)}</div>
+  </div>
+  <div class="small center">
+    <strong>${escapeHtml(e.name || e.label || '')}</strong><br>
+    ${e.nit ? 'NIT ' + escapeHtml(e.nit) + '<br>' : ''}
+    ${e.tel ? 'Tel. ' + escapeHtml(e.tel) + '<br>' : ''}
+    ${e.social ? escapeHtml(e.social) + '<br>' : ''}
+    ${e.dir ? escapeHtml(e.dir) : ''}
+  </div>
+  <div class="line"></div>
+  <div class="sec">Cliente</div>
+  <div class="small">
+    ${escapeHtml(inv.cliente || '')}<br>
+    ${inv.documento ? 'Doc: ' + escapeHtml(inv.documento) + '<br>' : ''}
+    ${inv.telefono ? 'Tel: ' + escapeHtml(inv.telefono) + '<br>' : ''}
+    ${inv.direccion ? escapeHtml(inv.direccion) + '<br>' : ''}
+    Fecha: ${fmtDate(inv.fecha)}
+  </div>
+  <div class="line"></div>
+  <div class="sec">Productos / servicios</div>
+  <div class="block">${items || '<div class="small">Sin ítems</div>'}</div>
+  <div class="line"></div>
+  <div class="block total">
+    <div class="ti">TOTAL</div>
+    <div class="tr">${money(inv.total)}</div>
+  </div>
+  ${abonosHtml ? '<div class="line"></div><div class="block">' + abonosHtml + '</div>' : ''}
+  ${inv.obs ? '<div class="line"></div><div class="sec">Obs.</div><div class="small">' + escapeHtml(inv.obs).replace(/\n/g, '<br>') + '</div>' : ''}
+  <div class="line"></div>
+  <div class="small">${escapeHtml(nota)}</div>
+  <div class="line"></div>
+  <div class="sec">Medio de pago</div>
+  <div class="pay">
+    🏦 Bancolombia<br>
+    🔑 Llave BRE-B <strong>@bonilla8395</strong><br>
+    Cuenta de ahorros<br>
+    Nro. <strong>86900003930</strong><br>
+    Sr. Luis Bonilla P. J.<br>
+    Pasaporte: 5001998395
+  </div>
+  <div class="line"></div>
+  <div class="center small" style="margin-top:8px">Gracias por su compra</div>
+</body></html>`;
+}
+
+function printThermalInv(id) {
+  const inv = getInv(id);
+  if (!inv) return toast('Factura no encontrada');
+  if (inv.isProyecto) return toast('Ticket térmico: usa facturas (proyectos siguen en PDF 🖨️)');
+  const html = buildThermalHtml(inv);
+  const w = window.open('', '_blank', 'noopener,noreferrer,width=360,height=720');
+  if (!w) return toast('Permite ventanas emergentes para imprimir el ticket');
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  // Espera a que carguen banner/QR y abre diálogo de impresión
+  setTimeout(() => {
+    try { w.focus(); w.print(); } catch (e) {}
+  }, 600);
+}
+
 function printCurrent() {
   if (!currentLines.length) return toast('Agrega líneas primero');
   const prev = editingInvId ? getInv(editingInvId) : null;
