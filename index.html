@@ -1724,7 +1724,26 @@ details.overdue-box[open]{
         </div>
       </div>
     </details>
-<details class="collapse" data-emp="perfumes" id="archivoCaps">
+
+    <details class="collapse">
+      <summary>🧾 Encabezado ticket térmico</summary>
+      <div class="body">
+        <p class="sub">Imagen angosta para Phomemo / ticket 🧾. Si no pones link, usa el encabezado del PDF.</p>
+        <div style="background:#fff;border-radius:8px;padding:6px;margin-bottom:10px">
+          <img id="thermalBannerPreview" alt="Banner térmico" style="width:100%;max-height:80px;object-fit:contain;display:block;border-radius:4px">
+        </div>
+        <label class="label">Link del banner térmico</label>
+        <input id="thermalBannerUrl" type="url" placeholder="https://… imagen pública (angosta)" style="margin-bottom:8px">
+        <p class="hint" style="margin:0 0 8px">Recomendado: logo simple, fondo claro, poco detalle (papel ~50 mm).</p>
+        <div class="actions">
+          <button type="button" id="btnApplyThermalUrl" class="success">Aplicar link</button>
+          <button type="button" id="btnClearThermal" class="secondary">Quitar (usar PDF)</button>
+          <button type="button" id="btnSaveThermal">💾 Guardar</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="collapse" data-emp="perfumes" id="archivoCaps">
       <summary>🧴 Capacidades de laboratorio (ml)</summary>
       <div class="body">
         <p class="sub" style="margin:0 0 10px">Presentaciones con las que trabajas (ej. 30, 60, 120). Se usan en Lab y al facturar Perfumes.</p>
@@ -6853,12 +6872,13 @@ function printInv(id) {
 function buildThermalHtml(inv) {
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
-  const banner = ''; // sin encabezado gráfico (solo QR + texto)
+  const banner = normImgUrl(e.thermalBanner || e.pdfBanner || '') || '';
   const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=2&data=' + encodeURIComponent(String(cod));
   const items = (inv.items || []).map(function (it) {
     const cant = it.cant || 0;
     const name = escapeHtml(it.name || '');
-    return '<div class="row"><span class="ti">' + cant + ' ' + name + '</span></div>';
+    const sub = money(it.sub != null ? it.sub : (cant * (it.precio || 0)));
+    return '<div class="row"><span class="ti">' + cant + ' x ' + name + '</span><span class="tr">' + sub + '</span></div>';
   }).join('');
   let abonosHtml = '';
   const abonos = inv.abonos || [];
@@ -6874,7 +6894,7 @@ function buildThermalHtml(inv) {
   const nota = 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO';
   const obs = inv.obs ? String(inv.obs) : '';
   const obsHtml = obs ? ('<div class="line"></div><div class="sec">Obs.</div><div class="small">' + escapeHtml(obs).replace(/\n/g, '<br>') + '</div>') : '';
-  const bannerHtml = '';
+  const bannerHtml = banner ? ('<img class="banner" src="' + escapeHtml(banner) + '" alt="">') : '';
   return [
     '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
     '<title>Ticket ' + escapeHtml(cod) + '</title>',
@@ -6949,27 +6969,13 @@ function openThermalModal(id) {
     const full = buildThermalHtml(inv);
     const bodyMatch = full.match(/<body[^>]*>([\s\S]*)<\/body>/i);
     wrap.innerHTML = bodyMatch ? bodyMatch[1] : full;
-    // Solo dejar el QR en la vista previa (quitar logo/banner)
-    const imgs = wrap.querySelectorAll('img');
-    imgs.forEach(function (im, idx) {
-      const src = (im.getAttribute('src') || '');
-      const isQr = /qrserver|qr|create-qr/i.test(src) || (im.width > 0 && im.width <= 200 && idx > 0);
-      if (/banner|logo|encabezado/i.test(src) || (!isQr && idx === 0 && imgs.length > 1)) {
-        im.remove();
-        return;
-      }
-      // QR: tamaño moderado
-      im.style.maxHeight = '110px';
+    wrap.querySelectorAll('img').forEach(function (im) {
+      im.style.maxHeight = '72px';
       im.style.width = 'auto';
-      im.style.maxWidth = '110px';
+      im.style.maxWidth = '100%';
       im.style.objectFit = 'contain';
       im.style.display = 'block';
-      im.style.margin = '4px auto';
-    });
-    // Si queda una sola img grande tipo logo, quitarla
-    wrap.querySelectorAll('img').forEach(function (im) {
-      const src = (im.getAttribute('src') || '');
-      if (!/qrserver|create-qr-code/i.test(src)) im.remove();
+      im.style.margin = '0 auto 6px';
     });
   } catch (e) {
     console.error(e);
@@ -7183,179 +7189,118 @@ function thermalCanvasToRaster(canvas) {
 /** Dibuja ticket en canvas 384×H con texto nítido negro sobre blanco */
 async function thermalRenderCanvas(inv) {
   const W = 384;
-  const pad = 6;
+  const pad = 10;
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
 
+  // Construir líneas de texto
   const lines = [];
   function add(t, o) {
-    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 24, bold: false, center: false, right: false }, o || {}));
+    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 16, bold: false, center: false, right: false }, o || {}));
   }
-  // Texto un poco más grande
-  add(e.name || e.label || 'Empresa', { size: 28, bold: true, center: true });
-  if (e.nit) add('NIT ' + e.nit, { size: 20, center: true });
-  if (e.tel) add('Tel. ' + e.tel, { size: 20, center: true });
-  add('--------------------------------', { center: true, size: 18 });
-  add(String(cod), { size: 30, bold: true, center: true });
-  add('--------------------------------', { center: true, size: 18 });
-  add('CLIENTE', { size: 22, bold: true });
-  add(inv.cliente || '-', { size: 24 });
-  if (inv.documento) add('Doc: ' + inv.documento, { size: 20 });
-  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 20 });
-  if (inv.direccion) add(inv.direccion, { size: 18 });
-  add('Fecha: ' + fmtDate(inv.fecha), { size: 20 });
-  add('--------------------------------', { center: true, size: 18 });
-  add('PRODUCTOS', { size: 22, bold: true });
+  add(e.name || e.label || 'Empresa', { size: 18, bold: true, center: true });
+  if (e.nit) add('NIT ' + e.nit, { size: 13, center: true });
+  if (e.tel) add('Tel. ' + e.tel, { size: 13, center: true });
+  add('--------------------------------', { center: true, size: 13 });
+  add(String(cod), { size: 20, bold: true, center: true });
+  add('--------------------------------', { center: true, size: 13 });
+  add('CLIENTE', { size: 14, bold: true });
+  add(inv.cliente || '-');
+  if (inv.documento) add('Doc: ' + inv.documento, { size: 13 });
+  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 13 });
+  add('Fecha: ' + fmtDate(inv.fecha), { size: 13 });
+  add('--------------------------------', { center: true, size: 13 });
+  add('PRODUCTOS', { size: 14, bold: true });
   (inv.items || []).forEach(function (it) {
-    add((it.cant || 0) + ' ' + (it.name || ''), { size: 22 });
+    const cant = it.cant || 0;
+    const name = it.name || '';
+    const sub = money(it.sub != null ? it.sub : cant * (it.precio || 0));
+    add(cant + ' x ' + name, { size: 13 });
+    add(sub, { size: 13, right: true });
   });
-  if (!(inv.items || []).length) add('(sin items)', { size: 20 });
-  add('--------------------------------', { center: true, size: 18 });
-  add('TOTAL  ' + money(inv.total), { size: 28, bold: true });
+  if (!(inv.items || []).length) add('(sin items)', { size: 13 });
+  add('--------------------------------', { center: true, size: 13 });
+  add('TOTAL  ' + money(inv.total), { size: 18, bold: true });
   if ((inv.abonos || []).length) {
-    add('ABONOS', { size: 22, bold: true });
+    add('ABONOS', { size: 14, bold: true });
     inv.abonos.forEach(function (a) {
-      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 18 });
-      if (a.nota) add(String(a.nota), { size: 16 });
+      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 12 });
     });
-    add('Abonado ' + money(totalAbonado(inv)), { size: 20, bold: true });
-    add('Saldo ' + money(saldoPendiente(inv)), { size: 20, bold: true });
+    add('Abonado ' + money(totalAbonado(inv)), { size: 13, bold: true });
+    add('Saldo ' + money(saldoPendiente(inv)), { size: 13, bold: true });
   }
   if (inv.obs) {
-    add('OBS.', { size: 22, bold: true });
-    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 18 }); });
+    add('OBS.', { size: 14, bold: true });
+    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 12 }); });
   }
-  add('--------------------------------', { center: true, size: 18 });
-  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 16 });
-  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 16 });
-  add('--------------------------------', { center: true, size: 18 });
-  add('MEDIO DE PAGO', { size: 22, bold: true });
-  add('Bancolombia', { size: 20 });
-  add('Llave BRE-B @bonilla8395', { size: 20, bold: true });
-  add('Ahorros 86900003930', { size: 20 });
-  add('Luis Bonilla P. J.', { size: 18 });
-  add('Pasaporte 5001998395', { size: 17 });
-  add('Gracias por su compra', { size: 22, center: true, bold: true });
+  add('--------------------------------', { center: true, size: 13 });
+  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 11 });
+  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 11 });
+  add('--------------------------------', { center: true, size: 13 });
+  add('MEDIO DE PAGO', { size: 14, bold: true });
+  add('Bancolombia', { size: 13 });
+  add('Llave BRE-B @bonilla8395', { size: 13, bold: true });
+  add('Ahorros 86900003930', { size: 13 });
+  add('Luis Bonilla P. J.', { size: 12 });
+  add('Pasaporte 5001998395', { size: 12 });
+  add('Gracias por su compra', { size: 14, center: true, bold: true });
 
-  // QR como data:URL (local, no CORS, se dibuja bien en térmica)
-  let qrImg = null;
-  try {
-    if (typeof QRCode !== 'undefined' && QRCode.toDataURL) {
-      const dataUrl = await new Promise(function (resolve, reject) {
-        QRCode.toDataURL(String(cod), {
-          width: 160,
-          margin: 2,
-          errorCorrectionLevel: 'M',
-          color: { dark: '#000000', light: '#FFFFFF' }
-        }, function (err, url) {
-          if (err) reject(err);
-          else resolve(url);
-        });
-      });
-      qrImg = await new Promise(function (resolve) {
-        const img = new Image();
-        let done = false;
-        const fin = function (v) { if (!done) { done = true; resolve(v); } };
-        img.onload = function () { fin(img); };
-        img.onerror = function () { fin(null); };
-        img.src = dataUrl;
-        setTimeout(function () { fin(null); }, 1500);
-      });
-    }
-  } catch (e) {
-    console.warn('[thermal] QR toDataURL', e);
-    qrImg = null;
-  }
-
-  // Fallback: dibujar módulos a mano si toDataURL falló
-  let qrMatrix = null;
-  if (!qrImg && typeof QRCode !== 'undefined' && QRCode.create) {
-    try {
-      qrMatrix = QRCode.create(String(cod), { errorCorrectionLevel: 'M' }).modules;
-    } catch (e) {}
-  }
-
+  // Medir altura
   const measure = document.createElement('canvas').getContext('2d');
-  let needH = pad + 4 + ((qrImg || qrMatrix) ? 130 : 0);
+  let needH = pad + 8;
+  // barra de prueba + espacio QR
+  needH += 8 + 8 + 100 + 8;
   lines.forEach(function (L) {
     measure.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
     const maxW = W - pad * 2;
     const words = String(L.t).split(/\s+/);
-    let line = '', rows = 0;
+    let line = '';
+    let rows = 0;
     words.forEach(function (w) {
       const test = line ? line + ' ' + w : w;
-      if (measure.measureText(test).width > maxW && line) { rows++; line = w; }
-      else line = test;
+      if (measure.measureText(test).width > maxW && line) {
+        rows++;
+        line = w;
+      } else line = test;
     });
     if (line) rows++;
-    needH += Math.max(1, rows) * (L.size + 4) + 1;
+    needH += Math.max(1, rows) * (L.size + 3) + 1;
   });
-  needH += 10;
+  needH += pad + 20;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
-  canvas.height = Math.max(needH, 120);
+  canvas.height = Math.max(needH, 200);
   const ctx = canvas.getContext('2d');
+  // blanco
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, canvas.height);
+  // barra negra de prueba (si sale, el protocolo funciona)
   ctx.fillStyle = '#000000';
-  let y = pad;
+  ctx.fillRect(0, 0, W, 6);
 
-  // QR arriba centrado
-  if (qrImg) {
-    try {
-      const qs = 120;
-      // forzar contraste: dibujar sobre blanco
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(Math.round((W - qs) / 2) - 2, y - 2, qs + 4, qs + 4);
-      ctx.drawImage(qrImg, Math.round((W - qs) / 2), y, qs, qs);
-      // re-binarizar zona QR (cualquier gris → negro)
-      try {
-        const ox = Math.round((W - qs) / 2);
-        const id = ctx.getImageData(ox, y, qs, qs);
-        for (let i = 0; i < id.data.length; i += 4) {
-          const g = id.data[i] * 0.299 + id.data[i + 1] * 0.587 + id.data[i + 2] * 0.114;
-          const v = g < 180 ? 0 : 255;
-          id.data[i] = id.data[i + 1] = id.data[i + 2] = v;
-          id.data[i + 3] = 255;
-        }
-        ctx.putImageData(id, ox, y);
-      } catch (e) {}
-      y += qs + 8;
-    } catch (e) {
-      console.warn('[thermal] QR img draw', e);
-    }
-  } else if (qrMatrix) {
-    try {
-      const size = qrMatrix.size;
-      const marginMods = 2;
-      const totalMods = size + marginMods * 2;
-      const qs = 120;
-      const cell = Math.max(1, Math.floor(qs / totalMods));
-      const drawSize = cell * totalMods;
-      const ox = Math.round((W - drawSize) / 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(ox, y, drawSize, drawSize);
-      ctx.fillStyle = '#000000';
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-          let dark = false;
-          if (typeof qrMatrix.get === 'function') dark = !!qrMatrix.get(c, r);
-          else if (qrMatrix.data) dark = !!qrMatrix.data[r * size + c];
-          if (dark) ctx.fillRect(ox + (c + marginMods) * cell, y + (r + marginMods) * cell, cell, cell);
-        }
-      }
-      y += drawSize + 8;
-    } catch (e) {
-      console.warn('[thermal] QR matrix', e);
-    }
-  } else {
-    // Último recurso: texto del código grande (para no perder el dato)
-    ctx.font = 'bold 22px monospace';
-    const tw = ctx.measureText(String(cod)).width;
-    ctx.fillText(String(cod), Math.max(0, (W - tw) / 2), y + 22);
-    y += 30;
-  }
+  let y = 14;
+
+  // QR (opcional)
+  try {
+    await new Promise(function (resolve) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      let done = false;
+      const fin = function () { if (!done) { done = true; resolve(); } };
+      img.onload = function () {
+        try {
+          const qs = 96;
+          ctx.drawImage(img, (W - qs) / 2, y, qs, qs);
+          y += qs + 6;
+        } catch (e) {}
+        fin();
+      };
+      img.onerror = fin;
+      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=1&data=' + encodeURIComponent(String(cod));
+      setTimeout(fin, 2000);
+    });
+  } catch (e) {}
 
   ctx.fillStyle = '#000000';
   lines.forEach(function (L) {
@@ -7378,32 +7323,24 @@ async function thermalRenderCanvas(inv) {
       const tw = ctx.measureText(wl).width;
       if (L.center) x = Math.max(0, (W - tw) / 2);
       if (L.right) x = Math.max(pad, W - pad - tw);
+      // fillText usa baseline: y + size
       ctx.fillText(wl, x, y + L.size);
-      y += L.size + 4;
+      y += L.size + 3;
     });
     y += 1;
   });
 
-  // Recortar blanco al pie
-  try {
-    const img = ctx.getImageData(0, 0, W, canvas.height);
-    let lastY = canvas.height - 1;
-    outer: for (; lastY > 0; lastY--) {
-      for (let x = 0; x < W; x++) {
-        const i = (lastY * W + x) * 4;
-        if (img.data[i] < 250) break outer;
-      }
-    }
-    const trimH = Math.min(canvas.height, lastY + 8);
-    if (trimH > 50 && trimH < canvas.height - 5) {
-      const c2 = document.createElement('canvas');
-      c2.width = W;
-      c2.height = trimH;
-      c2.getContext('2d').drawImage(canvas, 0, 0);
-      return c2;
-    }
-  } catch (e) {}
+  // barra inferior
+  ctx.fillRect(0, Math.min(canvas.height - 4, y + 4), W, 4);
 
+  // guardar ref para depuración
+  const hold = document.getElementById('thermalPrintCanvas');
+  if (hold) {
+    hold.width = canvas.width;
+    hold.height = canvas.height;
+    hold.getContext('2d').drawImage(canvas, 0, 0);
+  }
+  console.log('[thermal] canvas rendered', canvas.width, 'x', canvas.height, 'lines', lines.length);
   return canvas;
 }
 
@@ -7838,6 +7775,36 @@ btnSaveBanner.onclick = async () => {
   await autoSave();
   toast('Banner PDF de ' + (e.label || activeEmpresa) + ' guardado');
 };
+
+(function initThermalBanner() {
+  const applyT = async () => {
+    const url = normImgUrl((document.getElementById('thermalBannerUrl') || {}).value);
+    if (!url) return toast('Pega un link https de la imagen térmica');
+    const e = empCfg();
+    e.thermalBanner = url;
+    settings.empresas = settings.empresas || {};
+    settings.empresas[activeEmpresa] = e;
+    try { syncSettingsUI(); } catch (err) {}
+    toast('Banner térmico aplicado');
+    await autoSave();
+  };
+  const bA = document.getElementById('btnApplyThermalUrl');
+  if (bA) bA.onclick = applyT;
+  const bS = document.getElementById('btnSaveThermal');
+  if (bS) bS.onclick = applyT;
+  const bC = document.getElementById('btnClearThermal');
+  if (bC) bC.onclick = async () => {
+    const e = empCfg();
+    e.thermalBanner = '';
+    settings.empresas = settings.empresas || {};
+    settings.empresas[activeEmpresa] = e;
+    const tbu = document.getElementById('thermalBannerUrl');
+    if (tbu) tbu.value = '';
+    try { syncSettingsUI(); } catch (err) {}
+    toast('Térmico: usará el encabezado del PDF');
+    await autoSave();
+  };
+})();
 
 function refreshAll() {
   renderStats(); renderProducts(); renderClients(); renderInvoices(); renderLines(); syncSettingsUI();
