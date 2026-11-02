@@ -7130,55 +7130,38 @@ async function thermalBleConnect() {
 }
 
 /** Re-obtiene service/writeChar si hace falta (impresiones 2, 3…) */
-/** Solo reconecta si hace falta; no toca el canal si ya está vivo */
 async function thermalBleEnsure() {
   if (!thermalBle || !thermalBle.device) throw new Error('Sin impresora. Pulsa Conectar.');
   if (!thermalBle.device.gatt) throw new Error('Sin GATT');
   if (!thermalBle.device.gatt.connected) {
     console.log('[thermal] ensure: reconnect GATT');
-    setThermalStatus('Reconectando GATT…');
     await thermalBle.device.gatt.connect();
-    await thermalDelay(300);
-    await thermalBleDiscoverChars(thermalBle.device);
-  } else if (!thermalBle.writeChar) {
-    await thermalBleDiscoverChars(thermalBle.device);
+    await thermalDelay(200);
   }
-}
-
-async function thermalBleDiscoverChars(device) {
-  const server = device.gatt;
-  let service = null;
-  const uuids = [
-    0xff00,
-    '0000ff00-0000-1000-8000-00805f9b34fb',
-    0xffe0,
-    '0000ffe0-0000-1000-8000-00805f9b34fb'
-  ];
-  for (let i = 0; i < uuids.length; i++) {
+  // Re-obtener característica de escritura (evita canal “muerto” tras 1ª impresión)
+  try {
+    let service = null;
+    for (let si = 0; si < PHOMEMO_BLE.ALT_SERVICES.length; si++) {
+      try {
+        service = await thermalBle.device.gatt.getPrimaryService(PHOMEMO_BLE.ALT_SERVICES[si]);
+        break;
+      } catch (e) {}
+    }
+    if (!service) throw new Error('Servicio BLE perdido');
+    let writeChar = null;
     try {
-      service = await server.getPrimaryService(uuids[i]);
-      console.log('[thermal] service ok', uuids[i]);
-      break;
-    } catch (e) {}
+      writeChar = await service.getCharacteristic(PHOMEMO_BLE.WRITE);
+    } catch (e) {
+      writeChar = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+    }
+    thermalBle.writeChar = writeChar;
+    thermalBle.server = thermalBle.device.gatt;
+    const props = writeChar.properties || {};
+    thermalBle.useResp = !props.writeWithoutResponse && !!props.write;
+  } catch (e) {
+    console.warn('[thermal] ensure char', e);
+    throw new Error('No se pudo reabrir el canal BLE. Conecta de nuevo.');
   }
-  if (!service) throw new Error('Servicio BLE no encontrado');
-  let writeChar = null;
-  const writeIds = [0xff02, '0000ff02-0000-1000-8000-00805f9b34fb'];
-  for (let i = 0; i < writeIds.length; i++) {
-    try {
-      writeChar = await service.getCharacteristic(writeIds[i]);
-      break;
-    } catch (e) {}
-  }
-  if (!writeChar) throw new Error('Característica 0xff02 no encontrada');
-  const props = writeChar.properties || {};
-  thermalBle = thermalBle || {};
-  thermalBle.device = device;
-  thermalBle.server = server;
-  thermalBle.writeChar = writeChar;
-  thermalBle.useResp = !props.writeWithoutResponse && !!props.write;
-  thermalBle.name = device.name || thermalBle.name || 'Phomemo';
-  console.log('[thermal] writeChar ok', 'useResp', thermalBle.useResp, props);
 }
 
 async function thermalBleSend(bytes) {
@@ -7188,16 +7171,26 @@ async function thermalBleSend(bytes) {
   const copy = new Uint8Array(u8.length);
   copy.set(u8);
   const buffer = copy.buffer;
-  if (thermalBle.useResp) {
-    await thermalBle.writeChar.writeValue(buffer);
-  } else {
-    try {
-      await thermalBle.writeChar.writeValueWithoutResponse(buffer);
-    } catch (e) {
-      console.warn('[thermal] withoutResponse fail → withResponse', e && e.message);
-      thermalBle.useResp = true;
+  const doWrite = async function () {
+    if (thermalBle.useResp) {
       await thermalBle.writeChar.writeValue(buffer);
+    } else {
+      try {
+        await thermalBle.writeChar.writeValueWithoutResponse(buffer);
+      } catch (e) {
+        thermalBle.useResp = true;
+        await thermalBle.writeChar.writeValue(buffer);
+      }
     }
+  };
+  try {
+    await doWrite();
+  } catch (e) {
+    // Reintento: reabrir canal y volver a escribir (típico en 2ª impresión)
+    console.warn('[thermal] send fail, retry ensure', e && e.message);
+    await thermalBleEnsure();
+    await thermalDelay(80);
+    await doWrite();
   }
 }
 
@@ -7232,70 +7225,65 @@ function thermalCanvasToRaster(canvas) {
 /** Dibuja ticket en canvas 384×H con texto nítido negro sobre blanco */
 async function thermalRenderCanvas(inv) {
   const W = 384;
-  const pad = 8;
+  const pad = 10;
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
 
-  // Legibilidad térmica: texto más grande + más aire entre líneas.
-  // QR se mantiene en 96px (no tocar).
+  // Texto agrandado; QR se mantiene en 96px (no tocar)
   const lines = [];
   function add(t, o) {
-    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 21, bold: false, center: false, right: false }, o || {}));
+    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 22, bold: false, center: false, right: false }, o || {}));
   }
-  add(e.name || e.label || 'Empresa', { size: 27, bold: true, center: true });
-  if (e.nit) add('NIT ' + e.nit, { size: 19, center: true });
-  if (e.tel) add('Tel. ' + e.tel, { size: 19, center: true });
-  add('--------------------------------', { center: true, size: 17 });
-  add(String(cod), { size: 30, bold: true, center: true });
-  add('--------------------------------', { center: true, size: 17 });
-  add('CLIENTE', { size: 21, bold: true });
-  add(inv.cliente || '-', { size: 23, bold: true });
-  if (inv.documento) add('Doc: ' + inv.documento, { size: 19 });
-  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 19 });
-  if (inv.direccion) add(inv.direccion, { size: 18 });
-  add('Fecha: ' + fmtDate(inv.fecha), { size: 19 });
-  add('--------------------------------', { center: true, size: 17 });
-  add('PRODUCTOS', { size: 21, bold: true });
+  add(e.name || e.label || 'Empresa', { size: 26, bold: true, center: true });
+  if (e.nit) add('NIT ' + e.nit, { size: 18, center: true });
+  if (e.tel) add('Tel. ' + e.tel, { size: 18, center: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add(String(cod), { size: 28, bold: true, center: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add('CLIENTE', { size: 20, bold: true });
+  add(inv.cliente || '-', { size: 22 });
+  if (inv.documento) add('Doc: ' + inv.documento, { size: 18 });
+  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 18 });
+  add('Fecha: ' + fmtDate(inv.fecha), { size: 18 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('PRODUCTOS', { size: 20, bold: true });
   (inv.items || []).forEach(function (it) {
     const cant = it.cant || 0;
     const name = it.name || '';
-    add(cant + ' ' + name, { size: 20 });
+    // Solo cantidad + nombre (sin precios unitarios ni subtotales por línea)
+    add(cant + ' ' + name, { size: 18 });
   });
-  if (!(inv.items || []).length) add('(sin items)', { size: 19 });
-  add('--------------------------------', { center: true, size: 17 });
-  add('TOTAL  ' + money(inv.total), { size: 28, bold: true });
+  if (!(inv.items || []).length) add('(sin items)', { size: 18 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('TOTAL  ' + money(inv.total), { size: 26, bold: true });
   if ((inv.abonos || []).length) {
-    add('ABONOS', { size: 21, bold: true });
+    add('ABONOS', { size: 20, bold: true });
     inv.abonos.forEach(function (a) {
-      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 19 });
-      if (a.nota) add(String(a.nota), { size: 17 });
+      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 17 });
     });
-    add('Abonado ' + money(totalAbonado(inv)), { size: 20, bold: true });
-    add('Saldo ' + money(saldoPendiente(inv)), { size: 20, bold: true });
+    add('Abonado ' + money(totalAbonado(inv)), { size: 18, bold: true });
+    add('Saldo ' + money(saldoPendiente(inv)), { size: 18, bold: true });
   }
   if (inv.obs) {
-    add('OBS.', { size: 21, bold: true });
-    String(inv.obs).split(/\n/).forEach(function (l) {
-      const t = String(l || '').trim();
-      if (t) add(t, { size: 18 });
-    });
+    add('OBS.', { size: 20, bold: true });
+    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 17 }); });
   }
-  add('--------------------------------', { center: true, size: 17 });
-  add('REPUESTOS ELECTRICO-MECANICOS', { size: 17 });
-  add('NO POSEE GARANTIA.', { size: 17 });
-  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 17 });
-  add('--------------------------------', { center: true, size: 17 });
-  add('MEDIO DE PAGO', { size: 21, bold: true });
-  add('Bancolombia', { size: 20 });
-  add('Llave BRE-B @bonilla8395', { size: 19, bold: true });
-  add('Ahorros 86900003930', { size: 19 });
-  add('Luis Bonilla P. J.', { size: 18 });
-  add('Pasaporte 5001998395', { size: 18 });
-  add('Gracias por su compra', { size: 22, center: true, bold: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 15 });
+  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 15 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('MEDIO DE PAGO', { size: 20, bold: true });
+  add('Bancolombia', { size: 18 });
+  add('Llave BRE-B @bonilla8395', { size: 18, bold: true });
+  add('Ahorros 86900003930', { size: 18 });
+  add('Luis Bonilla P. J.', { size: 17 });
+  add('Pasaporte 5001998395', { size: 16 });
+  add('Gracias por su compra', { size: 20, center: true, bold: true });
 
   const measure = document.createElement('canvas').getContext('2d');
   let needH = pad + 8;
-  needH += 8 + 96 + 8; // QR 96px fijo
+  // espacio QR 96px (mismo tamaño que el respaldo que imprime bien)
+  needH += 8 + 96 + 8;
   lines.forEach(function (L) {
     measure.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
     const maxW = W - pad * 2;
@@ -7310,9 +7298,9 @@ async function thermalRenderCanvas(inv) {
       } else line = test;
     });
     if (line) rows++;
-    needH += Math.max(1, rows) * (L.size + 5) + 2;
+    needH += Math.max(1, rows) * (L.size + 3) + 1;
   });
-  needH += pad + 12;
+  needH += pad + 16;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -7321,13 +7309,10 @@ async function thermalRenderCanvas(inv) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, canvas.height);
   ctx.fillStyle = '#000000';
-  // Texto más nítido en raster (menos antialias gris)
-  try { ctx.imageSmoothingEnabled = false; } catch (e) {}
-  try { ctx.textRendering = 'geometricPrecision'; } catch (e) {}
 
   let y = pad;
 
-  // QR — MISMO método y tamaño 96 que imprime bien
+  // QR — MISMO método y tamaño 96 que el respaldo que imprime bien
   try {
     await new Promise(function (resolve) {
       const img = new Image();
@@ -7338,7 +7323,7 @@ async function thermalRenderCanvas(inv) {
         try {
           const qs = 96;
           ctx.drawImage(img, (W - qs) / 2, y, qs, qs);
-          y += qs + 8;
+          y += qs + 6;
         } catch (e) {}
         fin();
       };
@@ -7369,16 +7354,10 @@ async function thermalRenderCanvas(inv) {
       const tw = ctx.measureText(wl).width;
       if (L.center) x = Math.max(0, (W - tw) / 2);
       if (L.right) x = Math.max(pad, W - pad - tw);
-      // Faux-bold: doble trazo en negrita para térmica (mejor contraste)
-      if (L.bold) {
-        ctx.fillText(wl, x, y + L.size);
-        ctx.fillText(wl, x + 1, y + L.size);
-      } else {
-        ctx.fillText(wl, x, y + L.size);
-      }
-      y += L.size + 5;
+      ctx.fillText(wl, x, y + L.size);
+      y += L.size + 3;
     });
-    y += 2;
+    y += 1;
   });
 
   const hold = document.getElementById('thermalPrintCanvas');
@@ -7394,53 +7373,58 @@ async function thermalRenderCanvas(inv) {
 async function thermalBlePrint() {
   const inv = getInv(thermalInvId);
   if (!inv) return toast('Sin factura');
-  if (!thermalBle || !thermalBle.device) {
+  if (!thermalBle || !thermalBle.writeChar) {
     setThermalStatus('Primero conecta la impresora', false);
     return toast('Conecta la impresora BLE');
   }
+  if (!thermalBle.device.gatt.connected) {
+    try {
+      setThermalStatus('Reconectando GATT…');
+      await thermalBle.device.gatt.connect();
+      await thermalDelay(250);
+      await thermalBleEnsure();
+    } catch (e) {
+      thermalBle = null;
+      const b = document.getElementById('btnThermalBlePrint');
+      if (b) b.disabled = true;
+      return toast('Se perdió la conexión. Pulsa Conectar impresora.');
+    }
+  }
   const btnP = document.getElementById('btnThermalBlePrint');
   if (btnP) btnP.disabled = true;
+  setThermalStatus('Generando ticket…');
   try {
-    setThermalStatus('Comprobando conexión…');
-    await thermalBleEnsure();
-    // Probe: comando SPEED corto — si falla, redescubrir canal
-    try {
-      await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
-      await thermalDelay(50);
-    } catch (e1) {
-      console.warn('[thermal] probe fail', e1);
-      setThermalStatus('Reabriendo canal BLE…');
-      await thermalBleDiscoverChars(thermalBle.device);
-      await thermalDelay(100);
-      await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
-      await thermalDelay(50);
-    }
-
-    setThermalStatus('Generando ticket…');
     const canvas = await thermalRenderCanvas(inv);
     const raster = thermalCanvasToRaster(canvas);
     const data = raster.data;
     const widthBytes = raster.widthBytes;
     const heightLines = raster.heightLines;
-    console.log('[thermal] print', widthBytes, 'x', heightLines, 'bytes', data.length);
+    console.log('[thermal] print', widthBytes, heightLines, data.length);
     if (heightLines < 8) throw new Error('Ticket demasiado corto');
 
+    // Contar bits negros (si 0 → imagen blanca)
     let blackBits = 0;
     for (let bi = 0; bi < data.length; bi++) {
       let v = data[bi];
       while (v) { blackBits += v & 1; v >>= 1; }
     }
-    console.log('[thermal] blackBits', blackBits);
+    console.log('[thermal] blackBits', blackBits, 'of', data.length * 8);
     if (blackBits < 50) throw new Error('Imagen casi blanca (' + blackBits + ' px). Reintenta.');
 
-    setThermalStatus('Enviando a impresora… 0%');
-    // Protocolo M110 Phomymo (probado)
+    // Asegurar canal vivo (impresiones 2, 3… sin apagar impresora)
+    await thermalBleEnsure();
+    await thermalDelay(100);
+
+    setThermalStatus('Imprimiendo… 0% (' + blackBits + ' px negros)');
+    // printM110 (Phomymo): SPEED + DENSITY + MEDIA continuous + raster + FOOTER
+    // Sin ESC @ entre trabajos (deja el buffer en mal estado en 2ª impresión)
     await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5])); // SPEED
-    await thermalDelay(30);
+    await thermalDelay(40);
     await thermalBleSend(new Uint8Array([0x1b, 0x4e, 0x04, 12])); // DENSITY
-    await thermalDelay(30);
-    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0b])); // continuous
-    await thermalDelay(30);
+    await thermalDelay(40);
+    // 0x0b = continuous (papel continuo); 0x0a = etiquetas con gap
+    await thermalBleSend(new Uint8Array([0x1f, 0x11, 0x0b]));
+    await thermalDelay(40);
     await thermalBleSend(new Uint8Array([
       0x1d, 0x76, 0x30, 0x00,
       widthBytes & 0xff, 0x00,
@@ -7449,24 +7433,25 @@ async function thermalBlePrint() {
 
     const chunkSize = 128;
     for (let i = 0; i < data.length; i += chunkSize) {
-      const chunk = data.slice(i, Math.min(i + chunkSize, data.length));
+      const end = Math.min(i + chunkSize, data.length);
+      // Copia del slice (evita problemas de buffer compartido)
+      const chunk = data.slice(i, end);
       await thermalBleSend(chunk);
-      await thermalDelay(20);
-      if (i % (chunkSize * 8) === 0) {
-        const pct = Math.min(99, Math.round(i / data.length * 100));
-        setThermalStatus('Enviando datos… ' + pct + '%');
+      await thermalDelay(25);
+      if (i % (chunkSize * 10) === 0) {
+        setThermalStatus('Imprimiendo… ' + Math.min(99, Math.round(i / data.length * 100)) + '%');
       }
     }
-    await thermalDelay(300);
-    await thermalBleSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00])); // FOOTER
-    await thermalDelay(600);
-    setThermalStatus('Enviado OK. Si la impresora no reacciona, apaga/enciende y Conecta de nuevo.', true);
-    toast('🖨️ Datos enviados a ' + (thermalBle.name || 'impresora'));
+    await thermalDelay(350);
+    // FOOTER Phomymo — cierra el trabajo para poder imprimir el siguiente
+    await thermalBleSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00]));
+    await thermalDelay(800); // dejar que la impresora termine antes del siguiente ticket
+    setThermalStatus('Listo. Puedes imprimir otra factura sin reconectar.', true);
+    toast('🖨️ Enviado a ' + thermalBle.name);
   } catch (e) {
     console.error('[thermal] print', e);
-    const msg = (e && e.message) ? e.message : String(e);
-    setThermalStatus('Error: ' + msg, false);
-    toast('Error BLE: ' + msg);
+    setThermalStatus('Error: ' + (e.message || e), false);
+    toast('Error BLE: ' + (e.message || e));
   } finally {
     if (btnP && thermalBle) btnP.disabled = false;
   }
