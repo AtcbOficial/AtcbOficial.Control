@@ -775,13 +775,11 @@ details.overdue-box[open]{
     </div>
     <div class="sub" id="headerSub" hidden></div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-      <span class="auth-user" id="authUserLabel" title=""></span>
       <select id="empresaSelect" title="Empresa activa">
         <option value="atcb">🧊 AtcbOficial</option>
         <option value="perfumes">🧴 Perfumes L&amp;R</option>
       </select>
-      <button type="button" class="sm secondary" id="btnLookupQr" title="Consultar código QR (stock / insumos)" style="display:none;padding:5px 8px">📷</button>
-      <button type="button" class="sm secondary" id="btnLogout" title="Cerrar sesión" style="display:none;padding:5px 8px">⎋</button>
+      <button type="button" class="sm secondary" id="btnLookupQr" title="Consultar código QR (factura / stock / insumos)" style="display:none;padding:5px 8px">📷</button>
     </div>
   </div>
 </header>
@@ -2950,7 +2948,17 @@ function loadFromObj(obj) {
     empresa: (v.empresa === EMPRESA_PERFUMES || v.empresa === 'perfumes') ? EMPRESA_PERFUMES : EMPRESA_ATCB
   }));
   invoices = (obj.invoices || []).map(inv => ({
-    id: +inv.id, numero: +inv.numero, fecha: inv.fecha,
+    id: +inv.id, numero: (function(){
+      const raw = inv.numero;
+      // ya viene f1-/f2-/P1-
+      if (raw != null && /^(f1|f2|P1|p1)-/i.test(String(raw))) return String(raw);
+      const n = parseInt(raw, 10);
+      if (!n && n !== 0) return raw || inv.id;
+      // migrar legado numérico al estándar
+      if (inv.isProyecto) return 'P1-' + String(n).padStart(4, '0');
+      if ((inv.empresa === EMPRESA_PERFUMES || inv.empresa === 'perfumes')) return 'f2-' + String(n).padStart(4, '0');
+      return 'f1-' + String(n).padStart(4, '0');
+    })(), fecha: inv.fecha,
     tipo: inv.tipo || 'pendiente',
     cliente: inv.cliente || '', documento: inv.documento || '',
     direccion: inv.direccion || '', telefono: inv.telefono || '',
@@ -3005,7 +3013,15 @@ function loadFromObj(obj) {
   nextCliId  = ctr.nextCliId  || (clients.reduce((m,x)=>Math.max(m,x.id||0),0)+1);
   nextProvId = ctr.nextProvId || (proveedores.reduce((m,x)=>Math.max(m,x.id||0),0)+1);
   nextInvId  = ctr.nextInvId  || (invoices.reduce((m,x)=>Math.max(m,x.id||0),0)+1);
-  nextNumero = ctr.nextNumero || (invoices.reduce((m,x)=>Math.max(m,x.numero||0),0)+1);
+  nextNumero = ctr.nextNumero || 1;
+  try {
+    // contador legado; la numeración real usa nextInvCodigo
+    const maxN = invoices.reduce((m,x) => {
+      const p = parseInvCodigo(x.numero);
+      return Math.max(m, p.n || 0);
+    }, 0);
+    if (maxN + 1 > nextNumero) nextNumero = maxN + 1;
+  } catch (e) {}
   nextInsId  = ctr.nextInsId  || (insumos.reduce((m,x)=>Math.max(m,x.id||0),0)+1);
   // Contabilidad personal (única / compartida)
   const ct = obj.contabilidad || {};
@@ -3054,7 +3070,8 @@ function loadFromObj(obj) {
   try { applyEmpresaUI(); } catch (e) {}
   syncSettingsUI();
   syncContCajasInputs();
-  try { reconcileContFromInvoices(); } catch (e) {}
+  try { reconcileContFromInvoices();
+  try { migrateContFactConcepts(); } catch (e) {} } catch (e) {}
 }
 
 /* ---------- File System ---------- */
@@ -5045,6 +5062,28 @@ function isContLinkedToInv(x, inv) {
    SALIDA: 0 o 1 movimiento locked con source fact:ID|proy:ID
    Regla monto: cobrada → full rent; pendiente → max(0, abonado−costo)
    ============================================================ */
+
+/** Actualiza conceptos del libro: f1-#### · cliente · 🧊 AtcbOficial */
+function migrateContFactConcepts() {
+  (contMovimientos || []).forEach(x => {
+    if (!x || !x.locked) return;
+    let inv = null;
+    if (x.sourceInvId != null) inv = getInv(x.sourceInvId);
+    if (!inv && x.source) {
+      const m = /^(fact|proy):(\d+)$/i.exec(String(x.source));
+      if (m) inv = getInv(+m[2]);
+    }
+    if (!inv) return;
+    const empLab = empCfg(inv.empresa || EMPRESA_ATCB).label || '';
+    const empChip = (inv.empresa === EMPRESA_PERFUMES) ? ('🧴 ' + empLab) : ('🧊 ' + empLab);
+    const cod = invNumeroDisplay(inv);
+    const cli = (inv.cliente || 'Cliente').trim();
+    let concept = cod + ' · ' + cli + '  ' + empChip;
+    if (inv.tipo !== 'cobrada') concept += ' (util. parcial abonos)';
+    x.concept = concept;
+  });
+}
+
 function syncContFromInvoice(inv) {
   if (!inv || inv.id == null) return;
   const key = contSourceKey(inv);
@@ -5059,9 +5098,11 @@ function syncContFromInvoice(inv) {
   const abonado = totalAbonado(inv);
   const costo = invCostoTotal(inv);
   const empLab = empCfg(inv.empresa || EMPRESA_ATCB).label || (inv.empresa === EMPRESA_PERFUMES ? 'Perfumes L&R' : 'AtcbOficial');
+  const cod = invNumeroDisplay(inv);
+  const empChip = (inv.empresa === EMPRESA_PERFUMES) ? '🧴 ' + empLab : '🧊 ' + empLab;
   let concept = inv.isProyecto
-    ? ('Proyecto #' + num + ' · ' + cli + ' · ' + empLab)
-    : ('Factura #' + num + ' · ' + cli + ' · ' + empLab);
+    ? (cod + ' · ' + cli + '  ' + empChip)
+    : (cod + ' · ' + cli + '  ' + empChip);
   if (inv.tipo !== 'cobrada') {
     concept += ' (util. parcial abonos)';
   }
@@ -6301,7 +6342,7 @@ function viewInvDetail(id) {
   title.textContent = (isProy ? 'Proyecto' : 'Factura') + ' ' + codShow;
   let html = '';
   html += `<div style="text-align:center;margin:0 0 10px;background:#fff;border-radius:10px;padding:10px">
-    <canvas id="invDetailQrCanvas" width="180" height="180" style="max-width:180px;margin:0 auto;display:block"></canvas>
+    <img id="invDetailQrImg" alt="QR ${escapeHtml(codShow)}" width="180" height="180" style="max-width:180px;margin:0 auto;display:block;background:#fff"/>
     <div style="color:#111;font-weight:800;font-size:13px;margin-top:6px">${escapeHtml(codShow)}</div>
   </div>`;
   html += `<div class="d-row"><strong>Estado:</strong> ${tipoLabel(inv.tipo, overdue)}</div>`;
@@ -6356,13 +6397,25 @@ function viewInvDetail(id) {
     if (inv.garantia) html += `<div class="d-row"><strong>Garantía:</strong> ${escapeHtml(inv.garantia)}</div>`;
   }
   body.innerHTML = html;
-  // QR del número de factura/proyecto
+  // QR del número de factura/proyecto (img dataURL: más fiable que canvas vacío)
   try {
-    const cvs = document.getElementById('invDetailQrCanvas');
-    if (cvs && typeof QRCode !== 'undefined' && QRCode.toCanvas) {
-      QRCode.toCanvas(cvs, codShow, { width: 180, margin: 1, color: { dark: '#000', light: '#fff' } }).catch(()=>{});
+    const img = document.getElementById('invDetailQrImg');
+    if (img && typeof QRCode !== 'undefined') {
+      const opts = { width: 180, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#ffffff' } };
+      const apply = (url) => { if (url) img.src = url; };
+      if (typeof QRCode.toDataURL === 'function') {
+        const r = QRCode.toDataURL(codShow, opts);
+        if (r && typeof r.then === 'function') r.then(apply).catch(() => {});
+        else if (typeof r === 'string') apply(r);
+      } else if (typeof QRCode.toCanvas === 'function') {
+        const cvs = document.createElement('canvas');
+        const pr = QRCode.toCanvas(cvs, codShow, opts);
+        const done = () => { try { apply(cvs.toDataURL('image/png')); } catch (e) {} };
+        if (pr && typeof pr.then === 'function') pr.then(done).catch(() => {});
+        else done();
+      }
     }
-  } catch (e) {}
+  } catch (e) { console.warn('inv QR', e); }
   
   modal.classList.add('open');
 }
@@ -6714,8 +6767,14 @@ function buildPrintHtml(inv) {
   return `
   <div style="position:relative;max-width:800px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12px;line-height:1.35">
     ${paidStampHtml(inv)}
-    <div style="margin-bottom:10px">
-      <img src="${banner}" alt="Banner" style="width:100%;max-height:90px;object-fit:contain;display:block">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="flex:1;min-width:0">
+        <img src="${banner}" alt="Banner" style="width:100%;max-height:88px;object-fit:contain;display:block">
+      </div>
+      <div style="flex-shrink:0;text-align:center">
+        <img src="${qrImg}" alt="QR ${escapeHtml(String(numDisplay))}" style="width:64px;height:64px;border:1px solid #ccc;display:block"/>
+        <div style="font-size:9px;font-weight:700;margin-top:2px">${escapeHtml(String(numDisplay))}</div>
+      </div>
     </div>
     <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
       <div style="text-align:right;font-size:11px;line-height:1.4">
@@ -6734,7 +6793,6 @@ function buildPrintHtml(inv) {
           <div><strong>Fecha</strong> &nbsp;&nbsp; ${fmtDate(fechaFmt)}</div>
           <div style="margin-top:4px"><strong>Factura natural N°</strong> &nbsp;&nbsp; ${escapeHtml(String(numDisplay))}</div>
           <div style="margin-top:4px"><strong>Tel. Adm.</strong> &nbsp;&nbsp; ${escapeHtml(e.tel || '')}</div>
-          <div style="margin-top:8px"><img src="${qrImg}" alt="QR ${escapeHtml(String(numDisplay))}" style="width:72px;height:72px;border:1px solid #ddd"/></div>
         </td>
       </tr>
     </table>
@@ -7589,8 +7647,15 @@ function proyHeaderHtml(numDisplay, hoja, totalHojas) {
   const social = e.social || '@AtcbOficial';
   const name = e.name || '';
   const nit = e.nit || '';
+  const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=4&data=' + encodeURIComponent(String(numDisplay));
   return `
-  <div style="margin-bottom:8px">${banner ? `<img src="${banner}" alt="Banner" style="width:100%;max-height:80px;object-fit:contain;display:block">` : ''}</div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+    <div style="flex:1;min-width:0">${banner ? `<img src="${banner}" alt="Banner" style="width:100%;max-height:80px;object-fit:contain;display:block">` : ''}</div>
+    <div style="flex-shrink:0;text-align:center">
+      <img src="${qrImg}" alt="QR" style="width:56px;height:56px;border:1px solid #ccc;display:block"/>
+      <div style="font-size:8px;font-weight:700;margin-top:2px">${escapeHtml(String(numDisplay))}</div>
+    </div>
+  </div>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">
     <div style="flex:1;min-width:0">
       <div style="font-size:10px;line-height:1.4;margin-bottom:4px">
@@ -7678,11 +7743,7 @@ function buildProyPrintHtml(inv){
   const subTot = inv.subTotal != null ? (+inv.subTotal||0) : (subA+subE+subL);
   const aj = inv.ajuste && inv.ajuste.monto > 0 ? inv.ajuste : null;
   const tot = inv.total != null ? (+inv.total||0) : (aj ? (aj.sign==="+" ? subTot+aj.monto : Math.max(0, subTot-aj.monto)) : subTot);
-  let numDisplay = inv.numero;
-  if (inv.fecha && inv.numero) {
-    const parts = (inv.fecha||'').split('-');
-    if (parts.length===3) numDisplay = parts[1]+parts[2]+'-'+inv.numero;
-  }
+  const numDisplay = invNumeroDisplay(inv);
   const hasAbonos = (inv.abonos||[]).length > 0;
   const abonado = totalAbonado(inv);
   const saldo = saldoPendiente(inv);
