@@ -1724,26 +1724,7 @@ details.overdue-box[open]{
         </div>
       </div>
     </details>
-
-    <details class="collapse">
-      <summary>🧾 Encabezado ticket térmico</summary>
-      <div class="body">
-        <p class="sub">Imagen angosta para Phomemo / ticket 🧾. Si no pones link, usa el encabezado del PDF.</p>
-        <div style="background:#fff;border-radius:8px;padding:6px;margin-bottom:10px">
-          <img id="thermalBannerPreview" alt="Banner térmico" style="width:100%;max-height:80px;object-fit:contain;display:block;border-radius:4px">
-        </div>
-        <label class="label">Link del banner térmico</label>
-        <input id="thermalBannerUrl" type="url" placeholder="https://… imagen pública (angosta)" style="margin-bottom:8px">
-        <p class="hint" style="margin:0 0 8px">Recomendado: logo simple, fondo claro, poco detalle (papel ~50 mm).</p>
-        <div class="actions">
-          <button type="button" id="btnApplyThermalUrl" class="success">Aplicar link</button>
-          <button type="button" id="btnClearThermal" class="secondary">Quitar (usar PDF)</button>
-          <button type="button" id="btnSaveThermal">💾 Guardar</button>
-        </div>
-      </div>
-    </details>
-
-    <details class="collapse" data-emp="perfumes" id="archivoCaps">
+<details class="collapse" data-emp="perfumes" id="archivoCaps">
       <summary>🧴 Capacidades de laboratorio (ml)</summary>
       <div class="body">
         <p class="sub" style="margin:0 0 10px">Presentaciones con las que trabajas (ej. 30, 60, 120). Se usan en Lab y al facturar Perfumes.</p>
@@ -6877,7 +6858,6 @@ function buildThermalHtml(inv) {
   const items = (inv.items || []).map(function (it) {
     const cant = it.cant || 0;
     const name = escapeHtml(it.name || '');
-    // Solo cantidad + nombre (sin precio unitario en ticket)
     return '<div class="row"><span class="ti">' + cant + ' ' + name + '</span></div>';
   }).join('');
   let abonosHtml = '';
@@ -7186,18 +7166,18 @@ function thermalCanvasToRaster(canvas) {
   return { data: data, widthBytes: widthBytes, heightLines: h };
 }
 
-/** Dibuja ticket 384px. Logo/QR sin contaminar canvas (CORS → papel blanco). */
+/** Dibuja ticket en canvas 384×H con texto nítido negro sobre blanco */
 async function thermalRenderCanvas(inv) {
   const W = 384;
   const pad = 8;
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
-  const bannerUrl = normImgUrl(e.thermalBanner || e.pdfBanner || '') || '';
 
   const lines = [];
   function add(t, o) {
     lines.push(Object.assign({ t: String(t == null ? '' : t), size: 22, bold: false, center: false, right: false }, o || {}));
   }
+  // Texto ~50% más grande; sin logo (evita papel en blanco por CORS)
   add(e.name || e.label || 'Empresa', { size: 26, bold: true, center: true });
   if (e.nit) add('NIT ' + e.nit, { size: 18, center: true });
   if (e.tel) add('Tel. ' + e.tel, { size: 18, center: true });
@@ -7214,6 +7194,7 @@ async function thermalRenderCanvas(inv) {
   add('--------------------------------', { center: true, size: 18 });
   add('PRODUCTOS', { size: 20, bold: true });
   (inv.items || []).forEach(function (it) {
+    // Solo cantidad + nombre (sin precios unitarios)
     add((it.cant || 0) + ' ' + (it.name || ''), { size: 20 });
   });
   if (!(inv.items || []).length) add('(sin items)', { size: 18 });
@@ -7244,158 +7225,83 @@ async function thermalRenderCanvas(inv) {
   add('Pasaporte 5001998395', { size: 16 });
   add('Gracias por su compra', { size: 20, center: true, bold: true });
 
-  // Logo: intentar con CORS; si falla no se usa (evita canvas "tainted")
-  let logoImg = null;
-  if (bannerUrl) {
-    logoImg = await new Promise(function (resolve) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      let done = false;
-      const fin = function (v) { if (!done) { done = true; resolve(v); } };
-      img.onload = function () { fin(img); };
-      img.onerror = function () { fin(null); };
-      img.src = bannerUrl + (bannerUrl.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
-      setTimeout(function () { fin(null); }, 2000);
-    });
-  }
-
-  // QR local con librería QRCode (ya cargada) — sin red, sin CORS
+  // QR local (sin red / sin CORS)
   let qrCanvas = null;
   try {
     if (typeof QRCode !== 'undefined') {
       qrCanvas = document.createElement('canvas');
       await new Promise(function (resolve, reject) {
         QRCode.toCanvas(qrCanvas, String(cod), {
-          width: 120,
-          margin: 1,
+          width: 120, margin: 1,
           color: { dark: '#000000', light: '#ffffff' },
           errorCorrectionLevel: 'M'
-        }, function (err) {
-          if (err) reject(err);
-          else resolve();
-        });
+        }, function (err) { if (err) reject(err); else resolve(); });
       });
     }
   } catch (e) {
-    console.warn('[thermal] QR local', e);
+    console.warn('[thermal] QR', e);
     qrCanvas = null;
   }
 
-  function measureHeight(withLogo, withQr) {
-    const m = document.createElement('canvas').getContext('2d');
-    let h = pad + 10;
-    if (withLogo && logoImg) {
-      const maxLogoH = 70;
-      const scale = Math.min((W - 16) / logoImg.width, maxLogoH / logoImg.height);
-      h += Math.round(logoImg.height * scale) + 8;
-    }
-    if (withQr && qrCanvas) h += 120;
-    lines.forEach(function (L) {
-      m.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
-      const maxW = W - pad * 2;
-      const words = String(L.t).split(/\s+/);
-      let line = '', rows = 0;
-      words.forEach(function (w) {
-        const test = line ? line + ' ' + w : w;
-        if (m.measureText(test).width > maxW && line) { rows++; line = w; }
-        else line = test;
-      });
-      if (line) rows++;
-      h += Math.max(1, rows) * (L.size + 4) + 2;
+  const measure = document.createElement('canvas').getContext('2d');
+  let needH = pad + 10 + (qrCanvas ? 120 : 0);
+  lines.forEach(function (L) {
+    measure.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
+    const maxW = W - pad * 2;
+    const words = String(L.t).split(/\s+/);
+    let line = '', rows = 0;
+    words.forEach(function (w) {
+      const test = line ? line + ' ' + w : w;
+      if (measure.measureText(test).width > maxW && line) { rows++; line = w; }
+      else line = test;
     });
-    return h + pad + 16;
+    if (line) rows++;
+    needH += Math.max(1, rows) * (L.size + 4) + 2;
+  });
+  needH += pad + 16;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = Math.max(needH, 240);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, canvas.height);
+  ctx.fillStyle = '#000000';
+  let y = pad;
+
+  if (qrCanvas) {
+    try {
+      const qs = 100;
+      ctx.drawImage(qrCanvas, Math.round((W - qs) / 2), y, qs, qs);
+      y += qs + 6;
+    } catch (e) {}
   }
 
-  function paint(withLogo, withQr) {
-    const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = Math.max(measureHeight(withLogo, withQr), 240);
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, W, canvas.height);
-    ctx.fillStyle = '#000000';
-    let y = pad;
-
-    if (withLogo && logoImg) {
-      try {
-        const maxLogoH = 70;
-        const scale = Math.min((W - 16) / logoImg.width, maxLogoH / logoImg.height);
-        const lw = Math.round(logoImg.width * scale);
-        const lh = Math.round(logoImg.height * scale);
-        ctx.drawImage(logoImg, Math.round((W - lw) / 2), y, lw, lh);
-        y += lh + 6;
-      } catch (e) {
-        console.warn('[thermal] logo draw fail', e);
-      }
-    }
-
-    if (withQr && qrCanvas) {
-      try {
-        const qs = 100;
-        ctx.drawImage(qrCanvas, Math.round((W - qs) / 2), y, qs, qs);
-        y += qs + 6;
-      } catch (e) {}
-    }
-
-    lines.forEach(function (L) {
-      ctx.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
-      const maxW = W - pad * 2;
-      const words = String(L.t).split(/\s+/);
-      let line = '';
-      const wrapped = [];
-      words.forEach(function (w) {
-        const test = line ? line + ' ' + w : w;
-        if (ctx.measureText(test).width > maxW && line) {
-          wrapped.push(line);
-          line = w;
-        } else line = test;
-      });
-      if (line) wrapped.push(line);
-      if (!wrapped.length) wrapped.push('');
-      wrapped.forEach(function (wl) {
-        let x = pad;
-        const tw = ctx.measureText(wl).width;
-        if (L.center) x = Math.max(0, (W - tw) / 2);
-        if (L.right) x = Math.max(pad, W - pad - tw);
-        ctx.fillText(wl, x, y + L.size);
-        y += L.size + 4;
-      });
-      y += 2;
+  lines.forEach(function (L) {
+    ctx.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
+    const maxW = W - pad * 2;
+    const words = String(L.t).split(/\s+/);
+    let line = '';
+    const wrapped = [];
+    words.forEach(function (w) {
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && line) {
+        wrapped.push(line);
+        line = w;
+      } else line = test;
     });
-    return canvas;
-  }
-
-  // 1) intentar con logo + QR
-  let canvas = paint(!!logoImg, !!qrCanvas);
-  // 2) verificar que se pueda leer (si logo externo sin CORS → tainted → blanco)
-  try {
-    const test = canvas.getContext('2d').getImageData(0, 0, 8, 8);
-    // contar algo de negro en muestra
-    let dark = 0;
-    for (let i = 0; i < test.data.length; i += 4) {
-      if (test.data[i] < 200) dark++;
-    }
-    // muestra pequeña puede ser blanca arriba; probar más abajo
-    const mid = canvas.getContext('2d').getImageData(0, Math.min(40, canvas.height - 1), W, 1);
-    for (let i = 0; i < mid.data.length; i += 4) {
-      if (mid.data[i] < 200) dark++;
-    }
-    if (dark < 2 && logoImg) {
-      console.warn('[thermal] canvas sospechoso con logo, reintento sin logo');
-      canvas = paint(false, !!qrCanvas);
-    }
-  } catch (err) {
-    console.warn('[thermal] canvas tainted, reintento sin logo', err && err.message);
-    canvas = paint(false, !!qrCanvas);
-  }
-
-  // Verificar de nuevo getImageData
-  try {
-    canvas.getContext('2d').getImageData(0, 0, 4, 4);
-  } catch (err) {
-    console.warn('[thermal] still tainted, solo texto', err && err.message);
-    canvas = paint(false, false);
-  }
+    if (line) wrapped.push(line);
+    if (!wrapped.length) wrapped.push('');
+    wrapped.forEach(function (wl) {
+      let x = pad;
+      const tw = ctx.measureText(wl).width;
+      if (L.center) x = Math.max(0, (W - tw) / 2);
+      if (L.right) x = Math.max(pad, W - pad - tw);
+      ctx.fillText(wl, x, y + L.size);
+      y += L.size + 4;
+    });
+    y += 2;
+  });
 
   const hold = document.getElementById('thermalPrintCanvas');
   if (hold) {
@@ -7405,7 +7311,7 @@ async function thermalRenderCanvas(inv) {
       hold.getContext('2d').drawImage(canvas, 0, 0);
     } catch (e) {}
   }
-  console.log('[thermal] canvas ok', canvas.width, 'x', canvas.height, 'logo', !!logoImg);
+  console.log('[thermal] canvas', canvas.width, 'x', canvas.height);
   return canvas;
 }
 
@@ -7840,36 +7746,6 @@ btnSaveBanner.onclick = async () => {
   await autoSave();
   toast('Banner PDF de ' + (e.label || activeEmpresa) + ' guardado');
 };
-
-(function initThermalBanner() {
-  const applyT = async () => {
-    const url = normImgUrl((document.getElementById('thermalBannerUrl') || {}).value);
-    if (!url) return toast('Pega un link https de la imagen térmica');
-    const e = empCfg();
-    e.thermalBanner = url;
-    settings.empresas = settings.empresas || {};
-    settings.empresas[activeEmpresa] = e;
-    try { syncSettingsUI(); } catch (err) {}
-    toast('Banner térmico aplicado');
-    await autoSave();
-  };
-  const bA = document.getElementById('btnApplyThermalUrl');
-  if (bA) bA.onclick = applyT;
-  const bS = document.getElementById('btnSaveThermal');
-  if (bS) bS.onclick = applyT;
-  const bC = document.getElementById('btnClearThermal');
-  if (bC) bC.onclick = async () => {
-    const e = empCfg();
-    e.thermalBanner = '';
-    settings.empresas = settings.empresas || {};
-    settings.empresas[activeEmpresa] = e;
-    const tbu = document.getElementById('thermalBannerUrl');
-    if (tbu) tbu.value = '';
-    try { syncSettingsUI(); } catch (err) {}
-    toast('Térmico: usará el encabezado del PDF');
-    await autoSave();
-  };
-})();
 
 function refreshAll() {
   renderStats(); renderProducts(); renderClients(); renderInvoices(); renderLines(); syncSettingsUI();
