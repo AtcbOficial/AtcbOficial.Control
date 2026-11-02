@@ -6877,8 +6877,8 @@ function buildThermalHtml(inv) {
   const items = (inv.items || []).map(function (it) {
     const cant = it.cant || 0;
     const name = escapeHtml(it.name || '');
-    const sub = money(it.sub != null ? it.sub : (cant * (it.precio || 0)));
-    return '<div class="row"><span class="ti">' + cant + ' x ' + name + '</span><span class="tr">' + sub + '</span></div>';
+    // Solo cantidad + nombre (sin precio unitario en ticket)
+    return '<div class="row"><span class="ti">' + cant + ' ' + name + '</span></div>';
   }).join('');
   let abonosHtml = '';
   const abonos = inv.abonos || [];
@@ -7186,70 +7186,106 @@ function thermalCanvasToRaster(canvas) {
   return { data: data, widthBytes: widthBytes, heightLines: h };
 }
 
-/** Dibuja ticket en canvas 384×H con texto nítido negro sobre blanco */
+/** Dibuja ticket en canvas 384×H — logo, texto grande, productos sin precio unitario */
 async function thermalRenderCanvas(inv) {
   const W = 384;
-  const pad = 10;
+  const pad = 8;
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
+  const bannerUrl = normImgUrl(e.thermalBanner || e.pdfBanner || '') || '';
 
-  // Construir líneas de texto
   const lines = [];
   function add(t, o) {
-    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 16, bold: false, center: false, right: false }, o || {}));
+    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 22, bold: false, center: false, right: false }, o || {}));
   }
-  add(e.name || e.label || 'Empresa', { size: 18, bold: true, center: true });
-  if (e.nit) add('NIT ' + e.nit, { size: 13, center: true });
-  if (e.tel) add('Tel. ' + e.tel, { size: 13, center: true });
-  add('--------------------------------', { center: true, size: 13 });
-  add(String(cod), { size: 20, bold: true, center: true });
-  add('--------------------------------', { center: true, size: 13 });
-  add('CLIENTE', { size: 14, bold: true });
-  add(inv.cliente || '-');
-  if (inv.documento) add('Doc: ' + inv.documento, { size: 13 });
-  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 13 });
-  add('Fecha: ' + fmtDate(inv.fecha), { size: 13 });
-  add('--------------------------------', { center: true, size: 13 });
-  add('PRODUCTOS', { size: 14, bold: true });
+  // Tamaños ~50% mayores que la versión anterior
+  add(e.name || e.label || 'Empresa', { size: 26, bold: true, center: true });
+  if (e.nit) add('NIT ' + e.nit, { size: 18, center: true });
+  if (e.tel) add('Tel. ' + e.tel, { size: 18, center: true });
+  if (e.dir) add(e.dir, { size: 16, center: true });
+  add('--------------------------------', { center: true, size: 18 });
+  add(String(cod), { size: 28, bold: true, center: true });
+  add('--------------------------------', { center: true, size: 18 });
+  add('CLIENTE', { size: 20, bold: true });
+  add(inv.cliente || '-', { size: 22 });
+  if (inv.documento) add('Doc: ' + inv.documento, { size: 18 });
+  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 18 });
+  if (inv.direccion) add(inv.direccion, { size: 17 });
+  add('Fecha: ' + fmtDate(inv.fecha), { size: 18 });
+  add('--------------------------------', { center: true, size: 18 });
+  add('PRODUCTOS', { size: 20, bold: true });
   (inv.items || []).forEach(function (it) {
     const cant = it.cant || 0;
     const name = it.name || '';
-    const sub = money(it.sub != null ? it.sub : cant * (it.precio || 0));
-    add(cant + ' x ' + name, { size: 13 });
-    add(sub, { size: 13, right: true });
+    // Solo cantidad + nombre (sin precios unitarios ni subtotales por línea)
+    add(cant + ' ' + name, { size: 20 });
   });
-  if (!(inv.items || []).length) add('(sin items)', { size: 13 });
-  add('--------------------------------', { center: true, size: 13 });
-  add('TOTAL  ' + money(inv.total), { size: 18, bold: true });
+  if (!(inv.items || []).length) add('(sin items)', { size: 18 });
+  add('--------------------------------', { center: true, size: 18 });
+  add('TOTAL  ' + money(inv.total), { size: 26, bold: true });
   if ((inv.abonos || []).length) {
-    add('ABONOS', { size: 14, bold: true });
+    add('ABONOS', { size: 20, bold: true });
     inv.abonos.forEach(function (a) {
-      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 12 });
+      add(fmtDate(a.fecha) + '  ' + money(a.monto), { size: 17 });
+      if (a.nota) add(String(a.nota), { size: 15 });
     });
-    add('Abonado ' + money(totalAbonado(inv)), { size: 13, bold: true });
-    add('Saldo ' + money(saldoPendiente(inv)), { size: 13, bold: true });
+    add('Abonado ' + money(totalAbonado(inv)), { size: 19, bold: true });
+    add('Saldo ' + money(saldoPendiente(inv)), { size: 19, bold: true });
   }
   if (inv.obs) {
-    add('OBS.', { size: 14, bold: true });
-    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 12 }); });
+    add('OBS.', { size: 20, bold: true });
+    String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 17 }); });
   }
-  add('--------------------------------', { center: true, size: 13 });
-  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 11 });
-  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 11 });
-  add('--------------------------------', { center: true, size: 13 });
-  add('MEDIO DE PAGO', { size: 14, bold: true });
-  add('Bancolombia', { size: 13 });
-  add('Llave BRE-B @bonilla8395', { size: 13, bold: true });
-  add('Ahorros 86900003930', { size: 13 });
-  add('Luis Bonilla P. J.', { size: 12 });
-  add('Pasaporte 5001998395', { size: 12 });
-  add('Gracias por su compra', { size: 14, center: true, bold: true });
+  add('--------------------------------', { center: true, size: 18 });
+  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 15 });
+  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 15 });
+  add('--------------------------------', { center: true, size: 18 });
+  add('MEDIO DE PAGO', { size: 20, bold: true });
+  add('Bancolombia', { size: 18 });
+  add('Llave BRE-B @bonilla8395', { size: 18, bold: true });
+  add('Ahorros 86900003930', { size: 18 });
+  add('Luis Bonilla P. J.', { size: 17 });
+  add('Pasaporte 5001998395', { size: 16 });
+  add('Gracias por su compra', { size: 20, center: true, bold: true });
 
-  // Medir altura
+  // Cargar logo encabezado térmico
+  let logoImg = null;
+  if (bannerUrl) {
+    logoImg = await new Promise(function (resolve) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      let done = false;
+      const fin = function (v) { if (!done) { done = true; resolve(v || null); } };
+      img.onload = function () { fin(img); };
+      img.onerror = function () { fin(null); };
+      img.src = bannerUrl;
+      setTimeout(function () { fin(null); }, 2500);
+    });
+  }
+
+  // QR
+  let qrImg = null;
+  try {
+    qrImg = await new Promise(function (resolve) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      let done = false;
+      const fin = function (v) { if (!done) { done = true; resolve(v || null); } };
+      img.onload = function () { fin(img); };
+      img.onerror = function () { fin(null); };
+      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=1&data=' + encodeURIComponent(String(cod));
+      setTimeout(function () { fin(null); }, 2500);
+    });
+  } catch (e) { qrImg = null; }
+
   const measure = document.createElement('canvas').getContext('2d');
-  let needH = pad + 8;
-  // barra de prueba + espacio QR
-  needH += 8 + 8 + 100 + 8;
+  let needH = pad + 10;
+  if (logoImg) {
+    const maxLogoH = 70;
+    const scale = Math.min(W / logoImg.width, maxLogoH / logoImg.height);
+    needH += Math.round(logoImg.height * scale) + 8;
+  }
+  if (qrImg) needH += 110;
   lines.forEach(function (L) {
     measure.font = (L.bold ? 'bold ' : '') + L.size + 'px monospace,Arial,sans-serif';
     const maxW = W - pad * 2;
@@ -7264,43 +7300,42 @@ async function thermalRenderCanvas(inv) {
       } else line = test;
     });
     if (line) rows++;
-    needH += Math.max(1, rows) * (L.size + 3) + 1;
+    needH += Math.max(1, rows) * (L.size + 4) + 2;
   });
-  needH += pad + 20;
+  needH += pad + 16;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
-  canvas.height = Math.max(needH, 200);
+  canvas.height = Math.max(needH, 240);
   const ctx = canvas.getContext('2d');
-  // blanco
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, canvas.height);
-  // barra negra de prueba (si sale, el protocolo funciona)
   ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, W, 6);
 
-  let y = 14;
+  let y = pad;
 
-  // QR (opcional)
-  try {
-    await new Promise(function (resolve) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      let done = false;
-      const fin = function () { if (!done) { done = true; resolve(); } };
-      img.onload = function () {
-        try {
-          const qs = 96;
-          ctx.drawImage(img, (W - qs) / 2, y, qs, qs);
-          y += qs + 6;
-        } catch (e) {}
-        fin();
-      };
-      img.onerror = fin;
-      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=1&data=' + encodeURIComponent(String(cod));
-      setTimeout(fin, 2000);
-    });
-  } catch (e) {}
+  // Logo encabezado
+  if (logoImg) {
+    const maxLogoH = 70;
+    const scale = Math.min((W - 16) / logoImg.width, maxLogoH / logoImg.height);
+    const lw = Math.round(logoImg.width * scale);
+    const lh = Math.round(logoImg.height * scale);
+    try {
+      ctx.drawImage(logoImg, Math.round((W - lw) / 2), y, lw, lh);
+      y += lh + 6;
+    } catch (e) {
+      console.warn('[thermal] logo draw', e);
+    }
+  }
+
+  // QR centrado
+  if (qrImg) {
+    const qs = 100;
+    try {
+      ctx.drawImage(qrImg, Math.round((W - qs) / 2), y, qs, qs);
+      y += qs + 6;
+    } catch (e) {}
+  }
 
   ctx.fillStyle = '#000000';
   lines.forEach(function (L) {
@@ -7323,24 +7358,19 @@ async function thermalRenderCanvas(inv) {
       const tw = ctx.measureText(wl).width;
       if (L.center) x = Math.max(0, (W - tw) / 2);
       if (L.right) x = Math.max(pad, W - pad - tw);
-      // fillText usa baseline: y + size
       ctx.fillText(wl, x, y + L.size);
-      y += L.size + 3;
+      y += L.size + 4;
     });
-    y += 1;
+    y += 2;
   });
 
-  // barra inferior
-  ctx.fillRect(0, Math.min(canvas.height - 4, y + 4), W, 4);
-
-  // guardar ref para depuración
   const hold = document.getElementById('thermalPrintCanvas');
   if (hold) {
     hold.width = canvas.width;
     hold.height = canvas.height;
     hold.getContext('2d').drawImage(canvas, 0, 0);
   }
-  console.log('[thermal] canvas rendered', canvas.width, 'x', canvas.height, 'lines', lines.length);
+  console.log('[thermal] canvas', canvas.width, 'x', canvas.height, 'logo', !!logoImg);
   return canvas;
 }
 
