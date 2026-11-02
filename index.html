@@ -6341,10 +6341,6 @@ function viewInvDetail(id) {
   const codShow = invNumeroDisplay(inv);
   title.textContent = (isProy ? 'Proyecto' : 'Factura') + ' ' + codShow;
   let html = '';
-  html += `<div style="text-align:center;margin:0 0 10px;background:#fff;border-radius:10px;padding:10px">
-    <img id="invDetailQrImg" alt="QR ${escapeHtml(codShow)}" width="180" height="180" style="max-width:180px;margin:0 auto;display:block;background:#fff"/>
-    <div style="color:#111;font-weight:800;font-size:13px;margin-top:6px">${escapeHtml(codShow)}</div>
-  </div>`;
   html += `<div class="d-row"><strong>Estado:</strong> ${tipoLabel(inv.tipo, overdue)}</div>`;
   html += `<div class="d-row"><strong>Fecha:</strong> ${fmtDate(inv.fecha)} · ${daysAgo(inv.fecha)} día(s)</div>`;
   html += `<div class="d-row"><strong>Cliente:</strong> ${escapeHtml(inv.cliente || '')}</div>`;
@@ -6397,25 +6393,6 @@ function viewInvDetail(id) {
     if (inv.garantia) html += `<div class="d-row"><strong>Garantía:</strong> ${escapeHtml(inv.garantia)}</div>`;
   }
   body.innerHTML = html;
-  // QR del número de factura/proyecto (img dataURL: más fiable que canvas vacío)
-  try {
-    const img = document.getElementById('invDetailQrImg');
-    if (img && typeof QRCode !== 'undefined') {
-      const opts = { width: 180, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#ffffff' } };
-      const apply = (url) => { if (url) img.src = url; };
-      if (typeof QRCode.toDataURL === 'function') {
-        const r = QRCode.toDataURL(codShow, opts);
-        if (r && typeof r.then === 'function') r.then(apply).catch(() => {});
-        else if (typeof r === 'string') apply(r);
-      } else if (typeof QRCode.toCanvas === 'function') {
-        const cvs = document.createElement('canvas');
-        const pr = QRCode.toCanvas(cvs, codShow, opts);
-        const done = () => { try { apply(cvs.toDataURL('image/png')); } catch (e) {} };
-        if (pr && typeof pr.then === 'function') pr.then(done).catch(() => {});
-        else done();
-      }
-    }
-  } catch (e) { console.warn('inv QR', e); }
   
   modal.classList.add('open');
 }
