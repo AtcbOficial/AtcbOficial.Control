@@ -7312,7 +7312,7 @@ function thermalSysPrint() {
   if (modal) modal.addEventListener('click', (e) => { if (e.target.id === 'thermalModal') closeThermalModal(); });
 })();
 
-function printCurrent() {function printCurrent() {
+function printCurrent() {
   if (!currentLines.length) return toast('Agrega líneas primero');
   const prev = editingInvId ? getInv(editingInvId) : null;
   const inv = {
