@@ -210,13 +210,15 @@ nav button.active{color:var(--accent)}
 .chip.overdue{background:#4b2027;color:#ff9aa4;animation:pulse 1.5s infinite}
 @keyframes pulse{50%{opacity:.7}}
 @keyframes flashHl{
-  0%{box-shadow:0 0 0 0 rgba(77,163,255,.9);border-color:var(--accent)}
-  40%{box-shadow:0 0 0 6px rgba(77,163,255,.45);border-color:var(--accent)}
-  100%{box-shadow:0 3px 0 #0a0e14,0 5px 12px rgba(0,0,0,.4);border-color:#2e3d4f}
+  0%{box-shadow:0 0 0 0 rgba(77,163,255,.95);border-color:var(--accent);transform:scale(1)}
+  25%{box-shadow:0 0 0 8px rgba(77,163,255,.35);border-color:#7ec0ff;transform:scale(1.015)}
+  50%{box-shadow:0 0 0 2px rgba(77,163,255,.7);border-color:var(--accent);transform:scale(1)}
+  75%{box-shadow:0 0 0 8px rgba(77,163,255,.3);border-color:#7ec0ff;transform:scale(1.01)}
+  100%{box-shadow:0 3px 0 #0a0e14,0 5px 12px rgba(0,0,0,.4);border-color:#2e3d4f;transform:scale(1)}
 }
 .list-card.flash-hl{
   border-color:var(--accent)!important;
-  animation:flashHl 1.6s ease 2;
+  animation:flashHl 1.1s ease 3;
 }
 .list-card.clickable{cursor:pointer}
 .detail-modal-box{
@@ -1830,7 +1832,7 @@ details.overdue-box[open]{
       <button type="button" id="btnThermalSysPrint" class="secondary">📄 Imprimir sistema / PDF</button>
       <button type="button" id="btnThermalClose" class="danger">Cerrar</button>
     </div>
-    <p class="hint" style="margin-top:8px">BLE: Android/PC Chrome + Bluetooth. USB: PC Chrome/Edge con cable (WebUSB). BLE y USB son independientes.</p>
+    <p class="hint" style="margin-top:8px">BLE: Android/PC Chrome + Bluetooth. USB: solo PC Chrome/Edge + cable (no móvil). Si Access denied: cierra Phomymo, desconecta 3s y reintenta. BLE no se toca.</p>
   </div>
 </div>
 
@@ -4648,7 +4650,10 @@ btnSaveProd.onclick = async () => {
   if (sel) sel.disabled = false;
   editingCapMl = null;
   closeProdForm(); await autoSave(); renderProducts(); toast('Producto guardado');
-  if (savedProdId) setTimeout(() => flashCard('#prodList .list-card[data-prod-id="' + savedProdId + '"]'), 120);
+  if (savedProdId) {
+    show('stock');
+    setTimeout(() => flashCard('#prodList .list-card[data-prod-id="' + savedProdId + '"]'), 120);
+  }
 };
 
 
@@ -4670,7 +4675,16 @@ function setDetailActions(kind, id) {
   // siempre: cerrar + escanear otro
   // kind: insumo | stock | stockLab | inv
   if (kind === 'insumo') {
+    add('📍', 'Ir y resaltar', 'detailActGo');
     add('📲', 'WhatsApp / compartir', 'detailActShare');
+    add('✏️', 'Editar', 'detailActEdit');
+    add('🗑️', 'Eliminar', 'detailActDel');
+  } else if (kind === 'cliente') {
+    add('📍', 'Ir y resaltar', 'detailActGo');
+    add('✏️', 'Editar', 'detailActEdit');
+    add('🗑️', 'Eliminar', 'detailActDel');
+  } else if (kind === 'proveedor') {
+    add('📍', 'Ir y resaltar', 'detailActGo');
     add('✏️', 'Editar', 'detailActEdit');
     add('🗑️', 'Eliminar', 'detailActDel');
   } else if (kind === 'stockLab') {
@@ -4713,6 +4727,8 @@ function detailActGo() {
   if (kind === 'inv') return goToInvGuardadas(id);
   if (kind === 'stock' || kind === 'stockLab') return goToProdStock(id);
   if (kind === 'insumo') return goToInsumo(id);
+  if (kind === 'cliente') return goToCliente(id);
+  if (kind === 'proveedor') return goToProveedor(id);
 }
 function detailActEdit() {
   if (!detailCtx) return;
@@ -4721,6 +4737,8 @@ function detailActEdit() {
   if (kind === 'inv') return editInv(id);
   if (kind === 'stock' || kind === 'stockLab') return editProd(id);
   if (kind === 'insumo') return editInsumo(id);
+  if (kind === 'cliente') return editCli(id);
+  if (kind === 'proveedor') return editProv(id);
 }
 function detailActDel() {
   if (!detailCtx) return;
@@ -4728,6 +4746,8 @@ function detailActDel() {
   if (kind === 'inv') { if (typeof delInv === 'function') delInv(id); }
   else if (kind === 'stock' || kind === 'stockLab') { if (typeof delProd === 'function') delProd(id); }
   else if (kind === 'insumo') { if (typeof delInsumo === 'function') delInsumo(id); }
+  else if (kind === 'cliente') { if (typeof delCli === 'function') delCli(id); }
+  else if (kind === 'proveedor') { if (typeof delProv === 'function') delProv(id); }
   closeInvDetailModal();
 }
 function detailActShare() {
@@ -4807,6 +4827,16 @@ function goToInsumo(id) {
   show('insumos');
   try { renderInsumos(); } catch (e) {}
   setTimeout(() => flashCard('#insList .list-card[data-ins-id="' + id + '"], #insumosList .list-card[data-ins-id="' + id + '"]'), 150);
+}
+function goToCliente(id) {
+  show('clientes');
+  try { renderClients(); } catch (e) {}
+  setTimeout(() => flashCard('#cliList .list-card[data-cli-id="' + id + '"]'), 150);
+}
+function goToProveedor(id) {
+  show('proveedores');
+  try { renderProveedores(); } catch (e) {}
+  setTimeout(() => flashCard('#provList .list-card[data-prov-id="' + id + '"]'), 150);
 }
 
 function viewProdDetail(id) {
@@ -4937,6 +4967,7 @@ function viewCliDetail(id) {
     html += `<div class="d-row" style="color:var(--muted)">Sin facturas vinculadas por nombre/doc/tel</div>`;
   }
   body.innerHTML = html;
+  setDetailActions('cliente', c.id);
   modal.classList.add('open');
 }
 
@@ -4949,7 +4980,7 @@ function renderClients() {
     ? rows.map(c => {
         const dias = daysAgo(c.fecha);
         const wa = waChatUrl(c.telefono);
-        return `<div class="list-card">
+        return `<div class="list-card" data-cli-id="${c.id}">
           <div class="title">${escapeHtml(c.nombre)}</div>
           <div class="line">📅 ${fmtDate(c.fecha)} (${dias} día(s))</div>
           <div class="line">📞 ${escapeHtml(c.telefono || '—')} · Doc: ${escapeHtml(c.documento || '—')}</div>
@@ -5007,13 +5038,16 @@ btnSaveCli.onclick = async () => {
     obs: (document.getElementById('cObs')?.value || '').trim(),
     fecha: cFecha.value || today()
   };
+  let savedCliId = editingCliId;
   if (editingCliId) {
     const i = clients.findIndex(x => x.id === editingCliId);
     if (i >= 0) clients[i] = { id: editingCliId, ...data };
   } else {
-    clients.push({ id: nextCliId++, ...data });
+    savedCliId = nextCliId++;
+    clients.push({ id: savedCliId, ...data });
   }
   closeCliForm(); await autoSave(); renderClients(); toast('Cliente guardado');
+  if (savedCliId) setTimeout(() => flashCard('#cliList .list-card[data-cli-id="' + savedCliId + '"]'), 120);
 };
 cliSearch.oninput = () => renderClients();
 
@@ -5052,6 +5086,7 @@ function viewProvDetail(id) {
     });
   }
   body.innerHTML = html;
+  setDetailActions('proveedor', v.id);
   modal.classList.add('open');
 }
 
@@ -5069,7 +5104,7 @@ function renderProveedores() {
         const wa = waChatUrl(v.telefono);
         let web = (v.web || '').trim();
         if (web && !/^https?:\/\//i.test(web)) web = 'https://' + web;
-        return `<div class="list-card">
+        return `<div class="list-card" data-prov-id="${v.id}">
           <div class="title">${escapeHtml(v.nombre)}</div>
           <div class="line">📅 ${fmtDate(v.fecha)} (${dias} día(s))</div>
           <div class="line">📞 ${escapeHtml(v.telefono || '—')} · Doc: ${escapeHtml(v.documento || '—')}</div>
@@ -5147,6 +5182,7 @@ async function delProv(id) {
       fecha: (document.getElementById('vFecha')?.value || today()),
       empresa: activeEmpresa
     };
+    let savedProvId = editingProvId;
     if (editingProvId != null) {
       const i = proveedores.findIndex(x => +x.id === +editingProvId);
       if (i >= 0) {
@@ -5154,9 +5190,11 @@ async function delProv(id) {
         proveedores[i] = { id: editingProvId, ...data };
       }
     } else {
-      proveedores.push({ id: nextProvId++, ...data });
+      savedProvId = nextProvId++;
+      proveedores.push({ id: savedProvId, ...data });
     }
     closeProvForm(); await autoSave(); renderProveedores(); toast('Proveedor guardado');
+    if (savedProvId) setTimeout(() => flashCard('#provList .list-card[data-prov-id="' + savedProvId + '"]'), 120);
   };
   if (s) s.oninput = () => renderProveedores();
 })();
@@ -7732,11 +7770,11 @@ async function thermalUsbRelease() {
 }
 
 async function thermalUsbConnectTo(device) {
-  // Si ya está abierta por nosotros, cerrar y reabrir limpio
+  // Liberar si ya abierta (otra pestaña / intento previo)
   try {
     if (device.opened) {
       try { await device.close(); } catch (e) {}
-      await thermalDelay(80);
+      await thermalDelay(120);
     }
   } catch (e) {}
   try {
@@ -7744,7 +7782,11 @@ async function thermalUsbConnectTo(device) {
   } catch (e) {
     const msg = String(e && e.message || e);
     if (/Access denied|already open|SecurityError/i.test(msg)) {
-      throw new Error('USB ocupada. Cierra Phomymo / Print Master y vuelve a Conectar USB. (BLE no se toca)');
+      // Intentar olvidar y forzar nuevo permiso (Chrome)
+      try {
+        if (device.forget) await device.forget();
+      } catch (e2) {}
+      throw new Error('USB Access denied. 1) Cierra Phomymo/Print Master 2) Desconecta el cable 3s 3) Vuelve a Conectar USB. BLE no se toca.');
     }
     throw e;
   }
