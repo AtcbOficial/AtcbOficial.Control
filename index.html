@@ -1708,20 +1708,44 @@ details.overdue-box[open]{
     </details>
 
     <details class="collapse">
-      <summary>🖼️ Encabezado del PDF</summary>
+      <summary>🖨️ Impresora PDF</summary>
       <div class="body">
-        <p class="sub">Banner actual del PDF. Puedes restaurar el original o subir otra imagen.</p>
+        <p class="sub">Por empresa activa: banner y textos del PDF.</p>
         <div style="background:#fff;border-radius:8px;padding:6px;margin-bottom:10px">
           <img id="pdfBannerPreview" alt="Banner PDF" style="width:100%;display:block;border-radius:4px">
         </div>
         <label class="label">Link del banner PDF</label>
         <input id="pdfBannerUrl" type="url" placeholder="https://… imagen pública del encabezado" style="margin-bottom:8px">
         <p class="hint" style="margin:0 0 8px">URL pública (Drive/OneDrive/web). No se sube archivo al proyecto.</p>
-        <div class="actions">
+        <div class="actions" style="margin-bottom:10px">
           <button type="button" id="btnApplyBannerUrl" class="success">Aplicar link</button>
           <button type="button" id="btnRestoreBanner" class="secondary">Restaurar original</button>
           <button type="button" id="btnSaveBanner">💾 Guardar banner</button>
         </div>
+        <label class="label">Nota legal / pie del PDF</label>
+        <textarea id="setPdfNota" rows="3" placeholder="Nota al pie del PDF (por empresa)" style="margin-bottom:8px"></textarea>
+        <label class="label">Tamaño fuente base PDF (px)</label>
+        <input id="setPdfFontSize" type="number" min="8" max="18" step="1" placeholder="10" style="margin-bottom:8px">
+        <button type="button" id="btnSavePdfPrint" style="width:100%">💾 Guardar impresora PDF</button>
+      </div>
+    </details>
+
+    <details class="collapse">
+      <summary>🧾 Impresora térmica</summary>
+      <div class="body">
+        <p class="sub">Por empresa activa: textos y tamaños del ticket Phomemo (BLE/USB).</p>
+        <label class="label">Nota legal del ticket</label>
+        <textarea id="setThermalNota" rows="3" placeholder="Nota legal térmica" style="margin-bottom:8px"></textarea>
+        <label class="label">Escala de fuente (1 = normal, 1.2 = más grande)</label>
+        <input id="setThermalFontScale" type="number" min="0.8" max="1.6" step="0.05" placeholder="1.1" style="margin-bottom:8px">
+        <label class="label">Título / código (px canvas)</label>
+        <input id="setThermalSizeCod" type="number" min="16" max="36" step="1" placeholder="28" style="margin-bottom:8px">
+        <label class="label">Cuerpo / productos (px canvas)</label>
+        <input id="setThermalSizeBody" type="number" min="12" max="28" step="1" placeholder="18" style="margin-bottom:8px">
+        <label class="label">Total (px canvas)</label>
+        <input id="setThermalSizeTotal" type="number" min="16" max="36" step="1" placeholder="26" style="margin-bottom:8px">
+        <button type="button" id="btnSaveThermalPrint" style="width:100%">💾 Guardar impresora térmica</button>
+        <p class="hint" style="margin-top:8px">BLE y USB usan la misma plantilla. No afecta el PDF.</p>
       </div>
     </details>
 <details class="collapse" data-emp="perfumes" id="archivoCaps">
@@ -1787,22 +1811,26 @@ details.overdue-box[open]{
   </section>
 </main>
 
-<!-- Modal ticket térmico + BLE Phomemo -->
+<!-- Modal ticket térmico + BLE / USB Phomemo -->
 <div class="modal-overlay" id="thermalModal">
   <div class="modal-box" style="max-width:420px;max-height:92vh;overflow:auto;padding:12px">
     <h3 style="margin:0 0 8px;font-size:15px">🧾 Ticket térmico</h3>
-    <p class="hint" id="thermalStatus" style="margin:0 0 8px">Vista previa. Conecta la Phomemo M110 por Bluetooth (Chrome/Edge).</p>
+    <p class="hint" id="thermalStatus" style="margin:0 0 8px">Vista previa. Conecta la Phomemo M110 por Bluetooth o cable USB (Chrome/Edge).</p>
     <div id="thermalPreviewWrap" style="background:#fff;color:#000;border-radius:8px;padding:8px;max-height:45vh;overflow:auto;margin-bottom:10px;font-size:11px;line-height:1.3"></div>
     <canvas id="thermalPrintCanvas" width="384" height="100" style="display:none"></canvas>
     <div class="actions" style="margin-bottom:6px">
-      <button type="button" id="btnThermalBleConnect" class="success">📡 Conectar impresora</button>
+      <button type="button" id="btnThermalBleConnect" class="success">📡 Conectar BLE</button>
       <button type="button" id="btnThermalBlePrint" class="secondary" disabled>🖨️ Imprimir BLE</button>
+    </div>
+    <div class="actions" style="margin-bottom:6px">
+      <button type="button" id="btnThermalUsbConnect" class="success">🔌 Conectar USB</button>
+      <button type="button" id="btnThermalUsbPrint" class="secondary" disabled>🖨️ Imprimir USB</button>
     </div>
     <div class="actions">
       <button type="button" id="btnThermalSysPrint" class="secondary">📄 Imprimir sistema / PDF</button>
       <button type="button" id="btnThermalClose" class="danger">Cerrar</button>
     </div>
-    <p class="hint" style="margin-top:8px">Android: Chrome + Bluetooth + ubicación. PC: Chrome/Edge + Bluetooth. Si no conecta, usa «Imprimir sistema» o Print Master.</p>
+    <p class="hint" style="margin-top:8px">BLE: Android/PC Chrome + Bluetooth. USB: PC Chrome/Edge con cable (WebUSB). BLE y USB son independientes.</p>
   </div>
 </div>
 
@@ -2359,6 +2387,13 @@ function defaultEmpresaAtcb() {
     proyDescCondensadora: DEFAULT_PROY_DESC.condensadora,
     proyDescAccesorios: DEFAULT_PROY_DESC.accesorios,
     proyDescTablero: DEFAULT_PROY_DESC.tablero,
+    thermalNota: 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO',
+    thermalFontScale: 1.1,
+    thermalSizeCod: 28,
+    thermalSizeBody: 18,
+    thermalSizeTotal: 26,
+    pdfNota: 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO',
+    pdfFontSize: 10,
     daysPendiente: 7, daysCotizacion: 7, daysVencidas: 7, daysStock: 30
   };
 }
@@ -2372,6 +2407,13 @@ function defaultEmpresaPerfumes() {
     waMotivar: DEFAULT_WA_MOTIVAR, waProy: DEFAULT_WA_PROY,
     proyAplicacion: '', pdfBanner: DEFAULT_PDF_BANNER, thermalBanner: '',
     proyTiempo: '', proyValidez: '', proyFormaPago: '', proyGarantia: '', proyNota: '', proyIntro: '', proyTitulo: '',
+    thermalNota: 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO',
+    thermalFontScale: 1.1,
+    thermalSizeCod: 28,
+    thermalSizeBody: 18,
+    thermalSizeTotal: 26,
+    pdfNota: 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR',
+    pdfFontSize: 10,
     daysPendiente: 7, daysCotizacion: 7, daysVencidas: 7, daysStock: 30
   };
 }
@@ -2384,13 +2426,19 @@ let settings = {
 
 function empCfg(empId) {
   const id = empId || activeEmpresa || EMPRESA_ATCB;
-  const e = (settings.empresas && settings.empresas[id]) || null;
-  return e || (settings.empresas && settings.empresas.atcb) || defaultEmpresaAtcb();
+  let e = (settings.empresas && settings.empresas[id]) || null;
+  if (!e) e = (settings.empresas && settings.empresas.atcb) || defaultEmpresaAtcb();
+  const base = (id === 'perfumes') ? defaultEmpresaPerfumes() : defaultEmpresaAtcb();
+  ['thermalNota','thermalFontScale','thermalSizeCod','thermalSizeBody','thermalSizeTotal','pdfNota','pdfFontSize'].forEach(function (k) {
+    if (e[k] == null || e[k] === '') e[k] = base[k];
+  });
+  return e;
 }
 function syncFlatSettingsFromEmp() {
   const e = empCfg();
   ['name','nit','tel','social','note','email','dir','banks','waFact','waCxc','waMotivar','waProy',
-   'proyAplicacion','pdfBanner','thermalBanner','proyTiempo','proyValidez','proyFormaPago','proyGarantia','proyNota','proyIntro','proyTitulo'
+   'proyAplicacion','pdfBanner','thermalBanner','proyTiempo','proyValidez','proyFormaPago','proyGarantia','proyNota','proyIntro','proyTitulo',
+   'thermalNota','thermalFontScale','thermalSizeCod','thermalSizeBody','thermalSizeTotal','pdfNota','pdfFontSize'
   ].forEach(k => { settings[k] = e[k]; });
 }
 function applyEmpresaUI() {
@@ -2735,6 +2783,13 @@ function syncSettingsUI() {
   if (pbu) pbu.value = ban;
   const banHint = document.getElementById('pdfBannerEmpHint');
   if (banHint) banHint.textContent = 'Empresa: ' + (e.label || activeEmpresa) + ' — cada empresa tiene su propio encabezado.';
+  const spn = document.getElementById('setPdfNota'); if (spn) spn.value = e.pdfNota || '';
+  const spf = document.getElementById('setPdfFontSize'); if (spf) spf.value = e.pdfFontSize || 10;
+  const stn = document.getElementById('setThermalNota'); if (stn) stn.value = e.thermalNota || '';
+  const sts = document.getElementById('setThermalFontScale'); if (sts) sts.value = e.thermalFontScale || 1.1;
+  const stc = document.getElementById('setThermalSizeCod'); if (stc) stc.value = e.thermalSizeCod || 28;
+  const stb = document.getElementById('setThermalSizeBody'); if (stb) stb.value = e.thermalSizeBody || 18;
+  const stt = document.getElementById('setThermalSizeTotal'); if (stt) stt.value = e.thermalSizeTotal || 26;
   const st = document.getElementById('setProyTiempo'); if (st) st.value = e.proyTiempo || '';
   const sv = document.getElementById('setProyValidez'); if (sv) sv.value = e.proyValidez || '';
   const sfp = document.getElementById('setProyFormaPago'); if (sfp) sfp.value = e.proyFormaPago || '';
@@ -6815,10 +6870,10 @@ function buildPrintHtml(inv) {
       <div style="font-size:18px;font-weight:800">${money(inv.total)}</div>
     </div>
     ${abonosPdf}
-    <div style="margin-top:16px;font-size:9px;text-transform:uppercase;line-height:1.4">
-      ${(inv.empresa === EMPRESA_PERFUMES)
+    <div style="margin-top:16px;font-size:${(e.pdfFontSize || 10)}px;text-transform:uppercase;line-height:1.4">
+      ${escapeHtml((e.pdfNota && String(e.pdfNota).trim()) || ((inv.empresa === EMPRESA_PERFUMES)
         ? 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR'
-        : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO'}
+        : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO')).replace(/\n/g,'<br>')}
     </div>
     ${banksPdfHtml(inv.empresa)}
   </div>`;
@@ -6872,11 +6927,11 @@ function buildThermalHtml(inv) {
       '<div class="row"><span class="ti"><strong>Saldo</strong></span><span class="tr"><strong>' + money(saldo) + '</strong></span></div>';
   }
 
-  // Nota legal por empresa
-  const isPerfumes = (inv.empresa || activeEmpresa) === 'perfumes';
-  const nota = isPerfumes
-    ? 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO'
-    : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO';
+  // Nota legal por empresa (editable en Archivo → Impresora térmica)
+  const nota = (e.thermalNota && String(e.thermalNota).trim())
+    || ((inv.empresa || activeEmpresa) === 'perfumes'
+      ? 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO'
+      : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO');
 
   const obs = inv.obs ? String(inv.obs) : '';
   const obsHtml = obs ? ('<div class="line"></div><div class="sec">Obs.</div><div class="small">' + escapeHtml(obs).replace(/\n/g, '<br>') + '</div>') : '';
@@ -7235,34 +7290,39 @@ async function thermalRenderCanvas(inv) {
   const pad = 10;
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
+  const sc = Math.max(0.8, Math.min(1.6, +(e.thermalFontScale || 1.1)));
+  const szCod = Math.round((+(e.thermalSizeCod || 28)) * sc / 1.1);
+  const szBody = Math.round((+(e.thermalSizeBody || 18)) * sc / 1.1);
+  const szTotal = Math.round((+(e.thermalSizeTotal || 26)) * sc / 1.1);
+  const szSec = Math.max(14, Math.round(szBody * 1.1));
+  const szSmall = Math.max(12, Math.round(szBody * 0.9));
 
-  // Texto agrandado; QR se mantiene en 96px (no tocar)
+  // Texto configurable; QR se mantiene en 96px (no tocar)
   const lines = [];
   function add(t, o) {
-    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 22, bold: false, center: false, right: false }, o || {}));
+    lines.push(Object.assign({ t: String(t == null ? '' : t), size: szBody, bold: false, center: false, right: false }, o || {}));
   }
-  add(e.name || e.label || 'Empresa', { size: 26, bold: true, center: true });
-  if (e.nit) add('NIT ' + e.nit, { size: 18, center: true });
-  if (e.tel) add('Tel. ' + e.tel, { size: 18, center: true });
-  add('--------------------------------', { center: true, size: 16 });
-  add(String(cod), { size: 28, bold: true, center: true });
-  add('--------------------------------', { center: true, size: 16 });
-  add('CLIENTE', { size: 20, bold: true });
-  add(inv.cliente || '-', { size: 22 });
-  if (inv.documento) add('Doc: ' + inv.documento, { size: 18 });
-  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 18 });
-  add('Fecha: ' + fmtDate(inv.fecha), { size: 18 });
-  add('--------------------------------', { center: true, size: 16 });
-  add('PRODUCTOS', { size: 20, bold: true });
+  add(e.name || e.label || 'Empresa', { size: Math.round(szCod * 0.95), bold: true, center: true });
+  if (e.nit) add('NIT ' + e.nit, { size: szBody, center: true });
+  if (e.tel) add('Tel. ' + e.tel, { size: szBody, center: true });
+  add('--------------------------------', { center: true, size: szSmall });
+  add(String(cod), { size: szCod, bold: true, center: true });
+  add('--------------------------------', { center: true, size: szSmall });
+  add('CLIENTE', { size: szSec, bold: true });
+  add(inv.cliente || '-', { size: Math.round(szBody * 1.15) });
+  if (inv.documento) add('Doc: ' + inv.documento, { size: szBody });
+  if (inv.telefono) add('Tel: ' + inv.telefono, { size: szBody });
+  add('Fecha: ' + fmtDate(inv.fecha), { size: szBody });
+  add('--------------------------------', { center: true, size: szSmall });
+  add('PRODUCTOS', { size: szSec, bold: true });
   (inv.items || []).forEach(function (it) {
     const cant = it.cant || 0;
     const name = it.name || '';
-    // Solo cantidad + nombre (sin precios unitarios ni subtotales por línea)
-    add(cant + ' ' + name, { size: 18 });
+    add(cant + ' ' + name, { size: szBody });
   });
-  if (!(inv.items || []).length) add('(sin items)', { size: 18 });
-  add('--------------------------------', { center: true, size: 16 });
-  add('TOTAL  ' + money(inv.total), { size: 26, bold: true });
+  if (!(inv.items || []).length) add('(sin items)', { size: szBody });
+  add('--------------------------------', { center: true, size: szSmall });
+  add('TOTAL  ' + money(inv.total), { size: szTotal, bold: true });
   if ((inv.abonos || []).length) {
     add('ABONOS', { size: 20, bold: true });
     inv.abonos.forEach(function (a) {
@@ -7276,14 +7336,12 @@ async function thermalRenderCanvas(inv) {
     String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 17 }); });
   }
   add('--------------------------------', { center: true, size: 16 });
-  // Nota legal por empresa (misma lógica que buildThermalHtml / PDF)
-  const isPerfumes = (inv.empresa || activeEmpresa) === 'perfumes';
-  if (isPerfumes) {
-    add('PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO', { size: 15 });
-  } else {
-    add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 15 });
-    add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 15 });
-  }
+  // Nota legal por empresa (Archivo → Impresora térmica)
+  const notaT = (e.thermalNota && String(e.thermalNota).trim())
+    || ((inv.empresa || activeEmpresa) === 'perfumes'
+      ? 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO'
+      : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE.');
+  String(notaT).split(/\n/).forEach(function (l) { if (String(l).trim()) add(String(l).trim(), { size: 15 }); });
   add('--------------------------------', { center: true, size: 16 });
   add('MEDIO DE PAGO', { size: 20, bold: true });
   add('Bancolombia', { size: 18 });
@@ -7482,15 +7540,131 @@ function thermalSysPrint() {
   setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 600);
 }
 
+
+/* ========== WebUSB Phomemo (cable) — independiente de BLE ========== */
+const PHOMEMO_USB_FILTERS = [
+  { vendorId: 0x0483, productId: 0x5740 },
+  { vendorId: 0x0483 },
+  { vendorId: 0x2e3c, productId: 0x5750 },
+  { vendorId: 0x2e3c }
+];
+let thermalUsb = null; // { device, endpointOut, name }
+
+function thermalUsbAvailable() {
+  return !!(navigator.usb);
+}
+
+async function thermalUsbConnect() {
+  if (!thermalUsbAvailable()) {
+    setThermalStatus('WebUSB no disponible. Usa Chrome/Edge en PC con cable.', false);
+    return toast('WebUSB no disponible en este navegador');
+  }
+  setThermalStatus('Elige la impresora USB…');
+  try {
+    // Reconectar autorizada
+    const known = await navigator.usb.getDevices();
+    const vendors = [0x0483, 0x2e3c];
+    let device = known.find(d => vendors.includes(d.vendorId));
+    if (!device) {
+      device = await navigator.usb.requestDevice({ filters: PHOMEMO_USB_FILTERS });
+    }
+    await device.open();
+    if (device.configuration === null) await device.selectConfiguration(1);
+    let ifaceNum = 0;
+    for (const iface of device.configuration.interfaces) {
+      for (const alt of iface.alternates) {
+        if (alt.interfaceClass === 7) { ifaceNum = iface.interfaceNumber; break; }
+      }
+    }
+    await device.claimInterface(ifaceNum);
+    let endpointOut = null;
+    const iface = device.configuration.interfaces[ifaceNum];
+    for (const alt of iface.alternates) {
+      for (const ep of alt.endpoints) {
+        if (ep.direction === 'out') { endpointOut = ep.endpointNumber; break; }
+      }
+    }
+    if (endpointOut == null) throw new Error('Sin endpoint OUT USB');
+    thermalUsb = { device, endpointOut, name: device.productName || 'USB Phomemo' };
+    const b = document.getElementById('btnThermalUsbPrint');
+    if (b) b.disabled = false;
+    setThermalStatus('USB conectada: ' + thermalUsb.name + '. BLE sigue intacto.', true);
+    toast('🔌 ' + thermalUsb.name + ' lista');
+  } catch (e) {
+    console.error('[thermal usb]', e);
+    setThermalStatus('USB: ' + (e.message || e), false);
+    toast('Error USB: ' + (e.message || e));
+  }
+}
+
+async function thermalUsbSend(bytes) {
+  if (!thermalUsb || !thermalUsb.device) throw new Error('Sin impresora USB');
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const CHUNK = 512;
+  for (let i = 0; i < u8.length; i += CHUNK) {
+    const chunk = u8.slice(i, Math.min(i + CHUNK, u8.length));
+    await thermalUsb.device.transferOut(thermalUsb.endpointOut, chunk);
+    await thermalDelay(20);
+  }
+}
+
+async function thermalUsbPrint() {
+  const inv = getInv(thermalInvId);
+  if (!inv) return toast('Sin factura');
+  if (!thermalUsb || !thermalUsb.device) {
+    setThermalStatus('Primero conecta USB', false);
+    return toast('Conecta la impresora USB');
+  }
+  const btnP = document.getElementById('btnThermalUsbPrint');
+  if (btnP) btnP.disabled = true;
+  setThermalStatus('Generando ticket USB…');
+  try {
+    const canvas = await thermalRenderCanvas(inv);
+    const raster = thermalCanvasToRaster(canvas);
+    const data = raster.data;
+    const widthBytes = raster.widthBytes;
+    const heightLines = raster.heightLines;
+    if (heightLines < 8) throw new Error('Ticket demasiado corto');
+    setThermalStatus('Imprimiendo USB…');
+    await thermalUsbSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
+    await thermalDelay(40);
+    await thermalUsbSend(new Uint8Array([0x1b, 0x4e, 0x04, 12]));
+    await thermalDelay(40);
+    await thermalUsbSend(new Uint8Array([0x1f, 0x11, 0x0b]));
+    await thermalDelay(40);
+    await thermalUsbSend(new Uint8Array([
+      0x1d, 0x76, 0x30, 0x00,
+      widthBytes & 0xff, 0x00,
+      heightLines & 0xff, (heightLines >> 8) & 0xff
+    ]));
+    await thermalUsbSend(data);
+    await thermalDelay(350);
+    await thermalUsbSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00]));
+    await thermalDelay(500);
+    setThermalStatus('USB listo. BLE no se tocó.', true);
+    toast('🖨️ USB: ' + thermalUsb.name);
+  } catch (e) {
+    console.error('[thermal usb print]', e);
+    setThermalStatus('Error USB: ' + (e.message || e), false);
+    toast('Error USB: ' + (e.message || e));
+  } finally {
+    if (btnP && thermalUsb) btnP.disabled = false;
+  }
+}
+
 (function initThermalModal() {
   const bClose = document.getElementById('btnThermalClose');
   const bConn = document.getElementById('btnThermalBleConnect');
   const bPrint = document.getElementById('btnThermalBlePrint');
+  const bUsbConn = document.getElementById('btnThermalUsbConnect');
+  const bUsbPrint = document.getElementById('btnThermalUsbPrint');
   const bSys = document.getElementById('btnThermalSysPrint');
   const modal = document.getElementById('thermalModal');
   if (bClose) bClose.onclick = () => closeThermalModal();
   if (bConn) bConn.onclick = () => thermalBleConnect();
   if (bPrint) bPrint.onclick = () => thermalBlePrint();
+  if (bUsbConn) bUsbConn.onclick = () => thermalUsbConnect();
+  if (bUsbPrint) bUsbPrint.onclick = () => thermalUsbPrint();
   if (bSys) bSys.onclick = () => thermalSysPrint();
   if (modal) modal.addEventListener('click', (e) => { if (e.target.id === 'thermalModal') closeThermalModal(); });
 })();
@@ -7822,6 +7996,36 @@ btnSaveBanner.onclick = async () => {
   await autoSave();
   toast('Banner PDF de ' + (e.label || activeEmpresa) + ' guardado');
 };
+
+(function bindPrintCfgSave() {
+  const bPdf = document.getElementById('btnSavePdfPrint');
+  const bTh = document.getElementById('btnSaveThermalPrint');
+  if (bPdf) bPdf.onclick = async () => {
+    const e = empCfg();
+    e.pdfNota = ((document.getElementById('setPdfNota') || {}).value || '').trim();
+    e.pdfFontSize = Math.max(8, Math.min(18, parseInt((document.getElementById('setPdfFontSize') || {}).value, 10) || 10));
+    settings.empresas = settings.empresas || {};
+    settings.empresas[activeEmpresa] = e;
+    syncFlatSettingsFromEmp();
+    try { syncSettingsUI(); } catch (err) {}
+    await autoSave();
+    toast('Impresora PDF · ' + (e.label || activeEmpresa));
+  };
+  if (bTh) bTh.onclick = async () => {
+    const e = empCfg();
+    e.thermalNota = ((document.getElementById('setThermalNota') || {}).value || '').trim();
+    e.thermalFontScale = Math.max(0.8, Math.min(1.6, parseFloat((document.getElementById('setThermalFontScale') || {}).value) || 1.1));
+    e.thermalSizeCod = Math.max(16, Math.min(36, parseInt((document.getElementById('setThermalSizeCod') || {}).value, 10) || 28));
+    e.thermalSizeBody = Math.max(12, Math.min(28, parseInt((document.getElementById('setThermalSizeBody') || {}).value, 10) || 18));
+    e.thermalSizeTotal = Math.max(16, Math.min(36, parseInt((document.getElementById('setThermalSizeTotal') || {}).value, 10) || 26));
+    settings.empresas = settings.empresas || {};
+    settings.empresas[activeEmpresa] = e;
+    syncFlatSettingsFromEmp();
+    try { syncSettingsUI(); } catch (err) {}
+    await autoSave();
+    toast('Impresora térmica · ' + (e.label || activeEmpresa));
+  };
+})();
 
 function refreshAll() {
   renderStats(); renderProducts(); renderClients(); renderInvoices(); renderLines(); syncSettingsUI();
