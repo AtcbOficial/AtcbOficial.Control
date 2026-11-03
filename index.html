@@ -1858,8 +1858,8 @@ details.overdue-box[open]{
   <div class="detail-modal-box">
     <h3 id="invDetailTitle">Detalle</h3>
     <div id="invDetailBody"></div>
-    <div class="modal-actions" style="margin-top:12px">
-      <button type="button" class="secondary" id="btnCloseInvDetail">Cerrar</button>
+    <div class="modal-actions" id="invDetailActions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end">
+      <button type="button" class="secondary" id="btnCloseInvDetail">❌</button>
     </div>
   </div>
 </div>
@@ -4337,7 +4337,7 @@ function renderProducts() {
         const obs = (p.obs || '').trim();
         const titleName = (activeEmpresa === EMPRESA_PERFUMES) ? (basePerfumeName(p.name) || p.name) : p.name;
         const cod = (p.codigo || '').trim();
-        return `<div class="list-card ${isOld ? 'overdue-row' : ''}">
+        return `<div class="list-card ${isOld ? 'overdue-row' : ''}" data-prod-id="${p.id}">
           <div class="title">${escapeHtml(titleName)}${(p.lab || hasMulti) ? ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">Lab</span>' : ''}${isOld ? ' <span class="chip overdue">+'+lim+'d revisar precio</span>' : ''}</div>
           ${cod ? `<div class="line">🪪 <strong>${escapeHtml(cod)}</strong></div>` : ''}
           <div class="line">📅 ${fmtDate(p.fecha)} (${dias} día(s))</div>
@@ -4640,13 +4640,174 @@ btnSaveProd.onclick = async () => {
       data.caps[String(mlSel)] = { compra, venta, lab };
       data.name = basePerfumeName(name) || name;
     }
-    products.push({ id: nextProdId++, ...data });
+    data.id = nextProdId++;
+    products.push({ ...data });
   }
+  const savedProdId = data.id || editingProdId;
   const sel = document.getElementById('pLabML');
   if (sel) sel.disabled = false;
   editingCapMl = null;
   closeProdForm(); await autoSave(); renderProducts(); toast('Producto guardado');
+  if (savedProdId) setTimeout(() => flashCard('#prodList .list-card[data-prod-id="' + savedProdId + '"]'), 120);
 };
+
+
+/** Acciones del modal detalle (📷 lookup) — emojis */
+let detailCtx = null; // { kind, id }
+function closeInvDetailModal() {
+  const modal = document.getElementById('invDetailModal');
+  if (modal) modal.classList.remove('open');
+  detailCtx = null;
+}
+function setDetailActions(kind, id) {
+  detailCtx = { kind, id };
+  const wrap = document.getElementById('invDetailActions');
+  if (!wrap) return;
+  const btns = [];
+  const add = (emoji, title, fn) => {
+    btns.push({ emoji, title, fn });
+  };
+  // siempre: cerrar + escanear otro
+  // kind: insumo | stock | stockLab | inv
+  if (kind === 'insumo') {
+    add('📲', 'WhatsApp / compartir', 'detailActShare');
+    add('✏️', 'Editar', 'detailActEdit');
+    add('🗑️', 'Eliminar', 'detailActDel');
+  } else if (kind === 'stockLab') {
+    add('📍', 'Ir y resaltar', 'detailActGo');
+    add('📲', 'WhatsApp / compartir', 'detailActShare');
+    add('🔬', 'Lab +', 'detailActLab');
+    add('✏️', 'Editar', 'detailActEdit');
+    add('🗑️', 'Eliminar', 'detailActDel');
+  } else if (kind === 'stock') {
+    add('📍', 'Ir y resaltar', 'detailActGo');
+    add('📲', 'WhatsApp / compartir', 'detailActShare');
+    add('✏️', 'Editar', 'detailActEdit');
+    add('🗑️', 'Eliminar', 'detailActDel');
+  } else if (kind === 'inv') {
+    add('📍', 'Ir y resaltar', 'detailActGo');
+    add('💰', 'Abonos', 'detailActAbonos');
+    add('📲', 'WhatsApp', 'detailActShare');
+    add('👀', 'CxC', 'detailActCxc');
+    add('✏️', 'Editar', 'detailActEdit');
+    add('🖨️', 'PDF', 'detailActPdf');
+    add('🧾', 'Térmica', 'detailActThermal');
+    add('🗑️', 'Eliminar', 'detailActDel');
+  }
+  let html = '';
+  btns.forEach(b => {
+    html += `<button type="button" class="sm secondary" title="${b.title}" onclick="${b.fn}()">${b.emoji}</button>`;
+  });
+  html += `<button type="button" class="sm secondary" title="Escanear otro" onclick="detailActScan()">📷</button>`;
+  html += `<button type="button" class="sm secondary" id="btnCloseInvDetail" title="Cerrar" onclick="closeInvDetailModal()">❌</button>`;
+  wrap.innerHTML = html;
+}
+function detailActScan() {
+  closeInvDetailModal();
+  try { openQrScanner('lookup'); } catch (e) { toast('No se pudo abrir el escáner'); }
+}
+function detailActGo() {
+  if (!detailCtx) return;
+  const { kind, id } = detailCtx;
+  closeInvDetailModal();
+  if (kind === 'inv') return goToInvGuardadas(id);
+  if (kind === 'stock' || kind === 'stockLab') return goToProdStock(id);
+  if (kind === 'insumo') return goToInsumo(id);
+}
+function detailActEdit() {
+  if (!detailCtx) return;
+  const { kind, id } = detailCtx;
+  closeInvDetailModal();
+  if (kind === 'inv') return editInv(id);
+  if (kind === 'stock' || kind === 'stockLab') return editProd(id);
+  if (kind === 'insumo') return editInsumo(id);
+}
+function detailActDel() {
+  if (!detailCtx) return;
+  const { kind, id } = detailCtx;
+  if (kind === 'inv') { if (typeof delInv === 'function') delInv(id); }
+  else if (kind === 'stock' || kind === 'stockLab') { if (typeof delProd === 'function') delProd(id); }
+  else if (kind === 'insumo') { if (typeof delInsumo === 'function') delInsumo(id); }
+  closeInvDetailModal();
+}
+function detailActShare() {
+  if (!detailCtx) return;
+  const { kind, id } = detailCtx;
+  try {
+    if (kind === 'inv' && typeof shareInvWa === 'function') return shareInvWa(id);
+    if ((kind === 'stock' || kind === 'stockLab') && typeof showProdQr === 'function') return showProdQr(id);
+    if (kind === 'insumo' && typeof showInsQr === 'function') return showInsQr(id);
+  } catch (e) {}
+  toast('Compartir no disponible');
+}
+function detailActLab() {
+  if (!detailCtx || detailCtx.kind !== 'stockLab') return;
+  const id = detailCtx.id;
+  closeInvDetailModal();
+  try {
+    if (typeof openLabFromProd === 'function') openLabFromProd(id);
+    else {
+      show('laboratorio');
+      toast('Abre Lab y carga el perfume');
+    }
+  } catch (e) { show('laboratorio'); }
+}
+function detailActAbonos() {
+  if (!detailCtx || detailCtx.kind !== 'inv') return;
+  const id = detailCtx.id;
+  closeInvDetailModal();
+  goToInvGuardadas(id);
+  setTimeout(() => { try { if (typeof toggleAbonoForm === 'function') toggleAbonoForm(id); } catch (e) {} }, 200);
+}
+function detailActCxc() {
+  if (!detailCtx || detailCtx.kind !== 'inv') return;
+  const id = detailCtx.id;
+  closeInvDetailModal();
+  try {
+    if (typeof shareCxcWa === 'function') shareCxcWa(id);
+    else if (typeof waCxcInv === 'function') waCxcInv(id);
+    else toast('CxC WhatsApp');
+  } catch (e) { toast('CxC'); }
+}
+function detailActPdf() {
+  if (!detailCtx || detailCtx.kind !== 'inv') return;
+  const id = detailCtx.id;
+  try { printInv(id); } catch (e) { toast('PDF'); }
+}
+function detailActThermal() {
+  if (!detailCtx || detailCtx.kind !== 'inv') return;
+  const id = detailCtx.id;
+  try { printThermalInv(id); } catch (e) { toast('Térmica'); }
+}
+function flashCard(sel) {
+  const card = typeof sel === 'string' ? document.querySelector(sel) : sel;
+  if (!card) return;
+  const main = document.querySelector('main');
+  if (main) {
+    const top = card.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop - 12;
+    main.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  }
+  card.classList.remove('flash-hl');
+  void card.offsetWidth;
+  card.classList.add('flash-hl');
+  setTimeout(() => card.classList.remove('flash-hl'), 3500);
+}
+function goToProdStock(id) {
+  const p = (products || []).find(x => +x.id === +id);
+  if (!p) return toast('Producto no encontrado');
+  if (p.empresa && p.empresa !== activeEmpresa) {
+    activeEmpresa = p.empresa;
+    try { applyEmpresaUI(); } catch (e) {}
+  }
+  show('stock');
+  try { renderProducts(); } catch (e) {}
+  setTimeout(() => flashCard('#prodList .list-card[data-prod-id="' + id + '"], #stockList .list-card[data-prod-id="' + id + '"]'), 150);
+}
+function goToInsumo(id) {
+  show('insumos');
+  try { renderInsumos(); } catch (e) {}
+  setTimeout(() => flashCard('#insList .list-card[data-ins-id="' + id + '"], #insumosList .list-card[data-ins-id="' + id + '"]'), 150);
+}
 
 function viewProdDetail(id) {
   const p = products.find(x => x.id === id);
@@ -4694,6 +4855,8 @@ function viewProdDetail(id) {
     }
   }
   body.innerHTML = html;
+  const hasLab = !!(p.lab || (p.caps && Object.keys(p.caps || {}).length));
+  setDetailActions(((p.empresa || '') === EMPRESA_PERFUMES) && hasLab ? 'stockLab' : 'stock', p.id);
   modal.classList.add('open');
 }
 stockSearch.oninput = () => renderProducts();
@@ -6146,9 +6309,12 @@ async function doSaveFact(tipo) {
   // Stock: devolver lo de la versión anterior y aplicar lo nuevo (evita doble resta al editar)
   try { applyInvoiceStockChange(prev, inv); } catch (e) {}
   await autoSave();
-  toast(editingInvId ? 'Factura actualizada' : 'Factura guardada ' + invNumeroDisplay(inv));
+  const savedId = inv.id;
+  const wasEdit = !!editingInvId;
+  toast(wasEdit ? 'Factura actualizada' : 'Factura guardada ' + invNumeroDisplay(inv));
   try { refreshContabilidad(); } catch (e) {}
-  clearFactForm(); show('guardadas');
+  clearFactForm();
+  goToInvGuardadas(savedId);
 }
 
 /** Busca producto por nombre; prioriza la empresa de la factura */
@@ -6471,7 +6637,7 @@ function viewInvDetail(id) {
     if (inv.garantia) html += `<div class="d-row"><strong>Garantía:</strong> ${escapeHtml(inv.garantia)}</div>`;
   }
   body.innerHTML = html;
-  
+  setDetailActions('inv', inv.id);
   modal.classList.add('open');
 }
 function closeInvDetail() {
@@ -6480,7 +6646,7 @@ function closeInvDetail() {
 }
 (function bindInvDetail() {
   const b = document.getElementById('btnCloseInvDetail');
-  if (b) b.onclick = closeInvDetail;
+  if (b) b.onclick = () => closeInvDetailModal();
   const m = document.getElementById('invDetailModal');
   if (m) m.addEventListener('click', e => { if (e.target === m) closeInvDetail(); });
 })();
@@ -7554,42 +7720,94 @@ function thermalUsbAvailable() {
   return !!(navigator.usb);
 }
 
+async function thermalUsbRelease() {
+  try {
+    if (thermalUsb && thermalUsb.device) {
+      try { await thermalUsb.device.close(); } catch (e) {}
+    }
+  } catch (e) {}
+  thermalUsb = null;
+  const b = document.getElementById('btnThermalUsbPrint');
+  if (b) b.disabled = true;
+}
+
+async function thermalUsbConnectTo(device) {
+  // Si ya está abierta por nosotros, cerrar y reabrir limpio
+  try {
+    if (device.opened) {
+      try { await device.close(); } catch (e) {}
+      await thermalDelay(80);
+    }
+  } catch (e) {}
+  try {
+    await device.open();
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    if (/Access denied|already open|SecurityError/i.test(msg)) {
+      throw new Error('USB ocupada. Cierra Phomymo / Print Master y vuelve a Conectar USB. (BLE no se toca)');
+    }
+    throw e;
+  }
+  if (device.configuration === null) await device.selectConfiguration(1);
+  let ifaceNum = 0;
+  let foundPrinter = false;
+  for (const iface of device.configuration.interfaces) {
+    for (const alt of iface.alternates) {
+      if (alt.interfaceClass === 7) { ifaceNum = iface.interfaceNumber; foundPrinter = true; break; }
+    }
+    if (foundPrinter) break;
+  }
+  // Algunos firmwares Phomemo no marcan clase 7: usar interfaz 0
+  try {
+    await device.claimInterface(ifaceNum);
+  } catch (e1) {
+    try {
+      if (device.reset) await device.reset();
+      await thermalDelay(100);
+    } catch (e) {}
+    try {
+      await device.claimInterface(0);
+      ifaceNum = 0;
+    } catch (e2) {
+      throw new Error('No se pudo reclamar USB. Desconecta el cable 3s, cierra otras apps y reintenta.');
+    }
+  }
+  let endpointOut = null;
+  const iface = device.configuration.interfaces.find(x => x.interfaceNumber === ifaceNum) || device.configuration.interfaces[0];
+  for (const alt of (iface && iface.alternates) || []) {
+    for (const ep of alt.endpoints) {
+      if (ep.direction === 'out') { endpointOut = ep.endpointNumber; break; }
+    }
+    if (endpointOut != null) break;
+  }
+  if (endpointOut == null) throw new Error('Sin endpoint OUT USB');
+  thermalUsb = { device, endpointOut, name: device.productName || 'USB Phomemo' };
+  const b = document.getElementById('btnThermalUsbPrint');
+  if (b) b.disabled = false;
+  setThermalStatus('USB conectada: ' + thermalUsb.name + '. BLE intacto.', true);
+  toast('🔌 ' + thermalUsb.name + ' lista');
+}
+
 async function thermalUsbConnect() {
   if (!thermalUsbAvailable()) {
     setThermalStatus('WebUSB no disponible. Usa Chrome/Edge en PC con cable.', false);
     return toast('WebUSB no disponible en este navegador');
   }
-  setThermalStatus('Elige la impresora USB…');
+  setThermalStatus('Cierra Phomymo si está abierto. Elige la impresora USB…');
   try {
-    // Reconectar autorizada
-    const known = await navigator.usb.getDevices();
-    const vendors = [0x0483, 0x2e3c];
-    let device = known.find(d => vendors.includes(d.vendorId));
-    if (!device) {
+    await thermalUsbRelease();
+    // Siempre pedir al usuario (evita dispositivo “pegado” de otra app)
+    let device = null;
+    try {
       device = await navigator.usb.requestDevice({ filters: PHOMEMO_USB_FILTERS });
+    } catch (e) {
+      // Si cancela, intentar autorizadas
+      const known = await navigator.usb.getDevices();
+      const vendors = [0x0483, 0x2e3c];
+      device = known.find(d => vendors.includes(d.vendorId)) || null;
+      if (!device) throw e;
     }
-    await device.open();
-    if (device.configuration === null) await device.selectConfiguration(1);
-    let ifaceNum = 0;
-    for (const iface of device.configuration.interfaces) {
-      for (const alt of iface.alternates) {
-        if (alt.interfaceClass === 7) { ifaceNum = iface.interfaceNumber; break; }
-      }
-    }
-    await device.claimInterface(ifaceNum);
-    let endpointOut = null;
-    const iface = device.configuration.interfaces[ifaceNum];
-    for (const alt of iface.alternates) {
-      for (const ep of alt.endpoints) {
-        if (ep.direction === 'out') { endpointOut = ep.endpointNumber; break; }
-      }
-    }
-    if (endpointOut == null) throw new Error('Sin endpoint OUT USB');
-    thermalUsb = { device, endpointOut, name: device.productName || 'USB Phomemo' };
-    const b = document.getElementById('btnThermalUsbPrint');
-    if (b) b.disabled = false;
-    setThermalStatus('USB conectada: ' + thermalUsb.name + '. BLE sigue intacto.', true);
-    toast('🔌 ' + thermalUsb.name + ' lista');
+    await thermalUsbConnectTo(device);
   } catch (e) {
     console.error('[thermal usb]', e);
     setThermalStatus('USB: ' + (e.message || e), false);
@@ -8484,10 +8702,12 @@ if(pBtnSave) pBtnSave.onclick=async ()=>{
   inv.rentabilidad = Math.round((parseMoney(inv.total) - inv.costoTotal) * 100) / 100;
   syncContFromInvoice(inv);
   await autoSave();
+  const savedProyId = inv.id;
   toast((editingProyId?"Proyecto actualizado":"Proyecto guardado")+" "+invNumeroDisplay(inv)+" · "+tipoLabel(tipo,false));
   clearProyForm();
   renderInvoices(); renderStats();
   try { refreshContabilidad(); } catch(e) {}
+  goToInvGuardadas(savedProyId);
 };
 
 // Print proyecto — diseño 3 páginas como PDF de muestra
@@ -9524,6 +9744,7 @@ function viewInsDetail(id) {
     html += `<div class="d-row" style="color:var(--muted)">Sin proveedores vinculados</div>`;
   }
   body.innerHTML = html;
+  setDetailActions('insumo', i.id);
   modal.classList.add('open');
 }
 function waInsObs(id) {
@@ -9582,7 +9803,7 @@ function renderInsumos() {
           return `<div class="line">🏭 <strong>${escapeHtml(name)}</strong> · ${money(pv.precio)} / ${und}</div>`;
         }).join('');
         const icod = (i.codigo || '').trim();
-        return `<div class="list-card">
+        return `<div class="list-card" data-ins-id="${i.id}">
           <div class="title">${escapeHtml(i.producto)} <span class="chip" style="background:#1a2a3d;color:var(--accent)">${und}</span></div>
           ${icod ? `<div class="line">🪪 <strong>${escapeHtml(icod)}</strong></div>` : ''}
           <div class="line">Precio base: <strong>$ ${formatMoneyInput(i.precio)}</strong> / ${und} · Stock: <strong>${i.stock || 0}</strong></div>
@@ -9677,6 +9898,7 @@ async function saveInsumo() {
   await autoSave();
   renderInsumos();
   toast('Insumo guardado');
+  setTimeout(() => flashCard('#insList .list-card[data-ins-id="' + obj.id + '"]'), 120);
 }
 async function delInsumo(id) {
   if (!confirm('¿Borrar este insumo?')) return;
