@@ -7276,8 +7276,14 @@ async function thermalRenderCanvas(inv) {
     String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 17 }); });
   }
   add('--------------------------------', { center: true, size: 16 });
-  add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 15 });
-  add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 15 });
+  // Nota legal por empresa (misma lógica que buildThermalHtml / PDF)
+  const isPerfumes = (inv.empresa || activeEmpresa) === 'perfumes';
+  if (isPerfumes) {
+    add('PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO', { size: 15 });
+  } else {
+    add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 15 });
+    add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 15 });
+  }
   add('--------------------------------', { center: true, size: 16 });
   add('MEDIO DE PAGO', { size: 20, bold: true });
   add('Bancolombia', { size: 18 });
