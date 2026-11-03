@@ -210,15 +210,13 @@ nav button.active{color:var(--accent)}
 .chip.overdue{background:#4b2027;color:#ff9aa4;animation:pulse 1.5s infinite}
 @keyframes pulse{50%{opacity:.7}}
 @keyframes flashHl{
-  0%{box-shadow:0 0 0 0 rgba(77,163,255,.95);border-color:var(--accent);transform:scale(1)}
-  25%{box-shadow:0 0 0 8px rgba(77,163,255,.35);border-color:#7ec0ff;transform:scale(1.015)}
-  50%{box-shadow:0 0 0 2px rgba(77,163,255,.7);border-color:var(--accent);transform:scale(1)}
-  75%{box-shadow:0 0 0 8px rgba(77,163,255,.3);border-color:#7ec0ff;transform:scale(1.01)}
-  100%{box-shadow:0 3px 0 #0a0e14,0 5px 12px rgba(0,0,0,.4);border-color:#2e3d4f;transform:scale(1)}
+  0%{box-shadow:0 0 0 0 rgba(77,163,255,.9);border-color:var(--accent)}
+  40%{box-shadow:0 0 0 6px rgba(77,163,255,.45);border-color:var(--accent)}
+  100%{box-shadow:0 3px 0 #0a0e14,0 5px 12px rgba(0,0,0,.4);border-color:#2e3d4f}
 }
 .list-card.flash-hl{
   border-color:var(--accent)!important;
-  animation:flashHl 1.1s ease 3;
+  animation:flashHl 1.6s ease 2;
 }
 .list-card.clickable{cursor:pointer}
 .detail-modal-box{
@@ -1710,44 +1708,20 @@ details.overdue-box[open]{
     </details>
 
     <details class="collapse">
-      <summary>🖨️ Impresora PDF</summary>
+      <summary>🖼️ Encabezado del PDF</summary>
       <div class="body">
-        <p class="sub">Por empresa activa: banner y textos del PDF.</p>
+        <p class="sub">Banner actual del PDF. Puedes restaurar el original o subir otra imagen.</p>
         <div style="background:#fff;border-radius:8px;padding:6px;margin-bottom:10px">
           <img id="pdfBannerPreview" alt="Banner PDF" style="width:100%;display:block;border-radius:4px">
         </div>
         <label class="label">Link del banner PDF</label>
         <input id="pdfBannerUrl" type="url" placeholder="https://… imagen pública del encabezado" style="margin-bottom:8px">
         <p class="hint" style="margin:0 0 8px">URL pública (Drive/OneDrive/web). No se sube archivo al proyecto.</p>
-        <div class="actions" style="margin-bottom:10px">
+        <div class="actions">
           <button type="button" id="btnApplyBannerUrl" class="success">Aplicar link</button>
           <button type="button" id="btnRestoreBanner" class="secondary">Restaurar original</button>
           <button type="button" id="btnSaveBanner">💾 Guardar banner</button>
         </div>
-        <label class="label">Nota legal / pie del PDF</label>
-        <textarea id="setPdfNota" rows="3" placeholder="Nota al pie del PDF (por empresa)" style="margin-bottom:8px"></textarea>
-        <label class="label">Tamaño fuente base PDF (px)</label>
-        <input id="setPdfFontSize" type="number" min="8" max="18" step="1" placeholder="10" style="margin-bottom:8px">
-        <button type="button" id="btnSavePdfPrint" style="width:100%">💾 Guardar impresora PDF</button>
-      </div>
-    </details>
-
-    <details class="collapse">
-      <summary>🧾 Impresora térmica</summary>
-      <div class="body">
-        <p class="sub">Por empresa activa: textos y tamaños del ticket Phomemo (BLE/USB).</p>
-        <label class="label">Nota legal del ticket</label>
-        <textarea id="setThermalNota" rows="3" placeholder="Nota legal térmica" style="margin-bottom:8px"></textarea>
-        <label class="label">Escala de fuente (1 = normal, 1.2 = más grande)</label>
-        <input id="setThermalFontScale" type="number" min="0.8" max="1.6" step="0.05" placeholder="1.1" style="margin-bottom:8px">
-        <label class="label">Título / código (px canvas)</label>
-        <input id="setThermalSizeCod" type="number" min="16" max="36" step="1" placeholder="28" style="margin-bottom:8px">
-        <label class="label">Cuerpo / productos (px canvas)</label>
-        <input id="setThermalSizeBody" type="number" min="12" max="28" step="1" placeholder="18" style="margin-bottom:8px">
-        <label class="label">Total (px canvas)</label>
-        <input id="setThermalSizeTotal" type="number" min="16" max="36" step="1" placeholder="26" style="margin-bottom:8px">
-        <button type="button" id="btnSaveThermalPrint" style="width:100%">💾 Guardar impresora térmica</button>
-        <p class="hint" style="margin-top:8px">BLE y USB usan la misma plantilla. No afecta el PDF.</p>
       </div>
     </details>
 <details class="collapse" data-emp="perfumes" id="archivoCaps">
@@ -1813,26 +1787,22 @@ details.overdue-box[open]{
   </section>
 </main>
 
-<!-- Modal ticket térmico + BLE / USB Phomemo -->
+<!-- Modal ticket térmico + BLE Phomemo -->
 <div class="modal-overlay" id="thermalModal">
   <div class="modal-box" style="max-width:420px;max-height:92vh;overflow:auto;padding:12px">
     <h3 style="margin:0 0 8px;font-size:15px">🧾 Ticket térmico</h3>
-    <p class="hint" id="thermalStatus" style="margin:0 0 8px">Vista previa. Conecta la Phomemo M110 por Bluetooth o cable USB (Chrome/Edge).</p>
+    <p class="hint" id="thermalStatus" style="margin:0 0 8px">Vista previa. Conecta la Phomemo M110 por Bluetooth (Chrome/Edge).</p>
     <div id="thermalPreviewWrap" style="background:#fff;color:#000;border-radius:8px;padding:8px;max-height:45vh;overflow:auto;margin-bottom:10px;font-size:11px;line-height:1.3"></div>
     <canvas id="thermalPrintCanvas" width="384" height="100" style="display:none"></canvas>
     <div class="actions" style="margin-bottom:6px">
-      <button type="button" id="btnThermalBleConnect" class="success">📡 Conectar BLE</button>
+      <button type="button" id="btnThermalBleConnect" class="success">📡 Conectar impresora</button>
       <button type="button" id="btnThermalBlePrint" class="secondary" disabled>🖨️ Imprimir BLE</button>
-    </div>
-    <div class="actions" style="margin-bottom:6px">
-      <button type="button" id="btnThermalUsbConnect" class="success">🔌 Conectar USB</button>
-      <button type="button" id="btnThermalUsbPrint" class="secondary" disabled>🖨️ Imprimir USB</button>
     </div>
     <div class="actions">
       <button type="button" id="btnThermalSysPrint" class="secondary">📄 Imprimir sistema / PDF</button>
       <button type="button" id="btnThermalClose" class="danger">Cerrar</button>
     </div>
-    <p class="hint" style="margin-top:8px">BLE: Android/PC Chrome + Bluetooth. USB: solo PC Chrome/Edge + cable (no móvil). Si Access denied: cierra Phomymo, desconecta 3s y reintenta. BLE no se toca.</p>
+    <p class="hint" style="margin-top:8px">Android: Chrome + Bluetooth + ubicación. PC: Chrome/Edge + Bluetooth. Si no conecta, usa «Imprimir sistema» o Print Master.</p>
   </div>
 </div>
 
@@ -1860,8 +1830,8 @@ details.overdue-box[open]{
   <div class="detail-modal-box">
     <h3 id="invDetailTitle">Detalle</h3>
     <div id="invDetailBody"></div>
-    <div class="modal-actions" id="invDetailActions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end">
-      <button type="button" class="secondary" id="btnCloseInvDetail">❌</button>
+    <div class="modal-actions" style="margin-top:12px">
+      <button type="button" class="secondary" id="btnCloseInvDetail">Cerrar</button>
     </div>
   </div>
 </div>
@@ -2389,13 +2359,6 @@ function defaultEmpresaAtcb() {
     proyDescCondensadora: DEFAULT_PROY_DESC.condensadora,
     proyDescAccesorios: DEFAULT_PROY_DESC.accesorios,
     proyDescTablero: DEFAULT_PROY_DESC.tablero,
-    thermalNota: 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO',
-    thermalFontScale: 1.1,
-    thermalSizeCod: 28,
-    thermalSizeBody: 18,
-    thermalSizeTotal: 26,
-    pdfNota: 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO',
-    pdfFontSize: 10,
     daysPendiente: 7, daysCotizacion: 7, daysVencidas: 7, daysStock: 30
   };
 }
@@ -2409,13 +2372,6 @@ function defaultEmpresaPerfumes() {
     waMotivar: DEFAULT_WA_MOTIVAR, waProy: DEFAULT_WA_PROY,
     proyAplicacion: '', pdfBanner: DEFAULT_PDF_BANNER, thermalBanner: '',
     proyTiempo: '', proyValidez: '', proyFormaPago: '', proyGarantia: '', proyNota: '', proyIntro: '', proyTitulo: '',
-    thermalNota: 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO',
-    thermalFontScale: 1.1,
-    thermalSizeCod: 28,
-    thermalSizeBody: 18,
-    thermalSizeTotal: 26,
-    pdfNota: 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR',
-    pdfFontSize: 10,
     daysPendiente: 7, daysCotizacion: 7, daysVencidas: 7, daysStock: 30
   };
 }
@@ -2428,19 +2384,13 @@ let settings = {
 
 function empCfg(empId) {
   const id = empId || activeEmpresa || EMPRESA_ATCB;
-  let e = (settings.empresas && settings.empresas[id]) || null;
-  if (!e) e = (settings.empresas && settings.empresas.atcb) || defaultEmpresaAtcb();
-  const base = (id === 'perfumes') ? defaultEmpresaPerfumes() : defaultEmpresaAtcb();
-  ['thermalNota','thermalFontScale','thermalSizeCod','thermalSizeBody','thermalSizeTotal','pdfNota','pdfFontSize'].forEach(function (k) {
-    if (e[k] == null || e[k] === '') e[k] = base[k];
-  });
-  return e;
+  const e = (settings.empresas && settings.empresas[id]) || null;
+  return e || (settings.empresas && settings.empresas.atcb) || defaultEmpresaAtcb();
 }
 function syncFlatSettingsFromEmp() {
   const e = empCfg();
   ['name','nit','tel','social','note','email','dir','banks','waFact','waCxc','waMotivar','waProy',
-   'proyAplicacion','pdfBanner','thermalBanner','proyTiempo','proyValidez','proyFormaPago','proyGarantia','proyNota','proyIntro','proyTitulo',
-   'thermalNota','thermalFontScale','thermalSizeCod','thermalSizeBody','thermalSizeTotal','pdfNota','pdfFontSize'
+   'proyAplicacion','pdfBanner','thermalBanner','proyTiempo','proyValidez','proyFormaPago','proyGarantia','proyNota','proyIntro','proyTitulo'
   ].forEach(k => { settings[k] = e[k]; });
 }
 function applyEmpresaUI() {
@@ -2785,13 +2735,6 @@ function syncSettingsUI() {
   if (pbu) pbu.value = ban;
   const banHint = document.getElementById('pdfBannerEmpHint');
   if (banHint) banHint.textContent = 'Empresa: ' + (e.label || activeEmpresa) + ' — cada empresa tiene su propio encabezado.';
-  const spn = document.getElementById('setPdfNota'); if (spn) spn.value = e.pdfNota || '';
-  const spf = document.getElementById('setPdfFontSize'); if (spf) spf.value = e.pdfFontSize || 10;
-  const stn = document.getElementById('setThermalNota'); if (stn) stn.value = e.thermalNota || '';
-  const sts = document.getElementById('setThermalFontScale'); if (sts) sts.value = e.thermalFontScale || 1.1;
-  const stc = document.getElementById('setThermalSizeCod'); if (stc) stc.value = e.thermalSizeCod || 28;
-  const stb = document.getElementById('setThermalSizeBody'); if (stb) stb.value = e.thermalSizeBody || 18;
-  const stt = document.getElementById('setThermalSizeTotal'); if (stt) stt.value = e.thermalSizeTotal || 26;
   const st = document.getElementById('setProyTiempo'); if (st) st.value = e.proyTiempo || '';
   const sv = document.getElementById('setProyValidez'); if (sv) sv.value = e.proyValidez || '';
   const sfp = document.getElementById('setProyFormaPago'); if (sfp) sfp.value = e.proyFormaPago || '';
@@ -4339,7 +4282,7 @@ function renderProducts() {
         const obs = (p.obs || '').trim();
         const titleName = (activeEmpresa === EMPRESA_PERFUMES) ? (basePerfumeName(p.name) || p.name) : p.name;
         const cod = (p.codigo || '').trim();
-        return `<div class="list-card ${isOld ? 'overdue-row' : ''}" data-prod-id="${p.id}">
+        return `<div class="list-card ${isOld ? 'overdue-row' : ''}">
           <div class="title">${escapeHtml(titleName)}${(p.lab || hasMulti) ? ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">Lab</span>' : ''}${isOld ? ' <span class="chip overdue">+'+lim+'d revisar precio</span>' : ''}</div>
           ${cod ? `<div class="line">🪪 <strong>${escapeHtml(cod)}</strong></div>` : ''}
           <div class="line">📅 ${fmtDate(p.fecha)} (${dias} día(s))</div>
@@ -4642,202 +4585,13 @@ btnSaveProd.onclick = async () => {
       data.caps[String(mlSel)] = { compra, venta, lab };
       data.name = basePerfumeName(name) || name;
     }
-    data.id = nextProdId++;
-    products.push({ ...data });
+    products.push({ id: nextProdId++, ...data });
   }
-  const savedProdId = data.id || editingProdId;
   const sel = document.getElementById('pLabML');
   if (sel) sel.disabled = false;
   editingCapMl = null;
   closeProdForm(); await autoSave(); renderProducts(); toast('Producto guardado');
-  if (savedProdId) {
-    show('stock');
-    setTimeout(() => flashCard('#prodList .list-card[data-prod-id="' + savedProdId + '"]'), 120);
-  }
 };
-
-
-/** Acciones del modal detalle (📷 lookup) — emojis */
-let detailCtx = null; // { kind, id }
-function closeInvDetailModal() {
-  const modal = document.getElementById('invDetailModal');
-  if (modal) modal.classList.remove('open');
-  detailCtx = null;
-}
-function setDetailActions(kind, id) {
-  detailCtx = { kind, id };
-  const wrap = document.getElementById('invDetailActions');
-  if (!wrap) return;
-  const btns = [];
-  const add = (emoji, title, fn) => {
-    btns.push({ emoji, title, fn });
-  };
-  // siempre: cerrar + escanear otro
-  // kind: insumo | stock | stockLab | inv
-  if (kind === 'insumo') {
-    add('📍', 'Ir y resaltar', 'detailActGo');
-    add('📲', 'WhatsApp / compartir', 'detailActShare');
-    add('✏️', 'Editar', 'detailActEdit');
-    add('🗑️', 'Eliminar', 'detailActDel');
-  } else if (kind === 'cliente') {
-    add('📍', 'Ir y resaltar', 'detailActGo');
-    add('✏️', 'Editar', 'detailActEdit');
-    add('🗑️', 'Eliminar', 'detailActDel');
-  } else if (kind === 'proveedor') {
-    add('📍', 'Ir y resaltar', 'detailActGo');
-    add('✏️', 'Editar', 'detailActEdit');
-    add('🗑️', 'Eliminar', 'detailActDel');
-  } else if (kind === 'stockLab') {
-    add('📍', 'Ir y resaltar', 'detailActGo');
-    add('📲', 'WhatsApp / compartir', 'detailActShare');
-    add('🔬', 'Lab +', 'detailActLab');
-    add('✏️', 'Editar', 'detailActEdit');
-    add('🗑️', 'Eliminar', 'detailActDel');
-  } else if (kind === 'stock') {
-    add('📍', 'Ir y resaltar', 'detailActGo');
-    add('📲', 'WhatsApp / compartir', 'detailActShare');
-    add('✏️', 'Editar', 'detailActEdit');
-    add('🗑️', 'Eliminar', 'detailActDel');
-  } else if (kind === 'inv') {
-    add('📍', 'Ir y resaltar', 'detailActGo');
-    add('💰', 'Abonos', 'detailActAbonos');
-    add('📲', 'WhatsApp', 'detailActShare');
-    add('👀', 'CxC', 'detailActCxc');
-    add('✏️', 'Editar', 'detailActEdit');
-    add('🖨️', 'PDF', 'detailActPdf');
-    add('🧾', 'Térmica', 'detailActThermal');
-    add('🗑️', 'Eliminar', 'detailActDel');
-  }
-  let html = '';
-  btns.forEach(b => {
-    html += `<button type="button" class="sm secondary" title="${b.title}" onclick="${b.fn}()">${b.emoji}</button>`;
-  });
-  html += `<button type="button" class="sm secondary" title="Escanear otro" onclick="detailActScan()">📷</button>`;
-  html += `<button type="button" class="sm secondary" id="btnCloseInvDetail" title="Cerrar" onclick="closeInvDetailModal()">❌</button>`;
-  wrap.innerHTML = html;
-}
-function detailActScan() {
-  closeInvDetailModal();
-  try { openQrScanner('lookup'); } catch (e) { toast('No se pudo abrir el escáner'); }
-}
-function detailActGo() {
-  if (!detailCtx) return;
-  const { kind, id } = detailCtx;
-  closeInvDetailModal();
-  if (kind === 'inv') return goToInvGuardadas(id);
-  if (kind === 'stock' || kind === 'stockLab') return goToProdStock(id);
-  if (kind === 'insumo') return goToInsumo(id);
-  if (kind === 'cliente') return goToCliente(id);
-  if (kind === 'proveedor') return goToProveedor(id);
-}
-function detailActEdit() {
-  if (!detailCtx) return;
-  const { kind, id } = detailCtx;
-  closeInvDetailModal();
-  if (kind === 'inv') return editInv(id);
-  if (kind === 'stock' || kind === 'stockLab') return editProd(id);
-  if (kind === 'insumo') return editInsumo(id);
-  if (kind === 'cliente') return editCli(id);
-  if (kind === 'proveedor') return editProv(id);
-}
-function detailActDel() {
-  if (!detailCtx) return;
-  const { kind, id } = detailCtx;
-  if (kind === 'inv') { if (typeof delInv === 'function') delInv(id); }
-  else if (kind === 'stock' || kind === 'stockLab') { if (typeof delProd === 'function') delProd(id); }
-  else if (kind === 'insumo') { if (typeof delInsumo === 'function') delInsumo(id); }
-  else if (kind === 'cliente') { if (typeof delCli === 'function') delCli(id); }
-  else if (kind === 'proveedor') { if (typeof delProv === 'function') delProv(id); }
-  closeInvDetailModal();
-}
-function detailActShare() {
-  if (!detailCtx) return;
-  const { kind, id } = detailCtx;
-  try {
-    if (kind === 'inv' && typeof shareInvWa === 'function') return shareInvWa(id);
-    if ((kind === 'stock' || kind === 'stockLab') && typeof showProdQr === 'function') return showProdQr(id);
-    if (kind === 'insumo' && typeof showInsQr === 'function') return showInsQr(id);
-  } catch (e) {}
-  toast('Compartir no disponible');
-}
-function detailActLab() {
-  if (!detailCtx || detailCtx.kind !== 'stockLab') return;
-  const id = detailCtx.id;
-  closeInvDetailModal();
-  try {
-    if (typeof openLabFromProd === 'function') openLabFromProd(id);
-    else {
-      show('laboratorio');
-      toast('Abre Lab y carga el perfume');
-    }
-  } catch (e) { show('laboratorio'); }
-}
-function detailActAbonos() {
-  if (!detailCtx || detailCtx.kind !== 'inv') return;
-  const id = detailCtx.id;
-  closeInvDetailModal();
-  goToInvGuardadas(id);
-  setTimeout(() => { try { if (typeof toggleAbonoForm === 'function') toggleAbonoForm(id); } catch (e) {} }, 200);
-}
-function detailActCxc() {
-  if (!detailCtx || detailCtx.kind !== 'inv') return;
-  const id = detailCtx.id;
-  closeInvDetailModal();
-  try {
-    if (typeof shareCxcWa === 'function') shareCxcWa(id);
-    else if (typeof waCxcInv === 'function') waCxcInv(id);
-    else toast('CxC WhatsApp');
-  } catch (e) { toast('CxC'); }
-}
-function detailActPdf() {
-  if (!detailCtx || detailCtx.kind !== 'inv') return;
-  const id = detailCtx.id;
-  try { printInv(id); } catch (e) { toast('PDF'); }
-}
-function detailActThermal() {
-  if (!detailCtx || detailCtx.kind !== 'inv') return;
-  const id = detailCtx.id;
-  try { printThermalInv(id); } catch (e) { toast('Térmica'); }
-}
-function flashCard(sel) {
-  const card = typeof sel === 'string' ? document.querySelector(sel) : sel;
-  if (!card) return;
-  const main = document.querySelector('main');
-  if (main) {
-    const top = card.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop - 12;
-    main.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-  }
-  card.classList.remove('flash-hl');
-  void card.offsetWidth;
-  card.classList.add('flash-hl');
-  setTimeout(() => card.classList.remove('flash-hl'), 3500);
-}
-function goToProdStock(id) {
-  const p = (products || []).find(x => +x.id === +id);
-  if (!p) return toast('Producto no encontrado');
-  if (p.empresa && p.empresa !== activeEmpresa) {
-    activeEmpresa = p.empresa;
-    try { applyEmpresaUI(); } catch (e) {}
-  }
-  show('stock');
-  try { renderProducts(); } catch (e) {}
-  setTimeout(() => flashCard('#prodList .list-card[data-prod-id="' + id + '"], #stockList .list-card[data-prod-id="' + id + '"]'), 150);
-}
-function goToInsumo(id) {
-  show('insumos');
-  try { renderInsumos(); } catch (e) {}
-  setTimeout(() => flashCard('#insList .list-card[data-ins-id="' + id + '"], #insumosList .list-card[data-ins-id="' + id + '"]'), 150);
-}
-function goToCliente(id) {
-  show('clientes');
-  try { renderClients(); } catch (e) {}
-  setTimeout(() => flashCard('#cliList .list-card[data-cli-id="' + id + '"]'), 150);
-}
-function goToProveedor(id) {
-  show('proveedores');
-  try { renderProveedores(); } catch (e) {}
-  setTimeout(() => flashCard('#provList .list-card[data-prov-id="' + id + '"]'), 150);
-}
 
 function viewProdDetail(id) {
   const p = products.find(x => x.id === id);
@@ -4885,8 +4639,6 @@ function viewProdDetail(id) {
     }
   }
   body.innerHTML = html;
-  const hasLab = !!(p.lab || (p.caps && Object.keys(p.caps || {}).length));
-  setDetailActions(((p.empresa || '') === EMPRESA_PERFUMES) && hasLab ? 'stockLab' : 'stock', p.id);
   modal.classList.add('open');
 }
 stockSearch.oninput = () => renderProducts();
@@ -4967,7 +4719,6 @@ function viewCliDetail(id) {
     html += `<div class="d-row" style="color:var(--muted)">Sin facturas vinculadas por nombre/doc/tel</div>`;
   }
   body.innerHTML = html;
-  setDetailActions('cliente', c.id);
   modal.classList.add('open');
 }
 
@@ -4980,7 +4731,7 @@ function renderClients() {
     ? rows.map(c => {
         const dias = daysAgo(c.fecha);
         const wa = waChatUrl(c.telefono);
-        return `<div class="list-card" data-cli-id="${c.id}">
+        return `<div class="list-card">
           <div class="title">${escapeHtml(c.nombre)}</div>
           <div class="line">📅 ${fmtDate(c.fecha)} (${dias} día(s))</div>
           <div class="line">📞 ${escapeHtml(c.telefono || '—')} · Doc: ${escapeHtml(c.documento || '—')}</div>
@@ -5038,16 +4789,13 @@ btnSaveCli.onclick = async () => {
     obs: (document.getElementById('cObs')?.value || '').trim(),
     fecha: cFecha.value || today()
   };
-  let savedCliId = editingCliId;
   if (editingCliId) {
     const i = clients.findIndex(x => x.id === editingCliId);
     if (i >= 0) clients[i] = { id: editingCliId, ...data };
   } else {
-    savedCliId = nextCliId++;
-    clients.push({ id: savedCliId, ...data });
+    clients.push({ id: nextCliId++, ...data });
   }
   closeCliForm(); await autoSave(); renderClients(); toast('Cliente guardado');
-  if (savedCliId) setTimeout(() => flashCard('#cliList .list-card[data-cli-id="' + savedCliId + '"]'), 120);
 };
 cliSearch.oninput = () => renderClients();
 
@@ -5086,7 +4834,6 @@ function viewProvDetail(id) {
     });
   }
   body.innerHTML = html;
-  setDetailActions('proveedor', v.id);
   modal.classList.add('open');
 }
 
@@ -5104,7 +4851,7 @@ function renderProveedores() {
         const wa = waChatUrl(v.telefono);
         let web = (v.web || '').trim();
         if (web && !/^https?:\/\//i.test(web)) web = 'https://' + web;
-        return `<div class="list-card" data-prov-id="${v.id}">
+        return `<div class="list-card">
           <div class="title">${escapeHtml(v.nombre)}</div>
           <div class="line">📅 ${fmtDate(v.fecha)} (${dias} día(s))</div>
           <div class="line">📞 ${escapeHtml(v.telefono || '—')} · Doc: ${escapeHtml(v.documento || '—')}</div>
@@ -5182,7 +4929,6 @@ async function delProv(id) {
       fecha: (document.getElementById('vFecha')?.value || today()),
       empresa: activeEmpresa
     };
-    let savedProvId = editingProvId;
     if (editingProvId != null) {
       const i = proveedores.findIndex(x => +x.id === +editingProvId);
       if (i >= 0) {
@@ -5190,11 +4936,9 @@ async function delProv(id) {
         proveedores[i] = { id: editingProvId, ...data };
       }
     } else {
-      savedProvId = nextProvId++;
-      proveedores.push({ id: savedProvId, ...data });
+      proveedores.push({ id: nextProvId++, ...data });
     }
     closeProvForm(); await autoSave(); renderProveedores(); toast('Proveedor guardado');
-    if (savedProvId) setTimeout(() => flashCard('#provList .list-card[data-prov-id="' + savedProvId + '"]'), 120);
   };
   if (s) s.oninput = () => renderProveedores();
 })();
@@ -6347,12 +6091,9 @@ async function doSaveFact(tipo) {
   // Stock: devolver lo de la versión anterior y aplicar lo nuevo (evita doble resta al editar)
   try { applyInvoiceStockChange(prev, inv); } catch (e) {}
   await autoSave();
-  const savedId = inv.id;
-  const wasEdit = !!editingInvId;
-  toast(wasEdit ? 'Factura actualizada' : 'Factura guardada ' + invNumeroDisplay(inv));
+  toast(editingInvId ? 'Factura actualizada' : 'Factura guardada ' + invNumeroDisplay(inv));
   try { refreshContabilidad(); } catch (e) {}
-  clearFactForm();
-  goToInvGuardadas(savedId);
+  clearFactForm(); show('guardadas');
 }
 
 /** Busca producto por nombre; prioriza la empresa de la factura */
@@ -6675,7 +6416,7 @@ function viewInvDetail(id) {
     if (inv.garantia) html += `<div class="d-row"><strong>Garantía:</strong> ${escapeHtml(inv.garantia)}</div>`;
   }
   body.innerHTML = html;
-  setDetailActions('inv', inv.id);
+  
   modal.classList.add('open');
 }
 function closeInvDetail() {
@@ -6684,7 +6425,7 @@ function closeInvDetail() {
 }
 (function bindInvDetail() {
   const b = document.getElementById('btnCloseInvDetail');
-  if (b) b.onclick = () => closeInvDetailModal();
+  if (b) b.onclick = closeInvDetail;
   const m = document.getElementById('invDetailModal');
   if (m) m.addEventListener('click', e => { if (e.target === m) closeInvDetail(); });
 })();
@@ -7074,10 +6815,10 @@ function buildPrintHtml(inv) {
       <div style="font-size:18px;font-weight:800">${money(inv.total)}</div>
     </div>
     ${abonosPdf}
-    <div style="margin-top:16px;font-size:${(e.pdfFontSize || 10)}px;text-transform:uppercase;line-height:1.4">
-      ${escapeHtml((e.pdfNota && String(e.pdfNota).trim()) || ((inv.empresa === EMPRESA_PERFUMES)
+    <div style="margin-top:16px;font-size:9px;text-transform:uppercase;line-height:1.4">
+      ${(inv.empresa === EMPRESA_PERFUMES)
         ? 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR'
-        : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO')).replace(/\n/g,'<br>')}
+        : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO'}
     </div>
     ${banksPdfHtml(inv.empresa)}
   </div>`;
@@ -7131,11 +6872,11 @@ function buildThermalHtml(inv) {
       '<div class="row"><span class="ti"><strong>Saldo</strong></span><span class="tr"><strong>' + money(saldo) + '</strong></span></div>';
   }
 
-  // Nota legal por empresa (editable en Archivo → Impresora térmica)
-  const nota = (e.thermalNota && String(e.thermalNota).trim())
-    || ((inv.empresa || activeEmpresa) === 'perfumes'
-      ? 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO'
-      : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO');
+  // Nota legal por empresa
+  const isPerfumes = (inv.empresa || activeEmpresa) === 'perfumes';
+  const nota = isPerfumes
+    ? 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO'
+    : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE, AJENO A LO QUE NO SE MANIPULO EN EL EQUIPO';
 
   const obs = inv.obs ? String(inv.obs) : '';
   const obsHtml = obs ? ('<div class="line"></div><div class="sec">Obs.</div><div class="small">' + escapeHtml(obs).replace(/\n/g, '<br>') + '</div>') : '';
@@ -7494,39 +7235,34 @@ async function thermalRenderCanvas(inv) {
   const pad = 10;
   const e = empCfg(inv.empresa || activeEmpresa);
   const cod = invNumeroDisplay(inv);
-  const sc = Math.max(0.8, Math.min(1.6, +(e.thermalFontScale || 1.1)));
-  const szCod = Math.round((+(e.thermalSizeCod || 28)) * sc / 1.1);
-  const szBody = Math.round((+(e.thermalSizeBody || 18)) * sc / 1.1);
-  const szTotal = Math.round((+(e.thermalSizeTotal || 26)) * sc / 1.1);
-  const szSec = Math.max(14, Math.round(szBody * 1.1));
-  const szSmall = Math.max(12, Math.round(szBody * 0.9));
 
-  // Texto configurable; QR se mantiene en 96px (no tocar)
+  // Texto agrandado; QR se mantiene en 96px (no tocar)
   const lines = [];
   function add(t, o) {
-    lines.push(Object.assign({ t: String(t == null ? '' : t), size: szBody, bold: false, center: false, right: false }, o || {}));
+    lines.push(Object.assign({ t: String(t == null ? '' : t), size: 22, bold: false, center: false, right: false }, o || {}));
   }
-  add(e.name || e.label || 'Empresa', { size: Math.round(szCod * 0.95), bold: true, center: true });
-  if (e.nit) add('NIT ' + e.nit, { size: szBody, center: true });
-  if (e.tel) add('Tel. ' + e.tel, { size: szBody, center: true });
-  add('--------------------------------', { center: true, size: szSmall });
-  add(String(cod), { size: szCod, bold: true, center: true });
-  add('--------------------------------', { center: true, size: szSmall });
-  add('CLIENTE', { size: szSec, bold: true });
-  add(inv.cliente || '-', { size: Math.round(szBody * 1.15) });
-  if (inv.documento) add('Doc: ' + inv.documento, { size: szBody });
-  if (inv.telefono) add('Tel: ' + inv.telefono, { size: szBody });
-  add('Fecha: ' + fmtDate(inv.fecha), { size: szBody });
-  add('--------------------------------', { center: true, size: szSmall });
-  add('PRODUCTOS', { size: szSec, bold: true });
+  add(e.name || e.label || 'Empresa', { size: 26, bold: true, center: true });
+  if (e.nit) add('NIT ' + e.nit, { size: 18, center: true });
+  if (e.tel) add('Tel. ' + e.tel, { size: 18, center: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add(String(cod), { size: 28, bold: true, center: true });
+  add('--------------------------------', { center: true, size: 16 });
+  add('CLIENTE', { size: 20, bold: true });
+  add(inv.cliente || '-', { size: 22 });
+  if (inv.documento) add('Doc: ' + inv.documento, { size: 18 });
+  if (inv.telefono) add('Tel: ' + inv.telefono, { size: 18 });
+  add('Fecha: ' + fmtDate(inv.fecha), { size: 18 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('PRODUCTOS', { size: 20, bold: true });
   (inv.items || []).forEach(function (it) {
     const cant = it.cant || 0;
     const name = it.name || '';
-    add(cant + ' ' + name, { size: szBody });
+    // Solo cantidad + nombre (sin precios unitarios ni subtotales por línea)
+    add(cant + ' ' + name, { size: 18 });
   });
-  if (!(inv.items || []).length) add('(sin items)', { size: szBody });
-  add('--------------------------------', { center: true, size: szSmall });
-  add('TOTAL  ' + money(inv.total), { size: szTotal, bold: true });
+  if (!(inv.items || []).length) add('(sin items)', { size: 18 });
+  add('--------------------------------', { center: true, size: 16 });
+  add('TOTAL  ' + money(inv.total), { size: 26, bold: true });
   if ((inv.abonos || []).length) {
     add('ABONOS', { size: 20, bold: true });
     inv.abonos.forEach(function (a) {
@@ -7540,12 +7276,14 @@ async function thermalRenderCanvas(inv) {
     String(inv.obs).split(/\n/).forEach(function (l) { if (l) add(l, { size: 17 }); });
   }
   add('--------------------------------', { center: true, size: 16 });
-  // Nota legal por empresa (Archivo → Impresora térmica)
-  const notaT = (e.thermalNota && String(e.thermalNota).trim())
-    || ((inv.empresa || activeEmpresa) === 'perfumes'
-      ? 'PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO'
-      : 'REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA, APLICA SOLO EN SOLDADURA Y MONTAJE.');
-  String(notaT).split(/\n/).forEach(function (l) { if (String(l).trim()) add(String(l).trim(), { size: 15 }); });
+  // Nota legal por empresa (misma lógica que buildThermalHtml / PDF)
+  const isPerfumes = (inv.empresa || activeEmpresa) === 'perfumes';
+  if (isPerfumes) {
+    add('PRODUCTOS DE PERFUMERÍA · VERIFIQUE EL CONTENIDO AL RECIBIR, NO NOS HACEMOS RESPONSABLE DESPUES DE RECIBIDO', { size: 15 });
+  } else {
+    add('REPUESTOS ELECTRICO-MECANICOS NO POSEE GARANTIA,', { size: 15 });
+    add('APLICA SOLO EN SOLDADURA Y MONTAJE.', { size: 15 });
+  }
   add('--------------------------------', { center: true, size: 16 });
   add('MEDIO DE PAGO', { size: 20, bold: true });
   add('Bancolombia', { size: 18 });
@@ -7744,187 +7482,15 @@ function thermalSysPrint() {
   setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 600);
 }
 
-
-/* ========== WebUSB Phomemo (cable) — independiente de BLE ========== */
-const PHOMEMO_USB_FILTERS = [
-  { vendorId: 0x0483, productId: 0x5740 },
-  { vendorId: 0x0483 },
-  { vendorId: 0x2e3c, productId: 0x5750 },
-  { vendorId: 0x2e3c }
-];
-let thermalUsb = null; // { device, endpointOut, name }
-
-function thermalUsbAvailable() {
-  return !!(navigator.usb);
-}
-
-async function thermalUsbRelease() {
-  try {
-    if (thermalUsb && thermalUsb.device) {
-      try { await thermalUsb.device.close(); } catch (e) {}
-    }
-  } catch (e) {}
-  thermalUsb = null;
-  const b = document.getElementById('btnThermalUsbPrint');
-  if (b) b.disabled = true;
-}
-
-async function thermalUsbConnectTo(device) {
-  // Liberar si ya abierta (otra pestaña / intento previo)
-  try {
-    if (device.opened) {
-      try { await device.close(); } catch (e) {}
-      await thermalDelay(120);
-    }
-  } catch (e) {}
-  try {
-    await device.open();
-  } catch (e) {
-    const msg = String(e && e.message || e);
-    if (/Access denied|already open|SecurityError/i.test(msg)) {
-      // Intentar olvidar y forzar nuevo permiso (Chrome)
-      try {
-        if (device.forget) await device.forget();
-      } catch (e2) {}
-      throw new Error('USB Access denied. 1) Cierra Phomymo/Print Master 2) Desconecta el cable 3s 3) Vuelve a Conectar USB. BLE no se toca.');
-    }
-    throw e;
-  }
-  if (device.configuration === null) await device.selectConfiguration(1);
-  let ifaceNum = 0;
-  let foundPrinter = false;
-  for (const iface of device.configuration.interfaces) {
-    for (const alt of iface.alternates) {
-      if (alt.interfaceClass === 7) { ifaceNum = iface.interfaceNumber; foundPrinter = true; break; }
-    }
-    if (foundPrinter) break;
-  }
-  // Algunos firmwares Phomemo no marcan clase 7: usar interfaz 0
-  try {
-    await device.claimInterface(ifaceNum);
-  } catch (e1) {
-    try {
-      if (device.reset) await device.reset();
-      await thermalDelay(100);
-    } catch (e) {}
-    try {
-      await device.claimInterface(0);
-      ifaceNum = 0;
-    } catch (e2) {
-      throw new Error('No se pudo reclamar USB. Desconecta el cable 3s, cierra otras apps y reintenta.');
-    }
-  }
-  let endpointOut = null;
-  const iface = device.configuration.interfaces.find(x => x.interfaceNumber === ifaceNum) || device.configuration.interfaces[0];
-  for (const alt of (iface && iface.alternates) || []) {
-    for (const ep of alt.endpoints) {
-      if (ep.direction === 'out') { endpointOut = ep.endpointNumber; break; }
-    }
-    if (endpointOut != null) break;
-  }
-  if (endpointOut == null) throw new Error('Sin endpoint OUT USB');
-  thermalUsb = { device, endpointOut, name: device.productName || 'USB Phomemo' };
-  const b = document.getElementById('btnThermalUsbPrint');
-  if (b) b.disabled = false;
-  setThermalStatus('USB conectada: ' + thermalUsb.name + '. BLE intacto.', true);
-  toast('🔌 ' + thermalUsb.name + ' lista');
-}
-
-async function thermalUsbConnect() {
-  if (!thermalUsbAvailable()) {
-    setThermalStatus('WebUSB no disponible. Usa Chrome/Edge en PC con cable.', false);
-    return toast('WebUSB no disponible en este navegador');
-  }
-  setThermalStatus('Cierra Phomymo si está abierto. Elige la impresora USB…');
-  try {
-    await thermalUsbRelease();
-    // Siempre pedir al usuario (evita dispositivo “pegado” de otra app)
-    let device = null;
-    try {
-      device = await navigator.usb.requestDevice({ filters: PHOMEMO_USB_FILTERS });
-    } catch (e) {
-      // Si cancela, intentar autorizadas
-      const known = await navigator.usb.getDevices();
-      const vendors = [0x0483, 0x2e3c];
-      device = known.find(d => vendors.includes(d.vendorId)) || null;
-      if (!device) throw e;
-    }
-    await thermalUsbConnectTo(device);
-  } catch (e) {
-    console.error('[thermal usb]', e);
-    setThermalStatus('USB: ' + (e.message || e), false);
-    toast('Error USB: ' + (e.message || e));
-  }
-}
-
-async function thermalUsbSend(bytes) {
-  if (!thermalUsb || !thermalUsb.device) throw new Error('Sin impresora USB');
-  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  const CHUNK = 512;
-  for (let i = 0; i < u8.length; i += CHUNK) {
-    const chunk = u8.slice(i, Math.min(i + CHUNK, u8.length));
-    await thermalUsb.device.transferOut(thermalUsb.endpointOut, chunk);
-    await thermalDelay(20);
-  }
-}
-
-async function thermalUsbPrint() {
-  const inv = getInv(thermalInvId);
-  if (!inv) return toast('Sin factura');
-  if (!thermalUsb || !thermalUsb.device) {
-    setThermalStatus('Primero conecta USB', false);
-    return toast('Conecta la impresora USB');
-  }
-  const btnP = document.getElementById('btnThermalUsbPrint');
-  if (btnP) btnP.disabled = true;
-  setThermalStatus('Generando ticket USB…');
-  try {
-    const canvas = await thermalRenderCanvas(inv);
-    const raster = thermalCanvasToRaster(canvas);
-    const data = raster.data;
-    const widthBytes = raster.widthBytes;
-    const heightLines = raster.heightLines;
-    if (heightLines < 8) throw new Error('Ticket demasiado corto');
-    setThermalStatus('Imprimiendo USB…');
-    await thermalUsbSend(new Uint8Array([0x1b, 0x4e, 0x0d, 5]));
-    await thermalDelay(40);
-    await thermalUsbSend(new Uint8Array([0x1b, 0x4e, 0x04, 12]));
-    await thermalDelay(40);
-    await thermalUsbSend(new Uint8Array([0x1f, 0x11, 0x0b]));
-    await thermalDelay(40);
-    await thermalUsbSend(new Uint8Array([
-      0x1d, 0x76, 0x30, 0x00,
-      widthBytes & 0xff, 0x00,
-      heightLines & 0xff, (heightLines >> 8) & 0xff
-    ]));
-    await thermalUsbSend(data);
-    await thermalDelay(350);
-    await thermalUsbSend(new Uint8Array([0x1f, 0xf0, 0x05, 0x00, 0x1f, 0xf0, 0x03, 0x00]));
-    await thermalDelay(500);
-    setThermalStatus('USB listo. BLE no se tocó.', true);
-    toast('🖨️ USB: ' + thermalUsb.name);
-  } catch (e) {
-    console.error('[thermal usb print]', e);
-    setThermalStatus('Error USB: ' + (e.message || e), false);
-    toast('Error USB: ' + (e.message || e));
-  } finally {
-    if (btnP && thermalUsb) btnP.disabled = false;
-  }
-}
-
 (function initThermalModal() {
   const bClose = document.getElementById('btnThermalClose');
   const bConn = document.getElementById('btnThermalBleConnect');
   const bPrint = document.getElementById('btnThermalBlePrint');
-  const bUsbConn = document.getElementById('btnThermalUsbConnect');
-  const bUsbPrint = document.getElementById('btnThermalUsbPrint');
   const bSys = document.getElementById('btnThermalSysPrint');
   const modal = document.getElementById('thermalModal');
   if (bClose) bClose.onclick = () => closeThermalModal();
   if (bConn) bConn.onclick = () => thermalBleConnect();
   if (bPrint) bPrint.onclick = () => thermalBlePrint();
-  if (bUsbConn) bUsbConn.onclick = () => thermalUsbConnect();
-  if (bUsbPrint) bUsbPrint.onclick = () => thermalUsbPrint();
   if (bSys) bSys.onclick = () => thermalSysPrint();
   if (modal) modal.addEventListener('click', (e) => { if (e.target.id === 'thermalModal') closeThermalModal(); });
 })();
@@ -8256,36 +7822,6 @@ btnSaveBanner.onclick = async () => {
   await autoSave();
   toast('Banner PDF de ' + (e.label || activeEmpresa) + ' guardado');
 };
-
-(function bindPrintCfgSave() {
-  const bPdf = document.getElementById('btnSavePdfPrint');
-  const bTh = document.getElementById('btnSaveThermalPrint');
-  if (bPdf) bPdf.onclick = async () => {
-    const e = empCfg();
-    e.pdfNota = ((document.getElementById('setPdfNota') || {}).value || '').trim();
-    e.pdfFontSize = Math.max(8, Math.min(18, parseInt((document.getElementById('setPdfFontSize') || {}).value, 10) || 10));
-    settings.empresas = settings.empresas || {};
-    settings.empresas[activeEmpresa] = e;
-    syncFlatSettingsFromEmp();
-    try { syncSettingsUI(); } catch (err) {}
-    await autoSave();
-    toast('Impresora PDF · ' + (e.label || activeEmpresa));
-  };
-  if (bTh) bTh.onclick = async () => {
-    const e = empCfg();
-    e.thermalNota = ((document.getElementById('setThermalNota') || {}).value || '').trim();
-    e.thermalFontScale = Math.max(0.8, Math.min(1.6, parseFloat((document.getElementById('setThermalFontScale') || {}).value) || 1.1));
-    e.thermalSizeCod = Math.max(16, Math.min(36, parseInt((document.getElementById('setThermalSizeCod') || {}).value, 10) || 28));
-    e.thermalSizeBody = Math.max(12, Math.min(28, parseInt((document.getElementById('setThermalSizeBody') || {}).value, 10) || 18));
-    e.thermalSizeTotal = Math.max(16, Math.min(36, parseInt((document.getElementById('setThermalSizeTotal') || {}).value, 10) || 26));
-    settings.empresas = settings.empresas || {};
-    settings.empresas[activeEmpresa] = e;
-    syncFlatSettingsFromEmp();
-    try { syncSettingsUI(); } catch (err) {}
-    await autoSave();
-    toast('Impresora térmica · ' + (e.label || activeEmpresa));
-  };
-})();
 
 function refreshAll() {
   renderStats(); renderProducts(); renderClients(); renderInvoices(); renderLines(); syncSettingsUI();
@@ -8744,12 +8280,10 @@ if(pBtnSave) pBtnSave.onclick=async ()=>{
   inv.rentabilidad = Math.round((parseMoney(inv.total) - inv.costoTotal) * 100) / 100;
   syncContFromInvoice(inv);
   await autoSave();
-  const savedProyId = inv.id;
   toast((editingProyId?"Proyecto actualizado":"Proyecto guardado")+" "+invNumeroDisplay(inv)+" · "+tipoLabel(tipo,false));
   clearProyForm();
   renderInvoices(); renderStats();
   try { refreshContabilidad(); } catch(e) {}
-  goToInvGuardadas(savedProyId);
 };
 
 // Print proyecto — diseño 3 páginas como PDF de muestra
@@ -9786,7 +9320,6 @@ function viewInsDetail(id) {
     html += `<div class="d-row" style="color:var(--muted)">Sin proveedores vinculados</div>`;
   }
   body.innerHTML = html;
-  setDetailActions('insumo', i.id);
   modal.classList.add('open');
 }
 function waInsObs(id) {
@@ -9845,7 +9378,7 @@ function renderInsumos() {
           return `<div class="line">🏭 <strong>${escapeHtml(name)}</strong> · ${money(pv.precio)} / ${und}</div>`;
         }).join('');
         const icod = (i.codigo || '').trim();
-        return `<div class="list-card" data-ins-id="${i.id}">
+        return `<div class="list-card">
           <div class="title">${escapeHtml(i.producto)} <span class="chip" style="background:#1a2a3d;color:var(--accent)">${und}</span></div>
           ${icod ? `<div class="line">🪪 <strong>${escapeHtml(icod)}</strong></div>` : ''}
           <div class="line">Precio base: <strong>$ ${formatMoneyInput(i.precio)}</strong> / ${und} · Stock: <strong>${i.stock || 0}</strong></div>
@@ -9940,7 +9473,6 @@ async function saveInsumo() {
   await autoSave();
   renderInsumos();
   toast('Insumo guardado');
-  setTimeout(() => flashCard('#insList .list-card[data-ins-id="' + obj.id + '"]'), 120);
 }
 async function delInsumo(id) {
   if (!confirm('¿Borrar este insumo?')) return;
