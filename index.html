@@ -43,6 +43,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>AtcbOficial</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="AtcbOficial">
+<meta name="application-name" content="AtcbOficial">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
@@ -10230,6 +10236,19 @@ try {
 } catch (e) { console.error('Firebase start', e); }
 
 try { renderArchivedYearsUI(); updateYearCloseBanner(); } catch (e) {}
+</script>
+
+<script>
+/* PWA: registrar service worker (instalable en móvil/PC) */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js').then(function (reg) {
+      console.log('[PWA] SW ok', reg.scope);
+    }).catch(function (err) {
+      console.warn('[PWA] SW fail', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
