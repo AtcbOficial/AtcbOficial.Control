@@ -1,7 +1,7 @@
 {
-  "name": "Empresas AtcbOficial y Perfumes L&R",
-  "short_name": "Empresas AtcbOficial y Perfumes L&R",
-  "description": "Facturación multi-Empresas AtcbOficial y Perfumes L&R",
+  "name": "Luis Jose Bonilla & Empresas",
+  "short_name": "LJB Empresas",
+  "description": "Control multi-empresa · 🧊 AtcbOficial · 🧴 Perfumes L&R",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -9,7 +9,6 @@
   "background_color": "#0b0f14",
   "theme_color": "#0b0f14",
   "lang": "es",
-  "dir": "ltr",
   "icons": [
     {
       "src": "icon-192.png",

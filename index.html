@@ -1,7 +1,13 @@
 <!doctype html>
 <!--
   ============================================================
-  AtcbMulti — App única multi-empresa (HTML + CSS + JS)
+  PROYECTO BASE: 👨‍💼 Luis Jose Bonilla & Empresas
+  Estructura: App única de gestión / control multi-empresas (HTML+CSS+JS)
+
+  Empresas activas:
+  - 🧊 AtcbOficial  — Refrigeración Comercial Industrial
+  - 🧴 Perfumes L&R — Fabricantes de lociones personales
+  (Los nombres visibles se editan en Archivo → Datos de mi empresa)
   ============================================================
   ESTRUCTURA GENERAL
   - Persistencia: un archivo .json (products, clients, invoices,
@@ -42,11 +48,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>AtcbOficial</title>
+<title>👨‍💼 Luis Jose Bonilla &amp; Empresas</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="apple-mobile-web-app-title" content="AtcbOficial">
-<meta name="application-name" content="AtcbOficial">
+<meta name="apple-mobile-web-app-title" content="Luis Jose Bonilla &amp; Empresas">
+<meta name="application-name" content="Luis Jose Bonilla &amp; Empresas">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -763,8 +769,8 @@ details.overdue-box[open]{
 <body class="auth-locked">
 <div id="authGate" class="auth-gate">
   <div class="auth-card">
-    <h2>🧾 AtcbOficial</h2>
-    <p class="auth-sub">Inicia sesión con Google para acceder a tus datos (Firebase).</p>
+    <h2>👨‍💼 Luis Jose Bonilla &amp; Empresas</h2>
+    <p class="auth-sub">Control multi-empresa · 🧊 AtcbOficial · 🧴 Perfumes L&amp;R<br>Inicia sesión con Google (Firebase).</p>
     <button type="button" id="btnGoogleLogin">🔐 Continuar con Google</button>
     <p class="auth-err" id="authError"></p>
     <p class="hint" style="margin-top:16px">Hosting público · datos solo en tu cuenta Firebase</p>
@@ -773,7 +779,7 @@ details.overdue-box[open]{
 <header>
   <div class="hdr-row">
     <div class="hdr-left">
-      <h1 id="appTitle">🧾 AtcbOficial</h1>
+      <h1 id="appTitle">👨‍💼 Luis Jose Bonilla &amp; Empresas</h1>
       <div class="hdr-status" id="hdrStatus">
         <span>☁️ Firebase:<span id="cloudStatusLine" class="warn">sin sesión</span></span>
         <span> · </span>
@@ -1635,10 +1641,13 @@ details.overdue-box[open]{
     <details class="collapse">
       <summary>🏢 Datos de mi empresa</summary>
       <div class="body">
-        <p class="sub" id="archivoEmpresaHint" style="color:var(--accent);font-weight:650">Editando datos de: AtcbOficial</p>
-        <p class="sub">Cambia la empresa en el selector del encabezado. Cada empresa tiene nombre, NIT, bancos, WhatsApp y banner PDF propios. La <strong>contabilidad es única</strong> (compartida).</p>
-        <div class="form-row"><label class="label">Nombre / Razón social · PDF encabezado, WA, CxC</label>
-          <input id="setName" placeholder="Ej. LUIS J. BONILLA P."></div>
+        <p class="sub" id="archivoEmpresaHint" style="color:var(--accent);font-weight:650">Editando datos de: 🧊 AtcbOficial</p>
+        <p class="sub">Proyecto base: <strong>👨‍💼 Luis Jose Bonilla &amp; Empresas</strong>. Cambia la empresa en el selector del encabezado. Cada una tiene nombre, NIT, bancos, WhatsApp y banner PDF propios. La <strong>contabilidad es única</strong> (compartida).</p>
+        <div class="form-row"><label class="label">Nombre de la empresa (visible en la app)</label>
+          <input id="setLabel" placeholder="Ej. AtcbOficial · Perfumes L&R"></div>
+        <p class="hint" style="margin:0 0 8px">Nombre comercial de la empresa activa (selector, encabezado, libro). Puedes cambiarlo cuando quieras.</p>
+        <div class="form-row"><label class="label">Nombre / Razón social · PDF, térmica, WA, CxC</label>
+          <input id="setName" placeholder="Ej. Luis Jose Bonilla"></div>
         <div class="form-row"><label class="label">NIT / Documento · PDF encabezado y pie</label>
           <input id="setNit" placeholder="Ej. 700326444-6"></div>
         <div class="form-row"><label class="label">Teléfono / Celular · PDF, WA, pie de página</label>
@@ -2374,7 +2383,7 @@ const DEFAULT_PROY_DESC = {
 };
 function defaultEmpresaAtcb() {
   return {
-    id: EMPRESA_ATCB, label: 'AtcbOficial',
+    id: EMPRESA_ATCB, label: 'AtcbOficial', tagline: 'Refrigeración Comercial Industrial',
     name: 'LUIS J. BONILLA P.', nit: '700326444-6', tel: '3134399033', social: '@AtcbOficial',
     note: 'Artículo 437 del Estatuto Tributario, Persona Natural / No responsable de IVA',
     email: 'bonilla.luis.pj@gmail.com', dir: 'Ibague, Tolima, Colombia',
@@ -2406,7 +2415,7 @@ function defaultEmpresaAtcb() {
 }
 function defaultEmpresaPerfumes() {
   return {
-    id: EMPRESA_PERFUMES, label: 'Perfumes L&R',
+    id: EMPRESA_PERFUMES, label: 'Perfumes L&R', tagline: 'Fabricantes de lociones personales',
     name: 'PERFUMES L&R', nit: '', tel: '', social: '',
     note: 'Persona Natural / No responsable de IVA',
     email: '', dir: 'Ibague, Tolima, Colombia',
@@ -2436,7 +2445,7 @@ function empCfg(empId) {
   let e = (settings.empresas && settings.empresas[id]) || null;
   if (!e) e = (settings.empresas && settings.empresas.atcb) || defaultEmpresaAtcb();
   const base = (id === 'perfumes' || id === EMPRESA_PERFUMES) ? defaultEmpresaPerfumes() : defaultEmpresaAtcb();
-  ['thermalNota','thermalFontScale','thermalSizeCod','thermalSizeBody','thermalSizeTotal','pdfNota','pdfFontSize'].forEach(function (k) {
+  ['thermalNota','thermalFontScale','thermalSizeCod','thermalSizeBody','thermalSizeTotal','pdfNota','pdfFontSize','label','tagline'].forEach(function (k) {
     if (e[k] == null || e[k] === '') e[k] = base[k];
   });
   return e;
@@ -2451,11 +2460,19 @@ function syncFlatSettingsFromEmp() {
 function applyEmpresaUI() {
   const e = empCfg();
   const title = document.getElementById('appTitle');
-  if (title) title.textContent = (activeEmpresa === EMPRESA_PERFUMES ? '🧴 ' : '🧾 ') + (e.label || e.name || 'Empresa');
+  if (title) title.textContent = (activeEmpresa === EMPRESA_PERFUMES ? '🧴 ' : '🧊 ') + (e.label || e.name || 'Empresa');
   const sub = document.getElementById('headerSub');
-  if (sub) sub.textContent = '';
+  if (sub) sub.textContent = e.tagline || '';
   const sel = document.getElementById('empresaSelect');
-  if (sel) sel.value = activeEmpresa;
+  if (sel) {
+    const at = empCfg(EMPRESA_ATCB);
+    const pf = empCfg(EMPRESA_PERFUMES);
+    const oAt = sel.querySelector('option[value="atcb"]');
+    const oPf = sel.querySelector('option[value="perfumes"]');
+    if (oAt) oAt.textContent = '🧊 ' + (at.label || 'AtcbOficial');
+    if (oPf) oPf.textContent = '🧴 ' + (pf.label || 'Perfumes L&R');
+    sel.value = activeEmpresa;
+  }
   // Tabs y bloques de Archivo según empresa
   document.querySelectorAll('[data-emp]').forEach(el => {
     const need = el.getAttribute('data-emp');
@@ -2764,6 +2781,8 @@ function updateHeaderSub() {
 }
 function syncSettingsUI() {
   const e = empCfg();
+  const sl = document.getElementById('setLabel');
+  if (sl) sl.value = e.label || '';
   setName.value = e.name || '';
   setNit.value = e.nit || '';
   setTel.value = e.tel || '';
@@ -2822,7 +2841,7 @@ function syncSettingsUI() {
   const dv = document.getElementById('setDaysVencidas'); if (dv) dv.value = e.daysVencidas != null ? e.daysVencidas : daysVencidasLimit();
   const ds = document.getElementById('setDaysStock'); if (ds) ds.value = e.daysStock != null ? e.daysStock : daysStockLimit();
   const empHint = document.getElementById('archivoEmpresaHint');
-  if (empHint) empHint.textContent = 'Editando datos de: ' + (e.label || e.name || activeEmpresa);
+  if (empHint) empHint.textContent = 'Editando datos de: ' + ((activeEmpresa === EMPRESA_PERFUMES ? '🧴 ' : '🧊 ') + (e.label || e.name || activeEmpresa));
   updateDaysFilterLabel();
   updateHeaderSub();
 }
@@ -7974,6 +7993,11 @@ document.getElementById('btnClearAll').onclick = async () => {
 
 btnSaveCompany.onclick = async () => {
   const e = empCfg();
+  const sl = document.getElementById('setLabel');
+  if (sl) {
+    const lab = sl.value.trim();
+    if (lab) e.label = lab;
+  }
   e.name = setName.value.trim() || e.name;
   e.nit = setNit.value.trim() || e.nit;
   e.tel = setTel.value.trim() || e.tel;
