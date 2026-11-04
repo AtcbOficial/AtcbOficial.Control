@@ -5233,8 +5233,10 @@ function migrateContFactConcepts() {
     const empChip = (inv.empresa === EMPRESA_PERFUMES) ? ('🧴 ' + empLab) : ('🧊 ' + empLab);
     const cod = invNumeroDisplay(inv);
     const cli = (inv.cliente || 'Cliente').trim();
-    let concept = cod + ' · ' + cli + '  ' + empChip;
+    // f1-#### · cliente (util. parcial abonos) 🧊 Empresa  — chip solo al final
+    let concept = cod + ' · ' + cli;
     if (inv.tipo !== 'cobrada') concept += ' (util. parcial abonos)';
+    concept += ' ' + empChip;
     x.concept = concept;
   });
 }
@@ -5255,12 +5257,12 @@ function syncContFromInvoice(inv) {
   const empLab = empCfg(inv.empresa || EMPRESA_ATCB).label || (inv.empresa === EMPRESA_PERFUMES ? 'Perfumes L&R' : 'AtcbOficial');
   const cod = invNumeroDisplay(inv);
   const empChip = (inv.empresa === EMPRESA_PERFUMES) ? '🧴 ' + empLab : '🧊 ' + empLab;
-  let concept = inv.isProyecto
-    ? (cod + ' · ' + cli + '  ' + empChip)
-    : (cod + ' · ' + cli + '  ' + empChip);
+  // f1-#### · cliente (util. parcial abonos) 🧊 Empresa
+  let concept = cod + ' · ' + cli;
   if (inv.tipo !== 'cobrada') {
     concept += ' (util. parcial abonos)';
   }
+  concept += ' ' + empChip;
   const type = rent >= 0 ? 'Ingreso' : 'Egreso';
   const amount = Math.round(Math.abs(rent) * 100) / 100;
   let date = inv.fecha || today();
