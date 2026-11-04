@@ -1,7 +1,7 @@
 {
-  "name": "AtcbOficial & Empresas",
-  "short_name": "AtcbOficial & Empresas",
-  "description": "Facturación multi-empresa AtcbOficial / Perfumes L&R",
+  "name": "Empresas AtcbOficial y Perfumes L&R",
+  "short_name": "Empresas AtcbOficial y Perfumes L&R",
+  "description": "Facturación multi-Empresas AtcbOficial y Perfumes L&R",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
