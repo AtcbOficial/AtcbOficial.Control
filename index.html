@@ -139,21 +139,31 @@ main::-webkit-scrollbar{width:0;height:0;display:none} /* Chrome/Safari: sin bar
 .income{color:var(--green)}.expense{color:var(--red)}.balance{color:var(--accent)}.warn{color:var(--orange)}
 button,input,select,textarea{font:inherit}
 button{
-  border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 11px;background:var(--accent);color:#fff;
-  font-weight:650;cursor:pointer;font-size:13px;
-  box-shadow:0 3px 0 rgba(0,0,0,.4),0 5px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.12);
-  transition:transform .1s ease,box-shadow .1s ease,filter .1s ease;
+  border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 11px;
+  background:linear-gradient(180deg,#3a6a9a 0%,#2a4e78 55%,#1e3a5c 100%);
+  color:#e8f0fa;font-weight:650;cursor:pointer;font-size:13px;
+  box-shadow:0 3px 0 #0d1824,0 5px 12px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.14);
+  transition:transform .1s ease,box-shadow .1s ease,filter .12s ease;
 }
-button:hover{filter:brightness(1.06)}
+button:hover{filter:brightness(1.08)}
 button:active{
   transform:translateY(2px);
-  box-shadow:0 1px 0 rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.25),inset 0 2px 4px rgba(0,0,0,.2);
+  box-shadow:0 1px 0 #0d1824,0 2px 6px rgba(0,0,0,.3),inset 0 2px 5px rgba(0,0,0,.28);
 }
-button.secondary{background:linear-gradient(180deg,#243040 0%,#18222e 100%);color:var(--text);border-color:#2e3d4f}
-button.danger{background:linear-gradient(180deg,#5a2830 0%,#3a1a20 100%);color:#ff9aa4;border-color:#6a3038}
-button.success{background:linear-gradient(180deg,#1f4a36 0%,#163528 100%);color:var(--green);border-color:#2a5a42}
+button.secondary{background:linear-gradient(180deg,#2a3544 0%,#1c2632 55%,#151c26 100%);color:var(--text);border-color:#2e3d4f;
+  box-shadow:0 3px 0 #0a0e14,0 5px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.08)}
+button.success{background:linear-gradient(180deg,#2a5a42 0%,#1e4434 55%,#163528 100%);color:#9ddeb8;border-color:#2f5c45;
+  box-shadow:0 3px 0 #0c1c14,0 5px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.12)}
+button.danger{background:linear-gradient(180deg,#5c3038 0%,#452228 55%,#3a1a20 100%);color:#f0a8b0;border-color:#6a383f;
+  box-shadow:0 3px 0 #1a0c0e,0 5px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.1)}
+button.warn{background:linear-gradient(180deg,#6a5a28 0%,#52441e 55%,#3d3316 100%);color:#f0e0a0;border-color:#7a6a38;
+  box-shadow:0 3px 0 #1a1608,0 5px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.12)}
+button.print,button.pdf{background:linear-gradient(180deg,#2e5a8a 0%,#234670 55%,#1a3558 100%);color:#b8d4f0;border-color:#3a6a9a;
+  box-shadow:0 3px 0 #0c1828,0 5px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.12)}
 button:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
-button.sm{padding:5px 8px;font-size:11px;border-radius:7px}
+button.sm{padding:5px 8px;font-size:11px;border-radius:7px;
+  box-shadow:0 2px 0 rgba(0,0,0,.35),0 3px 8px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.1)}
+button.sm:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(0,0,0,.3),inset 0 2px 3px rgba(0,0,0,.25)}
 nav button{
   box-shadow:none!important;border:0!important;background:transparent!important;
   transform:none!important;filter:none!important;
@@ -445,8 +455,17 @@ nav button.active{color:var(--accent)}
 
 
 /* Contab: Registro | Cajas en 2 columnas en pantalla ancha */
-.cont-reg-body{display:block}
-.cont-reg-cajas{border-top:1px solid var(--border);padding-top:12px;margin-top:12px}
+.cont-reg-body{display:grid;grid-template-columns:1fr;gap:14px}
+.cont-reg-cajas{border-top:1px solid var(--border);padding-top:12px;margin-top:0}
+.cont-reg-resumen-wrap{grid-column:1/-1;border-top:1px solid var(--border);padding-top:10px;margin-top:4px}
+.caja-inline-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;justify-content:space-between}
+.caja-inline-row .label{flex:1;margin:0;font-size:11px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.caja-inline-row input{flex:0 0 auto;width:140px;max-width:42%;text-align:right}
+.caja-resumen{display:flex;gap:16px;justify-content:space-around;align-items:flex-start;flex-wrap:wrap;width:100%;padding:4px 4px 0}
+.caja-res-item{flex:1 1 140px;text-align:center;min-width:120px}
+.caja-res-item .label{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.caja-res-item .stat{font-size:16px;font-weight:700}
+.cont-reg-mov .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (min-width: 700px) {
   .cont-reg-body{
     display:grid;
@@ -461,6 +480,7 @@ nav button.active{color:var(--accent)}
     border-left:1px solid var(--border);
     padding-left:20px;
   }
+  .cont-reg-resumen-wrap{grid-column:1 / -1}
 }
 @media (min-width: 960px) {
   #contabilidad #contRegistro{
@@ -771,10 +791,10 @@ details.overdue-box[open]{
 .caja-resumen{display:flex;gap:12px;justify-content:center;align-items:stretch;flex-wrap:wrap;margin-top:12px;padding:12px 10px;border-top:1px solid var(--border);width:100%}
 .caja-res-item{flex:1 1 140px;text-align:center;min-width:120px}
 .caja-res-item .stat{font-size:15px}
-button.success,.btn-success,button.sm.success{background:#1b7a3d!important;color:#fff!important;border-color:#1b7a3d!important}
-button.danger,.btn-danger,button.sm.danger{background:#c0392b!important;color:#fff!important;border-color:#c0392b!important}
-button.warn,.btn-warn,button.sm.warn{background:#c9a227!important;color:#111!important;border-color:#c9a227!important}
-button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!important;color:#fff!important;border-color:#1a5fb4!important}
+
+
+
+
 </style>
 </head>
 <body class="auth-locked">
@@ -850,7 +870,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         <option value="atcb">🧊 AtcbOficial</option>
         <option value="perfumes">🧴 Perfumes L&amp;R</option>
       </select>
-      <button type="button" class="sm secondary" id="btnLookupQr" title="Consultar código QR (factura / stock / insumos)" style="display:none;padding:5px 8px">📷</button>
+      <button type="button" class="sm success" id="btnLookupQr" title="Consultar código QR (factura / stock / insumos)" style="display:none;padding:5px 8px">📷</button>
     </div>
   </div>
 </header>
@@ -892,7 +912,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
           <div style="text-align:center"><div class="label">Resultado</div><div id="homeCajaRes" class="stat balance" style="font-size:16px">$ 0,00</div></div>
           <div style="text-align:right"><div class="label">Diferencia vs resultado</div><div id="homeCajaDiff" class="stat" style="font-size:16px">$ 0,00</div></div>
         </div>
-        <button type="button" id="homeGoContab" class="sm secondary" style="width:auto">📒 Ir a Contab.</button>
+        <button type="button" id="homeGoContab" class="sm warn" style="width:auto">📒 Ir a Contab.</button>
       </div>
     </details>
 
@@ -974,7 +994,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
               <p class="hint" style="margin:4px 0 0">Pega: Atcb <code>1-0001;5</code> · Perfumes <code>2-0001;30;5</code> · o escanea QR</p>
               <div id="prodDrop" class="dropdown"></div>
             </div>
-            <button type="button" id="btnScanQr" class="secondary" title="Escanear QR del producto" style="flex-shrink:0;padding:8px 12px;white-space:nowrap">📷 QR</button>
+            <button type="button" id="btnScanQr" class="success" title="Escanear QR del producto" style="flex-shrink:0;padding:8px 12px;white-space:nowrap">📷 QR</button>
           </div>
         </div>
         <div class="grid3" style="margin-bottom:8px">
@@ -983,7 +1003,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
           <input id="fPrecio" type="number" min="0" step="1" placeholder="Venta unit." title="Precio de venta al cliente">
         </div>
         <p class="hint" style="margin:0 0 8px">Costo = lo que te cuesta · Venta = lo que facturas. En PDF/WA solo venta.</p>
-        <button type="button" id="btnAddLine" class="secondary" style="width:100%">➕ Agregar línea</button>
+        <button type="button" id="btnAddLine" class="success" style="width:100%">➕ Agregar línea</button>
         <div id="lineItems" style="margin-top:12px"></div>
       </div>
     </details>
@@ -1054,7 +1074,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
       </div>
       <div class="form-row">
         <div id="pCuartosList"></div>
-        <button type="button" class="secondary" id="pBtnAddCuarto" style="width:100%;margin-top:4px;padding:9px;font-size:13px">➕ Agregar otro cuarto</button>
+        <button type="button" class="success" id="pBtnAddCuarto" style="width:100%;margin-top:4px;padding:9px;font-size:13px">➕ Agregar otro cuarto</button>
         <div class="hint" id="pM2M3" style="margin-top:10px;font-weight:700;color:var(--accent)">TOTAL AISLAMIENTO · MTS²: 0,00 · MTS³: 0,00</div>
       </div>
     </details>
@@ -1235,7 +1255,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         <div class="form-row">
           <div class="search-wrap" style="display:flex;gap:6px;align-items:stretch">
             <input id="pResSearch" placeholder="Buscar / código o pega: codigo;cantidad" autocomplete="off" style="flex:1">
-            <button type="button" id="btnScanQrProy" class="secondary" title="Escanear QR" style="flex-shrink:0;padding:8px 12px;white-space:nowrap">📷 QR</button>
+            <button type="button" id="btnScanQrProy" class="success" title="Escanear QR" style="flex-shrink:0;padding:8px 12px;white-space:nowrap">📷 QR</button>
             <div id="pResDrop" class="dropdown"></div>
           </div>
         </div>
@@ -1243,7 +1263,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
           <input id="pResCant" type="number" min="0.01" step="0.01" value="" placeholder="Cant.">
           <input id="pResCosto" type="number" min="0" step="1" placeholder="Costo unit.">
         </div>
-        <button type="button" id="pBtnAddRes" class="purple" style="width:100%;margin-bottom:8px">➕ Agregar a resulta</button>
+        <button type="button" id="pBtnAddRes" class="purple success" style="width:100%;margin-bottom:8px">➕ Agregar a resulta</button>
         <div id="pResList"></div>
         <div class="pay-box" style="margin-top:8px">
           <div class="pay-row"><span>Costo total resulta</span><span id="pResCostoTot" class="expense">$0</span></div>
@@ -1305,7 +1325,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         <div class="prod-img-actions">
           <label class="label">Link imagen del producto</label>
           <input type="url" id="pImgUrl" placeholder="https://… (Drive, OneDrive, web)" autocomplete="off">
-          <button type="button" class="sm secondary" id="pImgClear">🗑️ Quitar imagen</button>
+          <button type="button" class="sm danger" id="pImgClear">🗑️ Quitar imagen</button>
           <p class="hint">Solo URL pública. No se sube archivo (más liviano en Firebase).</p>
         </div>
       </div>
@@ -1328,7 +1348,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
     </div>
     <div class="card">
       <div class="sticky-btns">
-        <button type="button" id="btnExportCatalogOpen" class="sm secondary" title="Exportar a catálogo">📤</button>
+        <button type="button" id="btnExportCatalogOpen" class="sm success" title="Exportar a catálogo">📤</button>
         <button type="button" id="btnNewProd" class="sm success">➕ Nuevo</button>
       </div>
       <div class="section-title" style="margin:0 0 8px">📦 Stock de productos</div>
@@ -1351,8 +1371,8 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
     <div id="insForm" class="edit-panel">
       <div class="section-title" id="insFormTitle">Nuevo insumo</div>
       <div class="edit-actions actions">
-        <button type="button" id="btnSaveIns">Guardar</button>
-        <button type="button" id="btnCancelIns" class="secondary">Cancelar</button>
+        <button class="success" type="button" id="btnSaveIns">Guardar</button>
+        <button type="button" id="btnCancelIns" class="danger">Cancelar</button>
       </div>
       <select id="insCat" style="margin-bottom:6px">
         <option value="quimico">Químico (gramos)</option>
@@ -1379,7 +1399,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
           </select>
           <input id="insProvPrecio" type="number" min="0" step="0.0001" placeholder="Precio de ese proveedor">
         </div>
-        <button type="button" class="sm secondary" id="btnAddInsProv" style="width:100%;margin-top:6px">➕ Agregar proveedor</button>
+        <button type="button" class="sm success" id="btnAddInsProv" style="width:100%;margin-top:6px">➕ Agregar proveedor</button>
         <p class="hint" style="margin:6px 0 0">Proveedores de la empresa activa (pestaña Proveed.). Puedes comparar precios.</p>
       </div>
 
@@ -1498,8 +1518,8 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
     <div id="provForm" class="edit-panel">
       <div class="section-title" id="provFormTitle">Nuevo proveedor</div>
       <div class="edit-actions actions">
-        <button type="button" id="btnSaveProv">Guardar</button>
-        <button type="button" id="btnCancelProv" class="secondary">Cancelar</button>
+        <button class="success" type="button" id="btnSaveProv">Guardar</button>
+        <button type="button" id="btnCancelProv" class="danger">Cancelar</button>
       </div>
       <input id="vNombre" placeholder="Nombre / Razón social" style="margin-bottom:6px">
       <input id="vDoc" placeholder="Documento / NIT" style="margin-bottom:6px">
@@ -1529,7 +1549,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
     <div id="contYearCloseBanner" class="banner" style="display:none;border-color:var(--orange)">
       <strong class="warn">📅 Cierre de año pendiente</strong>
       <p style="margin:6px 0 10px" id="contYearCloseMsg">Ya toca archivar el año anterior.</p>
-      <button type="button" id="btnGoArchiveYear" class="secondary" style="width:100%">📁 Ir a Archivo → Archivar año anterior</button>
+      <button type="button" id="btnGoArchiveYear" class="warn" style="width:100%">📁 Ir a Archivo → Archivar año anterior</button>
     </div>
     <!-- 1) Registro + cajas (siempre abierto) -->
     <details class="collapse" id="contRegistro">
@@ -1562,6 +1582,8 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
             <label class="label">Acciones e inversiones</label>
             <input id="cajaInversiones" type="text" inputmode="decimal" placeholder="0,00" data-money="1">
           </div>
+        </div>
+        <div class="cont-reg-resumen-wrap">
           <div class="caja-resumen">
             <div class="caja-res-item"><div class="label">Total cajas</div><div id="cajaTotal" class="stat balance">$0</div></div>
             <div class="caja-res-item"><div class="label">Resultado</div><div id="cajaResultado" class="stat balance">$0</div></div>
@@ -1643,9 +1665,9 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         que tú eliges.
       </p>
       <div class="actions3" style="margin-top:12px">
-        <button id="btnOpen">Abrir archivo</button>
-        <button id="btnCreate" class="secondary">Crear nuevo</button>
-        <button id="btnSaveAs" class="secondary">Guardar como…</button>
+        <button class="print" id="btnOpen">Abrir archivo</button>
+        <button id="btnCreate" class="print">Crear nuevo</button>
+        <button id="btnSaveAs" class="success">Guardar como…</button>
       </div>
       <div class="card" style="margin:12px 0 0;padding:12px;border-color:var(--accent)">
         <div class="section-title" style="font-size:13px;margin:0 0 6px">☁️ Firebase (nube)</div>
@@ -1653,11 +1675,11 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         <p class="hint" id="authUserLabel" style="margin:0 0 8px;color:var(--text);font-weight:600"></p>
         <div class="actions" style="margin-top:6px">
           <button type="button" id="btnCloudSave" class="success">☁️ Guardar en Firebase</button>
-          <button type="button" id="btnCloudLoad" class="secondary">☁️ Cargar desde Firebase</button>
+          <button type="button" id="btnCloudLoad" class="print">☁️ Cargar desde Firebase</button>
         </div>
         <div class="actions" style="margin-top:6px">
-          <button type="button" id="btnJsonToCloud" class="secondary">⬆️ JSON → Firebase</button>
-          <button type="button" id="btnCloudToJson" class="secondary">⬇️ Firebase → JSON</button>
+          <button type="button" id="btnJsonToCloud" class="print">⬆️ JSON → Firebase</button>
+          <button type="button" id="btnCloudToJson" class="print">⬇️ Firebase → JSON</button>
         </div>
         <div class="actions" style="margin-top:6px">
           <button type="button" id="btnLogout" class="danger" style="display:none">⎋ Cerrar sesión</button>
@@ -1665,8 +1687,8 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         <p class="hint" style="margin-top:8px">Sube tu JSON una vez. Luego usa Guardar/Cargar nube en cada dispositivo.</p>
       </div>
       <div class="actions" style="margin-top:8px">
-        <button type="button" id="btnRepairJson" class="secondary">🔧 Reparar JSON dañado</button>
-        <button type="button" id="btnRepairImport" class="secondary">🔧 Importar y reparar…</button>
+        <button type="button" id="btnRepairJson" class="print">🔧 Reparar JSON dañado</button>
+        <button type="button" id="btnRepairImport" class="print">🔧 Importar y reparar…</button>
       </div>
       <p class="hint" style="margin-top:6px">Si al abrir sale error de JSON, usa <strong>Reparar</strong> o <strong>Importar y reparar</strong>.</p>
       <input id="fileRepairImport" type="file" accept=".json,application/json,text/plain" style="display:none">
@@ -1679,8 +1701,8 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
       <div class="body">
         <p class="sub">Si tu navegador no permite escribir archivos directo, usa exportar e importar.</p>
         <div class="actions" style="margin-top:10px">
-          <button id="btnExport">Descargar JSON</button>
-          <button id="btnImport" class="secondary">Importar JSON</button>
+          <button class="print" id="btnExport">Descargar JSON</button>
+          <button id="btnImport" class="print">Importar JSON</button>
         </div>
         <input id="fileImport" type="file" accept=".json,application/json" style="display:none">
       </div>
@@ -1730,7 +1752,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
           <p class="sub">🧊 WhatsApp Proyecto (botón WA en proyectos). Usa {tipo} {numero} {fecha} {cliente} {doc} {proyecto} {items} {total} {obs} {abonos} {abonado} {saldo} {empresa} {tel} {social}</p>
           <textarea id="setWaProy" style="min-height:140px;margin-bottom:10px"></textarea>
         </div>
-        <button type="button" id="btnSaveWa" style="width:100%;margin-top:10px">💾 Guardar mensajes</button>
+        <button class="success" type="button" id="btnSaveWa" style="width:100%;margin-top:10px">💾 Guardar mensajes</button>
       </div>
     </details>
 
@@ -1767,7 +1789,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         <textarea id="setProyDescAccesorios" rows="2" style="margin-bottom:6px"></textarea>
         <label class="label">Tablero eléctrico</label>
         <textarea id="setProyDescTablero" rows="2" style="margin-bottom:6px"></textarea>
-        <button type="button" id="btnSaveProyParams" style="width:100%;margin-top:10px">💾 Guardar parámetros proyecto</button>
+        <button class="success" type="button" id="btnSaveProyParams" style="width:100%;margin-top:10px">💾 Guardar parámetros proyecto</button>
       </div>
     </details>
 
@@ -1783,14 +1805,14 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         <p class="hint" style="margin:0 0 8px">URL pública (Drive/OneDrive/web). No se sube archivo al proyecto.</p>
         <div class="actions" style="margin-bottom:10px">
           <button type="button" id="btnApplyBannerUrl" class="success">Aplicar link</button>
-          <button type="button" id="btnRestoreBanner" class="secondary">Restaurar original</button>
-          <button type="button" id="btnSaveBanner">💾 Guardar banner</button>
+          <button type="button" id="btnRestoreBanner" class="print">Restaurar original</button>
+          <button class="success" type="button" id="btnSaveBanner">💾 Guardar banner</button>
         </div>
         <label class="label">Nota legal / pie del PDF</label>
         <textarea id="setPdfNota" rows="3" placeholder="Nota al pie del PDF" style="margin-bottom:8px"></textarea>
         <label class="label">Tamaño fuente base PDF (px)</label>
         <input id="setPdfFontSize" type="number" min="8" max="18" step="1" placeholder="10" style="margin-bottom:8px">
-        <button type="button" id="btnSavePdfPrint" style="width:100%">💾 Guardar impresora PDF</button>
+        <button class="success" type="button" id="btnSavePdfPrint" style="width:100%">💾 Guardar impresora PDF</button>
       </div>
     </details>
 
@@ -1808,7 +1830,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         <input id="setThermalSizeBody" type="number" min="12" max="28" step="1" placeholder="18" style="margin-bottom:8px">
         <label class="label">Total (px canvas)</label>
         <input id="setThermalSizeTotal" type="number" min="16" max="36" step="1" placeholder="26" style="margin-bottom:8px">
-        <button type="button" id="btnSaveThermalPrint" style="width:100%">💾 Guardar impresora térmica</button>
+        <button class="success" type="button" id="btnSaveThermalPrint" style="width:100%">💾 Guardar impresora térmica</button>
         <p class="hint" style="margin-top:8px">BLE y USB usan la misma plantilla. No afecta el PDF.</p>
       </div>
     </details>
@@ -1819,7 +1841,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         <div id="capsList" style="margin-bottom:10px"></div>
         <div class="grid2" style="gap:8px;margin-bottom:8px">
           <input id="capNewMl" type="number" min="1" step="1" placeholder="Nueva capacidad ml">
-          <button type="button" id="btnAddCap" class="secondary">➕ Agregar</button>
+          <button type="button" id="btnAddCap" class="success">➕ Agregar</button>
         </div>
         <p class="hint" id="capsHint">Por defecto: 30 · 60 · 120</p>
       </div>
@@ -1849,7 +1871,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
           <input id="setDaysStock" type="number" min="1" max="365" step="1" placeholder="30">
           <p class="hint">Producto resaltado si su fecha tiene más de N días. Al cambiar precio, el contador se reinicia.</p>
         </div>
-        <button type="button" id="btnSaveDays" style="width:100%;margin-top:10px">💾 Guardar temporizadores</button>
+        <button class="success" type="button" id="btnSaveDays" style="width:100%;margin-top:10px">💾 Guardar temporizadores</button>
       </div>
     </details>
 
@@ -1863,7 +1885,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
         </div>
         <div id="archivedYearsList" style="margin-top:12px"></div>
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-          <button type="button" class="secondary" id="btnStripBase64Img" style="width:100%;font-size:12px;margin-bottom:8px">🧹 Quitar imágenes embebidas (base64)</button>
+          <button type="button" class="danger" id="btnStripBase64Img" style="width:100%;font-size:12px;margin-bottom:8px">🧹 Quitar imágenes embebidas (base64)</button>
           <p class="hint" style="margin:0 0 8px">Borra fotos/banners guardados como archivo interno. Solo quedan links https. Luego guarda en Firebase.</p>
           <button type="button" class="danger" id="btnClearAll" style="width:100%;font-size:12px">Vaciar todo (solo defaults)</button>
           <p class="hint" style="margin-top:6px">Borra facturas, clientes, productos, insumos, contabilidad y años archivados. Deja empresas y capacidades por defecto.</p>
@@ -1884,14 +1906,14 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
     <canvas id="thermalPrintCanvas" width="384" height="100" style="display:none"></canvas>
     <div class="actions" style="margin-bottom:6px">
       <button type="button" id="btnThermalBleConnect" class="success">📡 Conectar BLE</button>
-      <button type="button" id="btnThermalBlePrint" class="secondary" disabled>🖨️ Imprimir BLE</button>
+      <button type="button" id="btnThermalBlePrint" class="print" disabled>🖨️ Imprimir BLE</button>
     </div>
     <div class="actions" style="margin-bottom:6px">
       <button type="button" id="btnThermalUsbConnect" class="success">🔌 Conectar USB</button>
-      <button type="button" id="btnThermalUsbPrint" class="secondary" disabled>🖨️ Imprimir USB</button>
+      <button type="button" id="btnThermalUsbPrint" class="print" disabled>🖨️ Imprimir USB</button>
     </div>
     <div class="actions">
-      <button type="button" id="btnThermalSysPrint" class="secondary">📄 Imprimir sistema / PDF</button>
+      <button type="button" id="btnThermalSysPrint" class="print">📄 Imprimir sistema / PDF</button>
       <button type="button" id="btnThermalClose" class="danger">Cerrar</button>
     </div>
     <p class="hint" style="margin-top:8px">BLE: Android/PC Chrome + Bluetooth. USB: PC Chrome/Edge + cable (WebUSB). Independientes. Si USB Access denied: cierra Phomymo, desconecta 3s y reintenta.</p>
@@ -1923,7 +1945,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
     <h3 id="invDetailTitle">Detalle</h3>
     <div id="invDetailBody"></div>
     <div class="modal-actions" id="invDetailActions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end">
-      <button type="button" class="sm secondary" id="btnCloseInvDetail" title="Cerrar" onclick="closeInvDetail()">❌</button>
+      <button type="button" class="sm danger" id="btnCloseInvDetail" title="Cerrar" onclick="closeInvDetail()">❌</button>
     </div>
   </div>
 </div>
@@ -1960,7 +1982,7 @@ button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!i
     <p class="qr-hint">Imprime el que prefieras (QR o barras). Al escanear el valor del código id en Factura o en 📷 consulta se reconoce el producto/insumo.</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
       <button type="button" class="secondary" id="btnQrStickerClose">Cerrar</button>
-      <button type="button" class="success" id="btnQrStickerPrint">🖨️ Imprimir</button>
+      <button type="button" class="print" id="btnQrStickerPrint">🖨️ Imprimir</button>
     </div>
   </div>
 </div>
@@ -3746,9 +3768,9 @@ function renderStats() {
           ` : ''}
           <div class="row-actions" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap" onclick="event.stopPropagation()">
             <button type="button" class="sm success" onclick="sendCxc(${inv.id})">📲 CxC</button>
-            <button type="button" class="sm secondary" onclick="editInv(${inv.id})" class="warn">✏️</button>
-            <button type="button" class="sm" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
-            <button type="button" class="sm secondary" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
+            <button type="button" class="sm warn" onclick="editInv(${inv.id})" class="warn">✏️</button>
+            <button type="button" class="sm print" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
+            <button type="button" class="sm print" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
             <button type="button" class="sm success" onclick="waInv(${inv.id})">📲</button>
           </div>
         </div>`;
@@ -3780,9 +3802,9 @@ function renderStats() {
         })()}</div>
           <div class="row-actions" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap" onclick="event.stopPropagation()">
             <button type="button" class="sm success" onclick="motivarCotiz(${inv.id})">💬 Motivar</button>
-            <button type="button" class="sm secondary" onclick="editInv(${inv.id})" class="warn">✏️</button>
-            <button type="button" class="sm" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
-            <button type="button" class="sm secondary" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
+            <button type="button" class="sm warn" onclick="editInv(${inv.id})" class="warn">✏️</button>
+            <button type="button" class="sm print" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
+            <button type="button" class="sm print" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
             <button type="button" class="sm success" onclick="waInv(${inv.id})">📲</button>
             <button type="button" class="sm danger" onclick="delInv(${inv.id})">🗑️</button>
           </div>
@@ -4420,11 +4442,11 @@ function renderProducts() {
           <div class="line">🛒 Vendido: <strong>${vendido}</strong> ud en facturas</div>
           ${obs ? `<div class="line">📝 ${escapeHtml(obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
-            <button type="button" class="sm secondary" onclick="viewProdDetail(${p.id})" title="Ver detalles">👀</button>
-            <button type="button" class="sm secondary" onclick="showProdQr(${p.id})" title="QR para sticker">📷 QR</button>
+            <button type="button" class="sm warn" onclick="viewProdDetail(${p.id})" title="Ver detalles">👀</button>
+            <button type="button" class="sm success" onclick="showProdQr(${p.id})" title="QR para sticker">📷 QR</button>
             <button type="button" class="sm success" onclick="waProdObs(${p.id})" title="WhatsApp observaciones">📲</button>
-            ${(p.lab || hasMulti || Object.keys(caps).length) ? `<button type="button" class="sm secondary" onclick="startLabNewCap(${p.id})" title="Nueva capacidad en laboratorio">🔬+</button>` : ''}
-            <button type="button" class="sm secondary" onclick="editProd(${p.id})" class="warn">✏️</button>
+            ${(p.lab || hasMulti || Object.keys(caps).length) ? `<button type="button" class="sm warn" onclick="startLabNewCap(${p.id})" title="Nueva capacidad en laboratorio">🔬+</button>` : ''}
+            <button type="button" class="sm warn" onclick="editProd(${p.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delProd(${p.id})">🗑️</button>
           </div>
         </div>`;
@@ -4734,9 +4756,9 @@ function setDetailActions(kind, id) {
   const wrap = document.getElementById('invDetailActions');
   if (!wrap) return;
   wrap.innerHTML =
-    '<button type="button" class="sm secondary" title="Ir y resaltar" onclick="detailActGo()">📍</button>' +
-    '<button type="button" class="sm secondary" title="Escanear otro" onclick="detailActScan()">📷</button>' +
-    '<button type="button" class="sm secondary" id="btnCloseInvDetail" title="Cerrar" onclick="closeInvDetail()">❌</button>';
+    '<button type="button" class="sm warn" title="Ir y resaltar" onclick="detailActGo()">📍</button>' +
+    '<button type="button" class="sm success" title="Escanear otro" onclick="detailActScan()">📷</button>' +
+    '<button type="button" class="sm danger" id="btnCloseInvDetail" title="Cerrar" onclick="closeInvDetail()">❌</button>';
   const b = document.getElementById('btnCloseInvDetail');
   if (b) b.onclick = closeInvDetail;
 }
@@ -4936,9 +4958,9 @@ function renderClients() {
           ${c.email ? `<div class="line">✉️ ${escapeHtml(c.email)}</div>` : ''}
           ${c.obs ? `<div class="line" style="white-space:pre-wrap">📝 ${escapeHtml(c.obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
-            <button type="button" class="sm secondary" onclick="viewCliDetail(${c.id})" title="Ver detalles">👀</button>
+            <button type="button" class="sm warn" onclick="viewCliDetail(${c.id})" title="Ver detalles">👀</button>
             ${wa ? `<a class="sm success" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 10px;border-radius:8px;font-weight:650">📲</a>` : ''}
-            <button type="button" class="sm secondary" onclick="editCli(${c.id})" class="warn">✏️</button>
+            <button type="button" class="sm warn" onclick="editCli(${c.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delCli(${c.id})">🗑️</button>
           </div>
         </div>`;
@@ -5060,9 +5082,9 @@ function renderProveedores() {
           ${web ? `<div class="line">🔗 <a href="${escapeHtml(web)}" target="_blank" rel="noopener" style="color:var(--accent)">${escapeHtml(v.web)}</a></div>` : ''}
           ${v.obs ? `<div class="line" style="white-space:pre-wrap">📝 ${escapeHtml(v.obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
-            <button type="button" class="sm secondary" onclick="viewProvDetail(${v.id})" title="Ver detalles">👀</button>
+            <button type="button" class="sm warn" onclick="viewProvDetail(${v.id})" title="Ver detalles">👀</button>
             ${wa ? `<a class="sm success" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 10px;border-radius:8px;font-weight:650">📲</a>` : ''}
-            <button type="button" class="sm secondary" onclick="editProv(${v.id})" class="warn">✏️</button>
+            <button type="button" class="sm warn" onclick="editProv(${v.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delProv(${v.id})">🗑️</button>
           </div>
         </div>`;
@@ -5424,7 +5446,7 @@ function renderLines() {
             </div>
             <div class="actions">
               <button type="button" class="sm success" onclick="saveLineEdit(${i})">✓ Guardar</button>
-              <button type="button" class="sm secondary" onclick="cancelLineEdit()">Cancelar</button>
+              <button type="button" class="sm danger" onclick="cancelLineEdit()">Cancelar</button>
             </div>
           </div>`;
         }
@@ -5436,7 +5458,7 @@ function renderLines() {
             <div class="meta">Rent. línea: <strong class="${rent >= 0 ? 'income' : 'expense'}">${money(rent)}</strong></div>
           </div>
           <div class="row-actions">
-            <button type="button" class="sm secondary" onclick="editLine(${i})" class="warn">✏️</button>
+            <button type="button" class="sm warn" onclick="editLine(${i})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="removeLine(${i})">✕</button>
           </div>
         </div>`;
@@ -6426,7 +6448,7 @@ function renderInvoices() {
               <input id="abonoNota-${inv.id}" placeholder="Nota (opcional)">
               <div class="actions">
                 <button type="button" class="sm success" onclick="saveAbono(${inv.id})">Registrar abono</button>
-                <button type="button" class="sm secondary" onclick="toggleAbonoForm(${inv.id}, false)">Cerrar</button>
+                <button type="button" class="sm success" onclick="toggleAbonoForm(${inv.id}, false)">Cerrar</button>
               </div>
             </div>` : ''}
           ${inv.obs ? `<div class="line">📝 Obs: ${escapeHtml(inv.obs)}</div>` : ''}
@@ -6435,10 +6457,10 @@ function renderInvoices() {
             ${inv.tipo==='pendiente' || (inv.abonos||[]).length ? `<button type="button" class="sm success" onclick="toggleAbonoForm(${inv.id}, true)">💰 Abonos</button>` : ''}
             ${inv.tipo==='pendiente' ? `<button type="button" class="sm success" onclick="sendCxc(${inv.id})">📲 CxC</button>` : ''}
             ${inv.tipo==='cotizacion' ? `<button type="button" class="sm success" onclick="motivarCotiz(${inv.id})">💬 Motivar</button>` : ''}
-            <button type="button" class="sm secondary" onclick="viewInvDetail(${inv.id})">👀</button>
-            ${inv.tipo !== 'cobrada' ? `<button type="button" class="sm secondary" onclick="editInv(${inv.id})" class="warn">✏️</button>` : ''}
-            <button type="button" class="sm" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
-            <button type="button" class="sm secondary" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
+            <button type="button" class="sm warn" onclick="viewInvDetail(${inv.id})">👀</button>
+            ${inv.tipo !== 'cobrada' ? `<button type="button" class="sm warn" onclick="editInv(${inv.id})" class="warn">✏️</button>` : ''}
+            <button type="button" class="sm print" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
+            <button type="button" class="sm print" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
             <button type="button" class="sm success" onclick="waInv(${inv.id})">📲</button>
             <button type="button" class="sm danger" onclick="delInv(${inv.id})">🗑️</button>
           </div>
@@ -9266,7 +9288,7 @@ function renderContTable() {
         }
         const actions = locked
           ? (invId
-              ? `<button type="button" class="sm secondary" onclick="event.stopPropagation();goToInvGuardadas(${invId})" title="Ver en Guardadas">🔒 Desde factura</button>`
+              ? `<button type="button" class="sm warn" onclick="event.stopPropagation();goToInvGuardadas(${invId})" title="Ver en Guardadas">🔒 Desde factura</button>`
               : `<span class="hint">🔒 Desde factura</span>`)
           : `<div class="row-actions">
               <button type="button" class="sm warn" onclick="editContEntry(${x.id})" class="warn">✏️</button>
@@ -9400,8 +9422,8 @@ function renderArchivedYearsUI() {
       <div class="line">Resultado <strong class="${rCls}">${money(y.resultado)}</strong></div>
       <div class="line">Archivado: ${y.archivedAt ? fmtDate(y.archivedAt.slice(0,10)) : '—'}</div>
       <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
-        <button type="button" class="sm secondary" onclick="viewArchivedYear(${y.year})">👀</button>
-        <button type="button" class="sm secondary" onclick="printArchivedYear(${y.year})">🖨️</button>
+        <button type="button" class="sm warn" onclick="viewArchivedYear(${y.year})">👀</button>
+        <button type="button" class="sm print" onclick="printArchivedYear(${y.year})">🖨️</button>
         <button type="button" class="sm success" onclick="waArchivedYear(${y.year})">📲</button>
       </div>
     </div>`;
@@ -9572,7 +9594,7 @@ async function saveContEntry() {
         <div class="modal-actions">
           <button type="button" class="success" data-t="Ingreso">➕ Ingreso</button>
           <button type="button" class="danger" data-t="Egreso">➖ Egreso</button>
-          <button type="button" class="secondary" data-t="">Cancelar</button>
+          <button type="button" class="danger" data-t="">Cancelar</button>
         </div></div>`;
       document.body.appendChild(ov);
       ov.querySelectorAll('button').forEach(b => b.onclick = () => {
@@ -9780,10 +9802,10 @@ function renderInsumos() {
           ${provLines || '<div class="line" style="color:var(--muted)">🏭 Sin proveedores anotados</div>'}
           ${obs ? `<div class="line">📝 ${escapeHtml(obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
-            <button type="button" class="sm secondary" onclick="viewInsDetail(${i.id})" title="Ver detalles">👀</button>
-            <button type="button" class="sm secondary" onclick="showInsQr(${i.id})" title="QR sticker">📷 QR</button>
+            <button type="button" class="sm warn" onclick="viewInsDetail(${i.id})" title="Ver detalles">👀</button>
+            <button type="button" class="sm success" onclick="showInsQr(${i.id})" title="QR sticker">📷 QR</button>
             <button type="button" class="sm success" onclick="waInsObs(${i.id})" title="WhatsApp observaciones">📲</button>
-            <button type="button" class="sm secondary" onclick="editInsumo(${i.id})" class="warn">✏️</button>
+            <button type="button" class="sm warn" onclick="editInsumo(${i.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delInsumo(${i.id})">🗑️</button>
           </div>
         </div>`;
