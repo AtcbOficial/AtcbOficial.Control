@@ -837,33 +837,95 @@ body.emp-atcb, body.emp-perfumes{
   --text:#edf3f8;
   --muted:#91a0af;
 }
+/* Neón de empresa: más visible, color según Atcb / Perfumes */
+@keyframes empNeonPulse{
+  0%,100%{
+    box-shadow:
+      0 0 0 1px var(--emp-border),
+      0 0 10px var(--emp-soft),
+      0 0 22px var(--emp-soft),
+      0 3px 0 rgba(0,0,0,.35),
+      0 8px 18px rgba(0,0,0,.28);
+  }
+  50%{
+    box-shadow:
+      0 0 0 1px var(--emp),
+      0 0 14px var(--emp-soft),
+      0 0 32px var(--emp-soft),
+      0 3px 0 rgba(0,0,0,.35),
+      0 8px 18px rgba(0,0,0,.28);
+  }
+}
 header{
-  border-bottom:2px solid var(--emp-border) !important;
-  box-shadow:0 4px 18px var(--emp-soft);
+  border-bottom:2px solid var(--emp) !important;
+  box-shadow:
+    0 0 12px var(--emp-soft),
+    0 0 28px var(--emp-soft),
+    0 4px 18px rgba(0,0,0,.35) !important;
 }
 .card, .collapse, .edit-panel, .list-card, .modal-box, .detail-modal-box{
   border-color:var(--emp-border) !important;
+  box-shadow:
+    0 0 0 1px var(--emp-border),
+    0 0 12px var(--emp-soft),
+    0 0 26px var(--emp-soft),
+    0 3px 0 rgba(0,0,0,.35),
+    0 8px 18px rgba(0,0,0,.28) !important;
+  animation:empNeonPulse 3.2s ease-in-out infinite;
+}
+/* Módulo abierto: neón más fuerte */
+.collapse[open]{
+  border-color:var(--emp) !important;
+  box-shadow:
+    0 0 0 1px var(--emp),
+    0 0 16px var(--emp-soft),
+    0 0 36px var(--emp-soft),
+    0 3px 0 rgba(0,0,0,.35),
+    0 10px 22px rgba(0,0,0,.3) !important;
 }
 .collapse > summary{
   border-left:3px solid var(--emp);
+  text-shadow:0 0 12px var(--emp-soft);
+}
+.collapse[open] > summary{
+  color:var(--text);
+  border-left-width:4px;
+  box-shadow:inset 3px 0 12px var(--emp-soft);
 }
 nav button.active{
   color:var(--emp) !important;
+  text-shadow:0 0 10px var(--emp-soft);
+}
+/* Selector de empresa con brillo del tema */
+header #empresaSelect{
+  border-color:var(--emp-border) !important;
+  box-shadow:0 0 10px var(--emp-soft);
 }
 #appTitle{
   color:var(--text) !important;
+  text-shadow:0 0 14px var(--emp-soft);
 }
 #appTitle.catalog-link{
   cursor:pointer;
   text-decoration:none;
   border-bottom:1px dashed transparent;
-  transition:border-color .15s, opacity .15s;
+  transition:border-color .15s, opacity .15s, text-shadow .15s;
 }
 #appTitle.catalog-link:hover{
   border-bottom-color:var(--emp);
-  opacity:.92;
+  text-shadow:0 0 18px var(--emp-soft), 0 0 6px var(--emp-soft);
+  opacity:.95;
 }
 #appTitle.catalog-link:active{opacity:.8}
+/* Intensidad un poco mayor en perfumes (oro) y atcb (azul) */
+body.emp-atcb{
+  --emp-soft:rgba(77,163,255,.22);
+  --emp-border:rgba(77,163,255,.45);
+}
+body.emp-perfumes{
+  --emp-soft:rgba(201,165,116,.24);
+  --emp-border:rgba(201,165,116,.48);
+}
 
 </style>
 </head>
