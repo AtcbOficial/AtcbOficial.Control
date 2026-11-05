@@ -764,6 +764,17 @@ details.overdue-box[open]{
 #qrReader video{border-radius:10px}
 .qr-hint{font-size:11px;color:var(--muted);margin:8px 0 0;line-height:1.35}
 
+
+.caja-inline-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.caja-inline-row .label{flex:0 0 auto;min-width:140px;margin:0;white-space:nowrap;font-size:12px}
+.caja-inline-row input{flex:1;min-width:0;max-width:180px}
+.caja-resumen{display:flex;gap:12px;justify-content:center;align-items:stretch;flex-wrap:wrap;margin-top:12px;padding:12px 10px;border-top:1px solid var(--border);width:100%}
+.caja-res-item{flex:1 1 140px;text-align:center;min-width:120px}
+.caja-res-item .stat{font-size:15px}
+button.success,.btn-success,button.sm.success{background:#1b7a3d!important;color:#fff!important;border-color:#1b7a3d!important}
+button.danger,.btn-danger,button.sm.danger{background:#c0392b!important;color:#fff!important;border-color:#c0392b!important}
+button.warn,.btn-warn,button.sm.warn{background:#c9a227!important;color:#111!important;border-color:#c9a227!important}
+button.print,.btn-print,button.sm.print,button.pdf,.btn-pdf{background:#1a5fb4!important;color:#fff!important;border-color:#1a5fb4!important}
 </style>
 </head>
 <body class="auth-locked">
@@ -1273,8 +1284,8 @@ details.overdue-box[open]{
     <div id="prodForm" class="edit-panel">
       <div class="section-title" id="prodFormTitle">Nuevo producto</div>
       <div class="edit-actions actions">
-        <button type="button" id="btnSaveProd">Guardar</button>
-        <button type="button" id="btnCancelProd" class="secondary">Cancelar</button>
+        <button type="button" id="btnSaveProd" class="success">Guardar</button>
+        <button type="button" id="btnCancelProd" class="danger">Cancelar</button>
       </div>
       <input id="pName" placeholder="Nombre del producto" style="margin-bottom:6px">
       <div class="form-row" style="margin:0 0 6px">
@@ -1422,27 +1433,16 @@ details.overdue-box[open]{
     <details class="collapse" id="labFormula">
       <summary>🔬 Laboratorio — Fórmula</summary>
       <div class="body">
-        <div class="form-row" style="margin:0 0 8px">
-          <label class="label">Nombre del producto</label>
-          <input id="labNombre" placeholder="Ej. perfume floral 50ml">
-        </div>
+        <input id="labNombre" placeholder="Nombre del producto (ej. perfume floral 50ml)" style="margin-bottom:8px;width:100%">
         <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;margin-bottom:8px">
-          <div class="form-row" style="margin:0">
-            <label class="label">Capacidad (ml)</label>
-            <select id="labML"><option value="30">30 ml</option><option value="60" selected>60 ml</option><option value="120">120 ml</option></select>
-          </div>
-          <div class="form-row" style="margin:0">
-            <label class="label">Código id</label>
-            <input id="labCodigo" placeholder="Auto: 2-0001 (editable)" autocomplete="off">
-          </div>
+          <select id="labML" title="Capacidad ml"><option value="30">30 ml</option><option value="60" selected>60 ml</option><option value="120">120 ml</option></select>
+          <input id="labCodigo" placeholder="Código id (auto: 2-0001)" autocomplete="off">
         </div>
         <div class="prod-img-box">
           <img id="labImgPreview" class="prod-img-preview" alt="Foto producto">
           <div class="prod-img-actions">
-            <label class="label">Link imagen del producto</label>
-            <input type="url" id="labImgUrl" placeholder="https://… (Drive, OneDrive, web)" autocomplete="off">
-            <button type="button" class="sm secondary" id="labImgClear">🗑️ Quitar imagen</button>
-            <p class="hint">Solo URL pública. No se sube archivo.</p>
+            <input type="url" id="labImgUrl" placeholder="https://… imagen del producto" autocomplete="off">
+            <button type="button" class="sm danger" id="labImgClear">🗑️ Quitar imagen</button>
           </div>
         </div>
         <div class="form-row" style="margin-bottom:10px">
@@ -1468,8 +1468,8 @@ details.overdue-box[open]{
     <div id="cliForm" class="edit-panel">
       <div class="section-title" id="cliFormTitle">Nuevo cliente</div>
       <div class="edit-actions actions">
-        <button type="button" id="btnSaveCli">Guardar</button>
-        <button type="button" id="btnCancelCli" class="secondary">Cancelar</button>
+        <button type="button" id="btnSaveCli" class="success">Guardar</button>
+        <button type="button" id="btnCancelCli" class="danger">Cancelar</button>
       </div>
       <input id="cNombre" placeholder="Nombre y apellido / Razón social" style="margin-bottom:6px">
       <input id="cDoc" placeholder="Documento / NIT" style="margin-bottom:6px">
@@ -1537,36 +1537,37 @@ details.overdue-box[open]{
       <div class="body cont-reg-body">
         <div class="cont-reg-mov">
           <div class="section-title" style="font-size:13px;margin-bottom:8px">Nuevo movimiento</div>
-          <div class="form-row"><label class="label">Fecha</label><input id="contDate" type="date"></div>
-          <div class="form-row"><label class="label">Concepto</label><input id="contConcept" placeholder="Ej. Venta, mercado, combustible..."></div>
-          <div class="form-row"><label class="label">Monto</label><input id="contAmount" type="text" inputmode="decimal" placeholder="0,00" data-money="1"></div>
+          <input id="contConcept" placeholder="Concepto (ej. Venta, mercado, combustible...)" style="margin-bottom:8px;width:100%">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <input id="contAmount" type="text" inputmode="decimal" placeholder="Monto 0,00" data-money="1" style="flex:1;min-width:0;max-width:50%">
+            <input id="contDate" type="date" style="flex:1;min-width:0">
+          </div>
           <input type="hidden" id="contType" value="Ingreso">
           <div class="actions" style="margin-bottom:4px">
             <button type="button" id="contBtnSave" class="success" title="Guardar">💾 Guardar</button>
-            <button type="button" id="contBtnCancel" class="secondary" title="Cancelar">✖️ Cancelar</button>
+            <button type="button" id="contBtnCancel" class="danger" title="Cancelar">✖️ Cancelar</button>
           </div>
         </div>
         <div class="cont-reg-cajas">
           <div class="section-title" style="font-size:13px;margin-bottom:8px">Cierre de cajas</div>
-          <p class="hint" style="margin:0 0 10px">Dinero real. Debe cuadrar con el resultado acumulado (todos los movimientos).</p>
-          <div class="form-row">
+          <div class="caja-inline-row">
             <label class="label">Caja electrónica (bancos)</label>
             <input id="cajaElectronica" type="text" inputmode="decimal" placeholder="0,00" data-money="1">
           </div>
-          <div class="form-row">
+          <div class="caja-inline-row">
             <label class="label">Caja física (efectivo)</label>
             <input id="cajaFisica" type="text" inputmode="decimal" placeholder="0,00" data-money="1">
           </div>
-          <div class="form-row">
+          <div class="caja-inline-row">
             <label class="label">Acciones e inversiones</label>
             <input id="cajaInversiones" type="text" inputmode="decimal" placeholder="0,00" data-money="1">
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px;padding-top:10px;border-top:1px solid var(--border)">
-            <div><div class="label">Total cajas</div><div id="cajaTotal" class="stat balance">$0</div></div>
-            <div style="text-align:center"><div class="label">Resultado</div><div id="cajaResultado" class="stat balance">$0</div></div>
-            <div style="text-align:right"><div class="label">Diferencia vs resultado</div><div id="cajaDiff" class="stat balance">$0</div></div>
+          <div class="caja-resumen">
+            <div class="caja-res-item"><div class="label">Total cajas</div><div id="cajaTotal" class="stat balance">$0</div></div>
+            <div class="caja-res-item"><div class="label">Resultado</div><div id="cajaResultado" class="stat balance">$0</div></div>
+            <div class="caja-res-item"><div class="label">Diferencia vs resultado</div><div id="cajaDiff" class="stat balance">$0</div></div>
           </div>
-          <p id="cajaMsg" class="hint" style="margin:8px 0 0"></p>
+          <p id="cajaMsg" class="hint" style="margin:8px 0 0;text-align:center"></p>
         </div>
       </div>
     </details>
@@ -1712,7 +1713,7 @@ details.overdue-box[open]{
           <p class="hint" style="margin:0 0 6px">Se muestra al pie del PDF en 3 tarjetas (Bancolombia, Nequi, Daviplata, etc.). También en recordatorios de cobro. Edita el texto; sepera cada banco con un recuadro como el de ejemplo.</p>
           <textarea id="setBanks" placeholder="Datos bancarios..." style="min-height:180px;font-family:ui-monospace,monospace;font-size:12px"></textarea>
         </div>
-        <button type="button" id="btnSaveCompany" style="width:100%;margin-top:10px">💾 Guardar datos empresa</button>
+        <button type="button" id="btnSaveCompany" class="success" style="width:100%;margin-top:10px">💾 Guardar datos empresa</button>
       </div>
     </details>
 
@@ -3745,7 +3746,7 @@ function renderStats() {
           ` : ''}
           <div class="row-actions" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap" onclick="event.stopPropagation()">
             <button type="button" class="sm success" onclick="sendCxc(${inv.id})">📲 CxC</button>
-            <button type="button" class="sm secondary" onclick="editInv(${inv.id})">✏️</button>
+            <button type="button" class="sm secondary" onclick="editInv(${inv.id})" class="warn">✏️</button>
             <button type="button" class="sm" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
             <button type="button" class="sm secondary" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
             <button type="button" class="sm success" onclick="waInv(${inv.id})">📲</button>
@@ -3779,7 +3780,7 @@ function renderStats() {
         })()}</div>
           <div class="row-actions" style="margin-top:10px;justify-content:flex-start;flex-wrap:wrap" onclick="event.stopPropagation()">
             <button type="button" class="sm success" onclick="motivarCotiz(${inv.id})">💬 Motivar</button>
-            <button type="button" class="sm secondary" onclick="editInv(${inv.id})">✏️</button>
+            <button type="button" class="sm secondary" onclick="editInv(${inv.id})" class="warn">✏️</button>
             <button type="button" class="sm" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
             <button type="button" class="sm secondary" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
             <button type="button" class="sm success" onclick="waInv(${inv.id})">📲</button>
@@ -4423,7 +4424,7 @@ function renderProducts() {
             <button type="button" class="sm secondary" onclick="showProdQr(${p.id})" title="QR para sticker">📷 QR</button>
             <button type="button" class="sm success" onclick="waProdObs(${p.id})" title="WhatsApp observaciones">📲</button>
             ${(p.lab || hasMulti || Object.keys(caps).length) ? `<button type="button" class="sm secondary" onclick="startLabNewCap(${p.id})" title="Nueva capacidad en laboratorio">🔬+</button>` : ''}
-            <button type="button" class="sm secondary" onclick="editProd(${p.id})">✏️</button>
+            <button type="button" class="sm secondary" onclick="editProd(${p.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delProd(${p.id})">🗑️</button>
           </div>
         </div>`;
@@ -4937,7 +4938,7 @@ function renderClients() {
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
             <button type="button" class="sm secondary" onclick="viewCliDetail(${c.id})" title="Ver detalles">👀</button>
             ${wa ? `<a class="sm success" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 10px;border-radius:8px;font-weight:650">📲</a>` : ''}
-            <button type="button" class="sm secondary" onclick="editCli(${c.id})">✏️</button>
+            <button type="button" class="sm secondary" onclick="editCli(${c.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delCli(${c.id})">🗑️</button>
           </div>
         </div>`;
@@ -5061,7 +5062,7 @@ function renderProveedores() {
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
             <button type="button" class="sm secondary" onclick="viewProvDetail(${v.id})" title="Ver detalles">👀</button>
             ${wa ? `<a class="sm success" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 10px;border-radius:8px;font-weight:650">📲</a>` : ''}
-            <button type="button" class="sm secondary" onclick="editProv(${v.id})">✏️</button>
+            <button type="button" class="sm secondary" onclick="editProv(${v.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delProv(${v.id})">🗑️</button>
           </div>
         </div>`;
@@ -5287,7 +5288,14 @@ function isContLinkedToInv(x, inv) {
 /** Actualiza conceptos del libro: f1-#### · cliente · 🧊 AtcbOficial */
 function migrateContFactConcepts() {
   (contMovimientos || []).forEach(x => {
-    if (!x || !x.locked) return;
+    if (!x) return;
+    if (x.concept) {
+      x.concept = String(x.concept)
+        .replace(/\s*[🧊🧴]\s*[^\n]*$/u, '')
+        .replace(/\s*(AtcbOficial|Perfumes L&R|Perfumes L&amp;R)\s*$/gi, '')
+        .trim();
+    }
+    if (!x.locked) return;
     let inv = null;
     if (x.sourceInvId != null) inv = getInv(x.sourceInvId);
     if (!inv && x.source) {
@@ -5295,14 +5303,10 @@ function migrateContFactConcepts() {
       if (m) inv = getInv(+m[2]);
     }
     if (!inv) return;
-    const empLab = empCfg(inv.empresa || EMPRESA_ATCB).label || '';
-    const empChip = (inv.empresa === EMPRESA_PERFUMES) ? ('🧴 ' + empLab) : ('🧊 ' + empLab);
     const cod = invNumeroDisplay(inv);
     const cli = (inv.cliente || 'Cliente').trim();
-    // f1-#### · cliente (util. parcial abonos) 🧊 Empresa  — chip solo al final
     let concept = cod + ' · ' + cli;
     if (inv.tipo !== 'cobrada') concept += ' (util. parcial abonos)';
-    concept += ' ' + empChip;
     x.concept = concept;
   });
 }
@@ -5320,15 +5324,11 @@ function syncContFromInvoice(inv) {
   const cli = (inv.cliente || 'Cliente').trim();
   const abonado = totalAbonado(inv);
   const costo = invCostoTotal(inv);
-  const empLab = empCfg(inv.empresa || EMPRESA_ATCB).label || (inv.empresa === EMPRESA_PERFUMES ? 'Perfumes L&R' : 'AtcbOficial');
   const cod = invNumeroDisplay(inv);
-  const empChip = (inv.empresa === EMPRESA_PERFUMES) ? '🧴 ' + empLab : '🧊 ' + empLab;
-  // f1-#### · cliente (util. parcial abonos) 🧊 Empresa
   let concept = cod + ' · ' + cli;
   if (inv.tipo !== 'cobrada') {
     concept += ' (util. parcial abonos)';
   }
-  concept += ' ' + empChip;
   const type = rent >= 0 ? 'Ingreso' : 'Egreso';
   const amount = Math.round(Math.abs(rent) * 100) / 100;
   let date = inv.fecha || today();
@@ -5436,7 +5436,7 @@ function renderLines() {
             <div class="meta">Rent. línea: <strong class="${rent >= 0 ? 'income' : 'expense'}">${money(rent)}</strong></div>
           </div>
           <div class="row-actions">
-            <button type="button" class="sm secondary" onclick="editLine(${i})">✏️</button>
+            <button type="button" class="sm secondary" onclick="editLine(${i})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="removeLine(${i})">✕</button>
           </div>
         </div>`;
@@ -6436,7 +6436,7 @@ function renderInvoices() {
             ${inv.tipo==='pendiente' ? `<button type="button" class="sm success" onclick="sendCxc(${inv.id})">📲 CxC</button>` : ''}
             ${inv.tipo==='cotizacion' ? `<button type="button" class="sm success" onclick="motivarCotiz(${inv.id})">💬 Motivar</button>` : ''}
             <button type="button" class="sm secondary" onclick="viewInvDetail(${inv.id})">👀</button>
-            ${inv.tipo !== 'cobrada' ? `<button type="button" class="sm secondary" onclick="editInv(${inv.id})">✏️</button>` : ''}
+            ${inv.tipo !== 'cobrada' ? `<button type="button" class="sm secondary" onclick="editInv(${inv.id})" class="warn">✏️</button>` : ''}
             <button type="button" class="sm" onclick="printInv(${inv.id})" title="PDF / carta">🖨️</button>
             <button type="button" class="sm secondary" onclick="printThermalInv(${inv.id})" title="Ticket térmico Phomemo">🧾</button>
             <button type="button" class="sm success" onclick="waInv(${inv.id})">📲</button>
@@ -9256,12 +9256,6 @@ function renderContTable() {
   tbody.innerHTML = rows.length
     ? rows.map(x => {
         const locked = !!(x.locked || x.source);
-        const empLab = contEmpLabel(x);
-        const empChip = empLab
-          ? ( /perfume/i.test(empLab)
-              ? ` <span class="chip" style="background:#3d2a12;color:var(--orange)">🧴 ${escapeHtml(empLab)}</span>`
-              : ` <span class="chip" style="background:#1a2a3d;color:var(--accent)">🧊 ${escapeHtml(empLab)}</span>` )
-          : '';
         let invId = null;
         if (locked) {
           if (x.sourceInvId != null) invId = +x.sourceInvId;
@@ -9275,13 +9269,13 @@ function renderContTable() {
               ? `<button type="button" class="sm secondary" onclick="event.stopPropagation();goToInvGuardadas(${invId})" title="Ver en Guardadas">🔒 Desde factura</button>`
               : `<span class="hint">🔒 Desde factura</span>`)
           : `<div class="row-actions">
-              <button type="button" class="sm secondary" onclick="editContEntry(${x.id})">✏️</button>
+              <button type="button" class="sm warn" onclick="editContEntry(${x.id})" class="warn">✏️</button>
               <button type="button" class="sm danger" onclick="removeContEntry(${x.id})">🗑️</button>
             </div>`;
         const rowClick = invId ? ` style="cursor:pointer" onclick="goToInvGuardadas(${invId})" title="Ver en Guardadas"` : '';
         return `<tr${rowClick}>
         <td>${fmtDate(x.date)}</td>
-        <td>${escapeHtml(x.concept)}${empChip}${locked && !empLab ? ' <span class="chip" style="background:#1a2a3d;color:var(--accent)">Fact/Proy</span>' : ''}</td>
+        <td>${escapeHtml(x.concept)}</td>
         <td class="${x.type === 'Ingreso' ? 'income' : 'expense'}">${x.type}</td>
         <td>${money(x.amount)}</td>
         <td onclick="event.stopPropagation()">${actions}</td>
@@ -9789,7 +9783,7 @@ function renderInsumos() {
             <button type="button" class="sm secondary" onclick="viewInsDetail(${i.id})" title="Ver detalles">👀</button>
             <button type="button" class="sm secondary" onclick="showInsQr(${i.id})" title="QR sticker">📷 QR</button>
             <button type="button" class="sm success" onclick="waInsObs(${i.id})" title="WhatsApp observaciones">📲</button>
-            <button type="button" class="sm secondary" onclick="editInsumo(${i.id})">✏️</button>
+            <button type="button" class="sm secondary" onclick="editInsumo(${i.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delInsumo(${i.id})">🗑️</button>
           </div>
         </div>`;
