@@ -795,6 +795,23 @@ details.overdue-box[open]{
 
 
 
+
+/* Enlaces estilo botón (WhatsApp en clientes/proveedores) */
+a.sm{
+  display:inline-flex;align-items:center;justify-content:center;
+  text-decoration:none;font-weight:650;cursor:pointer;
+  border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:5px 8px;font-size:11px;
+  box-shadow:0 2px 0 rgba(0,0,0,.35),0 3px 8px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.1);
+  transition:transform .1s ease,box-shadow .1s ease,filter .12s ease;
+}
+a.sm:hover{filter:brightness(1.08)}
+a.sm:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(0,0,0,.3),inset 0 2px 3px rgba(0,0,0,.25)}
+a.sm.success{background:linear-gradient(180deg,#2a5a42 0%,#1e4434 55%,#163528 100%);color:#9ddeb8;border-color:#2f5c45}
+a.sm.danger{background:linear-gradient(180deg,#5c3038 0%,#452228 55%,#3a1a20 100%);color:#f0a8b0;border-color:#6a383f}
+a.sm.warn{background:linear-gradient(180deg,#6a5a28 0%,#52441e 55%,#3d3316 100%);color:#f0e0a0;border-color:#7a6a38;
+  box-shadow:0 2px 0 #1a1608,0 3px 8px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.12)}
+a.sm.print{background:linear-gradient(180deg,#2e5a8a 0%,#234670 55%,#1a3558 100%);color:#b8d4f0;border-color:#3a6a9a}
+
 </style>
 </head>
 <body class="auth-locked">
@@ -4959,7 +4976,7 @@ function renderClients() {
           ${c.obs ? `<div class="line" style="white-space:pre-wrap">📝 ${escapeHtml(c.obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
             <button type="button" class="sm warn" onclick="viewCliDetail(${c.id})" title="Ver detalles">👀</button>
-            ${wa ? `<a class="sm success" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 10px;border-radius:8px;font-weight:650">📲</a>` : ''}
+            ${wa ? `<a class="sm warn" href="${wa}" target="_blank" rel="noopener" title="WhatsApp">📲</a>` : ''}
             <button type="button" class="sm warn" onclick="editCli(${c.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delCli(${c.id})">🗑️</button>
           </div>
@@ -5083,7 +5100,7 @@ function renderProveedores() {
           ${v.obs ? `<div class="line" style="white-space:pre-wrap">📝 ${escapeHtml(v.obs)}</div>` : ''}
           <div class="row-actions" style="margin-top:8px;justify-content:flex-start;flex-wrap:wrap">
             <button type="button" class="sm warn" onclick="viewProvDetail(${v.id})" title="Ver detalles">👀</button>
-            ${wa ? `<a class="sm success" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 10px;border-radius:8px;font-weight:650">📲</a>` : ''}
+            ${wa ? `<a class="sm warn" href="${wa}" target="_blank" rel="noopener" title="WhatsApp">📲</a>` : ''}
             <button type="button" class="sm warn" onclick="editProv(${v.id})" class="warn">✏️</button>
             <button type="button" class="sm danger" onclick="delProv(${v.id})">🗑️</button>
           </div>
