@@ -813,26 +813,54 @@ a.sm.warn{background:linear-gradient(180deg,#6a5a28 0%,#52441e 55%,#3d3316 100%)
 a.sm.print{background:linear-gradient(180deg,#2e5a8a 0%,#234670 55%,#1a3558 100%);color:#b8d4f0;border-color:#3a6a9a}
 
 
-/* Temas por empresa (acentos tenues, no pisan botones success/danger/warn/print) */
+/* Temas por empresa: color de MÓDULOS (marcos), no del texto */
+:root{
+  --emp:#4da3ff;
+  --emp-soft:rgba(77,163,255,.12);
+  --emp-border:rgba(77,163,255,.28);
+}
 body.emp-atcb{
-  --accent:#4da3ff;
+  --emp:#4da3ff;
+  --emp-soft:rgba(77,163,255,.10);
+  --emp-border:rgba(77,163,255,.30);
   --hdr:#1a3a5c;
-  --accent-soft:rgba(77,163,255,.18);
 }
 body.emp-perfumes{
-  /* Oro rosado suave · legible en oscuro · distinto del ámbar de botones warn */
-  --accent:#c9a574;
-  --hdr:#2a1e28;
-  --accent-soft:rgba(201,165,116,.18);
+  --emp:#c9a574;
+  --emp-soft:rgba(201,165,116,.10);
+  --emp-border:rgba(201,165,116,.32);
+  --hdr:#241c22;
+}
+/* Texto y totales siguen legibles (no se pintan de dorado) */
+body.emp-atcb, body.emp-perfumes{
+  --accent:#4da3ff;
+  --text:#edf3f8;
+  --muted:#91a0af;
+}
+header{
+  border-bottom:2px solid var(--emp-border) !important;
+  box-shadow:0 4px 18px var(--emp-soft);
+}
+.card, .collapse, .edit-panel, .list-card, .modal-box, .detail-modal-box{
+  border-color:var(--emp-border) !important;
+}
+.collapse > summary{
+  border-left:3px solid var(--emp);
+}
+nav button.active{
+  color:var(--emp) !important;
+}
+#appTitle{
+  color:var(--text) !important;
 }
 #appTitle.catalog-link{
   cursor:pointer;
   text-decoration:none;
   border-bottom:1px dashed transparent;
-  transition:border-color .15s, color .15s, opacity .15s;
+  transition:border-color .15s, opacity .15s;
 }
 #appTitle.catalog-link:hover{
-  border-bottom-color:var(--accent);
+  border-bottom-color:var(--emp);
   opacity:.92;
 }
 #appTitle.catalog-link:active{opacity:.8}
