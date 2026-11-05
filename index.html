@@ -812,6 +812,31 @@ a.sm.warn{background:linear-gradient(180deg,#6a5a28 0%,#52441e 55%,#3d3316 100%)
   box-shadow:0 2px 0 #1a1608,0 3px 8px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.12)}
 a.sm.print{background:linear-gradient(180deg,#2e5a8a 0%,#234670 55%,#1a3558 100%);color:#b8d4f0;border-color:#3a6a9a}
 
+
+/* Temas por empresa (acentos tenues, no pisan botones success/danger/warn/print) */
+body.emp-atcb{
+  --accent:#4da3ff;
+  --hdr:#1a3a5c;
+  --accent-soft:rgba(77,163,255,.18);
+}
+body.emp-perfumes{
+  /* Oro rosado suave · legible en oscuro · distinto del ámbar de botones warn */
+  --accent:#c9a574;
+  --hdr:#2a1e28;
+  --accent-soft:rgba(201,165,116,.18);
+}
+#appTitle.catalog-link{
+  cursor:pointer;
+  text-decoration:none;
+  border-bottom:1px dashed transparent;
+  transition:border-color .15s, color .15s, opacity .15s;
+}
+#appTitle.catalog-link:hover{
+  border-bottom-color:var(--accent);
+  opacity:.92;
+}
+#appTitle.catalog-link:active{opacity:.8}
+
 </style>
 </head>
 <body class="auth-locked">
@@ -1747,6 +1772,9 @@ a.sm.print{background:linear-gradient(180deg,#2e5a8a 0%,#234670 55%,#1a3558 100%
           <input id="setEmail" placeholder="Ej. correo@empresa.com" type="email"></div>
         <div class="form-row"><label class="label">Dirección empresa · pie de PDF</label>
           <input id="setDir" placeholder="Ej. Ibague, Tolima, Colombia"></div>
+        <div class="form-row"><label class="label">Link del catálogo (toque en el nombre del encabezado)</label>
+          <input id="setCatalogUrl" type="url" placeholder="https://atcboficial.github.io/…"></div>
+        <p class="hint" style="margin:0 0 8px">Al tocar el nombre de la empresa en el encabezado se abre este link (catálogo público).</p>
         <div class="form-row">
           <label class="label">Datos bancarios de cobro · pie de PDF (factura y proyecto) + mensajes CxC / WhatsApp</label>
           <p class="hint" style="margin:0 0 6px">Se muestra al pie del PDF en 3 tarjetas (Bancolombia, Nequi, Daviplata, etc.). También en recordatorios de cobro. Edita el texto; sepera cada banco con un recuadro como el de ejemplo.</p>
@@ -2470,7 +2498,7 @@ const DEFAULT_PROY_DESC = {
 };
 function defaultEmpresaAtcb() {
   return {
-    id: EMPRESA_ATCB, label: 'AtcbOficial', tagline: 'Refrigeración Comercial Industrial',
+    id: EMPRESA_ATCB, label: 'AtcbOficial', tagline: 'Refrigeración Comercial Industrial', catalogUrl: 'https://atcboficial.github.io/AtcbOficial.Catalogo/',
     name: 'LUIS J. BONILLA P.', nit: '700326444-6', tel: '3134399033', social: '@AtcbOficial',
     note: 'Artículo 437 del Estatuto Tributario, Persona Natural / No responsable de IVA',
     email: 'bonilla.luis.pj@gmail.com', dir: 'Ibague, Tolima, Colombia',
@@ -2502,7 +2530,7 @@ function defaultEmpresaAtcb() {
 }
 function defaultEmpresaPerfumes() {
   return {
-    id: EMPRESA_PERFUMES, label: 'Perfumes L&R', tagline: 'Fabricantes de lociones personales',
+    id: EMPRESA_PERFUMES, label: 'Perfumes L&R', tagline: 'Fabricantes de lociones personales', catalogUrl: 'https://atcboficial.github.io/PerfumesLyR.Co/',
     name: 'PERFUMES L&R', nit: '', tel: '', social: '',
     note: 'Persona Natural / No responsable de IVA',
     email: '', dir: 'Ibague, Tolima, Colombia',
@@ -2532,7 +2560,7 @@ function empCfg(empId) {
   let e = (settings.empresas && settings.empresas[id]) || null;
   if (!e) e = (settings.empresas && settings.empresas.atcb) || defaultEmpresaAtcb();
   const base = (id === 'perfumes' || id === EMPRESA_PERFUMES) ? defaultEmpresaPerfumes() : defaultEmpresaAtcb();
-  ['thermalNota','thermalFontScale','thermalSizeCod','thermalSizeBody','thermalSizeTotal','pdfNota','pdfFontSize','label','tagline'].forEach(function (k) {
+  ['thermalNota','thermalFontScale','thermalSizeCod','thermalSizeBody','thermalSizeTotal','pdfNota','pdfFontSize','label','tagline','catalogUrl'].forEach(function (k) {
     if (e[k] == null || e[k] === '') e[k] = base[k];
   });
   return e;
@@ -2544,10 +2572,46 @@ function syncFlatSettingsFromEmp() {
    'thermalNota','thermalFontScale','thermalSizeCod','thermalSizeBody','thermalSizeTotal','pdfNota','pdfFontSize'
   ].forEach(k => { settings[k] = e[k]; });
 }
+
+function openEmpresaCatalog() {
+  const e = empCfg();
+  const url = (e.catalogUrl || '').trim();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    toast('Sin link de catálogo · configúralo en Archivo → Datos de mi empresa');
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
+}
+(function(){
+  const t = document.getElementById('appTitle');
+  if (!t) return;
+  t.addEventListener('click', function(){
+    if (!t.classList.contains('catalog-link')) return;
+    openEmpresaCatalog();
+  });
+})();
+
 function applyEmpresaUI() {
   const e = empCfg();
+  // Color de tema según empresa
+  try {
+    document.body.classList.remove('emp-atcb', 'emp-perfumes');
+    document.body.classList.add(activeEmpresa === EMPRESA_PERFUMES ? 'emp-perfumes' : 'emp-atcb');
+  } catch (err) {}
   const title = document.getElementById('appTitle');
-  if (title) title.textContent = (activeEmpresa === EMPRESA_PERFUMES ? '🧴 ' : '🧊 ') + (e.label || e.name || 'Empresa');
+  if (title) {
+    title.textContent = (activeEmpresa === EMPRESA_PERFUMES ? '🧴 ' : '🧊 ') + (e.label || e.name || 'Empresa');
+    const url = (e.catalogUrl || '').trim();
+    if (url && /^https?:\/\//i.test(url)) {
+      title.classList.add('catalog-link');
+      title.title = 'Abrir catálogo';
+      title.setAttribute('role', 'link');
+    } else {
+      title.classList.remove('catalog-link');
+      title.removeAttribute('title');
+      title.removeAttribute('role');
+    }
+  }
   const sub = document.getElementById('headerSub');
   if (sub) sub.textContent = e.tagline || '';
   const sel = document.getElementById('empresaSelect');
@@ -2871,6 +2935,8 @@ function syncSettingsUI() {
   const sl = document.getElementById('setLabel');
   if (sl) sl.value = e.label || '';
   setName.value = e.name || '';
+  const scu = document.getElementById('setCatalogUrl');
+  if (scu) scu.value = e.catalogUrl || '';
   setNit.value = e.nit || '';
   setTel.value = e.tel || '';
   setSocial.value = e.social || '';
@@ -8085,6 +8151,8 @@ btnSaveCompany.onclick = async () => {
     if (lab) e.label = lab;
   }
   e.name = setName.value.trim() || e.name;
+  const scu = document.getElementById('setCatalogUrl');
+  if (scu) e.catalogUrl = (scu.value || '').trim();
   e.nit = setNit.value.trim() || e.nit;
   e.tel = setTel.value.trim() || e.tel;
   e.social = setSocial.value.trim() || e.social;
