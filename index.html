@@ -2326,29 +2326,51 @@ async function logSessionAccess(user) {
 }
 async function signInWithGoogle() {
   setAuthError('');
+  const btn = document.getElementById('btnGoogleLogin');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Conectando…'; }
   if (!fbAuth) {
     setAuthError('Firebase no inicializado. Revisa conexión y SDK.');
+    if (btn) { btn.disabled = false; btn.textContent = '🔐 Continuar con Google'; }
     return;
   }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    const cred = await fbAuth.signInWithPopup(provider);
-    const user = cred.user;
-    if (FIREBASE_ALLOWED_EMAILS.length) {
+    let cred = null;
+    if (isMobile) {
+      // En móvil popup suele fallar → redirect
+      await fbAuth.signInWithRedirect(provider);
+      return; // la página volverá y onAuthStateChanged completará
+    }
+    try {
+      cred = await fbAuth.signInWithPopup(provider);
+    } catch (popErr) {
+      console.warn('popup fail, trying redirect', popErr);
+      if (popErr && (popErr.code === 'auth/popup-blocked' || popErr.code === 'auth/popup-closed-by-user' || isMobile)) {
+        await fbAuth.signInWithRedirect(provider);
+        return;
+      }
+      throw popErr;
+    }
+    const user = cred && cred.user;
+    if (user && FIREBASE_ALLOWED_EMAILS.length) {
       const ok = FIREBASE_ALLOWED_EMAILS.map(x => x.toLowerCase()).includes((user.email || '').toLowerCase());
       if (!ok) {
         await fbAuth.signOut();
         setAuthError('Cuenta no autorizada: ' + (user.email || ''));
-        return;
       }
     }
   } catch (e) {
     console.error(e);
     let msg = e.message || String(e);
-    if (e.code === 'auth/popup-blocked') msg = 'El navegador bloqueó la ventana de Google. Permite popups.';
-    if (e.code === 'auth/unauthorized-domain') msg = 'Dominio no autorizado en Firebase Auth (agrega tu dominio de GitHub Pages).';
+    if (e.code === 'auth/popup-blocked') msg = 'Ventana bloqueada. Reintentando…';
+    if (e.code === 'auth/unauthorized-domain') msg = 'Dominio no autorizado en Firebase Auth (agrega atcboficial.github.io).';
+    if (e.code === 'auth/operation-not-allowed') msg = 'Google Sign-In no habilitado en Firebase Console.';
+    if (e.code === 'auth/network-request-failed') msg = 'Sin conexión. Revisa datos/Wi‑Fi.';
     setAuthError(msg);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔐 Continuar con Google'; }
   }
 }
 async function signOutFirebase() {
@@ -2492,6 +2514,13 @@ function startFirebaseAuth() {
     return;
   }
   bindFirebaseUI();
+  // Completar login por redirect (móvil)
+  fbAuth.getRedirectResult().then(function(result){
+    if (result && result.user) console.log('[auth] redirect ok', result.user.email);
+  }).catch(function(e){
+    console.error('[auth] redirect', e);
+    setAuthError((e && e.message) || 'Error al volver de Google');
+  });
   fbAuth.onAuthStateChanged(async (user) => {
     if (user && FIREBASE_ALLOWED_EMAILS.length) {
       const ok = FIREBASE_ALLOWED_EMAILS.map(x => x.toLowerCase()).includes((user.email || '').toLowerCase());
@@ -2714,13 +2743,13 @@ function syncFlatSettingsFromEmp() {
 
 
 (function bindThemeColorInputs(){
-  const stc = document.getElementById('setThemeColor');
-  const stch = document.getElementById('setThemeColorHex');
-  if (!stc || !stch) return;
-  stc.addEventListener('input', function(){ stch.value = stc.value; });
-  stch.addEventListener('change', function(){
-    let v = (stch.value || '').trim();
-    if (/^#([0-9a-fA-F]{6})$/.test(v)) stc.value = v;
+  const elColor = document.getElementById('setThemeColor');
+  const elHex = document.getElementById('setThemeColorHex');
+  if (!elColor || !elHex) return;
+  elColor.addEventListener('input', function(){ elHex.value = elColor.value; });
+  elHex.addEventListener('change', function(){
+    let v = (elHex.value || '').trim();
+    if (/^#([0-9a-fA-F]{6})$/.test(v)) elColor.value = v;
   });
 })();
 
@@ -3102,11 +3131,11 @@ function syncSettingsUI() {
   setName.value = e.name || '';
   const scu = document.getElementById('setCatalogUrl');
   if (scu) scu.value = e.catalogUrl || '';
-  const stc = document.getElementById('setThemeColor');
-  const stch = document.getElementById('setThemeColorHex');
-  const col = (e.themeColor || (activeEmpresa === EMPRESA_PERFUMES ? '#c9a574' : '#4da3ff'));
-  if (stc) stc.value = col;
-  if (stch) stch.value = col;
+  const elThemeColor = document.getElementById('setThemeColor');
+  const elThemeHex = document.getElementById('setThemeColorHex');
+  const themeCol = (e.themeColor || (activeEmpresa === EMPRESA_PERFUMES ? '#c9a574' : '#4da3ff'));
+  if (elThemeColor) elThemeColor.value = themeCol;
+  if (elThemeHex) elThemeHex.value = themeCol;
   setNit.value = e.nit || '';
   setTel.value = e.tel || '';
   setSocial.value = e.social || '';
@@ -5038,12 +5067,6 @@ function flashCard(sel) {
     try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
     setTimeout(function () { try { el.classList.remove('flash-hl'); } catch (e) {} }, 15000);
   } catch (e) {}
-});
-  }
-  card.classList.remove('flash-hl');
-  void card.offsetWidth;
-  card.classList.add('flash-hl');
-  setTimeout(function () { card.classList.remove('flash-hl'); }, 15000);
 }
 function goToProdStock(id) {
   const p = (products || []).find(function (x) { return +x.id === +id; });
@@ -8327,11 +8350,11 @@ btnSaveCompany.onclick = async () => {
   e.name = setName.value.trim() || e.name;
   const scu = document.getElementById('setCatalogUrl');
   if (scu) e.catalogUrl = (scu.value || '').trim();
-  const stc = document.getElementById('setThemeColor');
-  const stch = document.getElementById('setThemeColorHex');
-  let col = (stch && stch.value.trim()) || (stc && stc.value) || e.themeColor || '#4da3ff';
-  if (!/^#([0-9a-fA-F]{6})$/.test(col)) col = (stc && stc.value) || '#4da3ff';
-  e.themeColor = col;
+  const elThemeColor2 = document.getElementById('setThemeColor');
+  const elThemeHex2 = document.getElementById('setThemeColorHex');
+  let themeColSave = (elThemeHex2 && elThemeHex2.value.trim()) || (elThemeColor2 && elThemeColor2.value) || e.themeColor || '#4da3ff';
+  if (!/^#([0-9a-fA-F]{6})$/.test(themeColSave)) themeColSave = (elThemeColor2 && elThemeColor2.value) || '#4da3ff';
+  e.themeColor = themeColSave;
   e.nit = setNit.value.trim() || e.nit;
   e.tel = setTel.value.trim() || e.tel;
   e.social = setSocial.value.trim() || e.social;
