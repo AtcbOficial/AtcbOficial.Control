@@ -1845,7 +1845,7 @@ header #empresaSelect{
         <button id="btnSaveAs" class="success">Guardar como…</button>
       </div>
       <div class="card" style="margin:12px 0 0;padding:12px;border-color:var(--accent)">
-        <div class="section-title" style="font-size:13px;margin:0 0 6px">☁️ Firebase (nube)</div>
+        <div class="section-title" style="font-size:13px;margin:0 0 6px">☁️ Firebase (nube) y sus herramientas</div>
         <p class="hint" id="fbStatus" style="margin:0 0 8px">Sin sesión</p>
         <p class="hint" id="authUserLabel" style="margin:0 0 8px;color:var(--text);font-weight:600"></p>
         <div class="actions" style="margin-top:6px">
@@ -1859,7 +1859,7 @@ header #empresaSelect{
         <div class="actions" style="margin-top:6px">
           <button type="button" id="btnLogout" class="danger" style="display:none">⎋ Cerrar sesión</button>
         </div>
-        <p class="hint" style="margin-top:8px">Sube tu JSON una vez. Luego usa Guardar/Cargar nube en cada dispositivo.</p>
+        <p class="hint" style="margin-top:8px"><strong>El JSON / nube incluye TODO el ecosistema de control:</strong> empresas y ajustes, productos/stock, clientes, proveedores, facturas y proyectos, insumos, contabilidad (movimientos, cajas, años archivados) y contadores. Las fotos embebidas base64 no se guardan (solo links https .png/.jpg). Sube el JSON una vez; luego usa Guardar/Cargar en cada dispositivo.</p>
       </div>
       <div class="actions" style="margin-top:8px">
         <button type="button" id="btnRepairJson" class="print">🔧 Reparar JSON dañado</button>
@@ -2553,7 +2553,7 @@ function startFirebaseAuth() {
    ============================================================ */
 const supportsFS = 'showOpenFilePicker' in window && 'showSaveFilePicker' in window;
 
-/* Banner PDF por defecto (BANNER 2.jpg embebido) */
+/* Banner PDF por defecto (BANNER.png embebido) */
 const DEFAULT_PDF_BANNER = ''; // sin base64: usar link público en Archivo → Encabezado PDF
 
 const DEFAULT_BANKS = `┌─────────────────┐
@@ -3223,8 +3223,8 @@ function updateCloudBanner(msgHtml) {
 function payload() {
   syncFlatSettingsFromEmp();
   return {
-    app: 'AtcbMulti',
-    version: 3,
+    app: 'LuisJoseBonilla-Empresas',
+    version: 4,
     storage: 'archivo-json',
     exportedAt: new Date().toISOString(),
     activeEmpresa,
