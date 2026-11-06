@@ -91,7 +91,7 @@ h1{font-size:14px;margin:0;font-weight:750;line-height:1.15;white-space:nowrap;o
 .auth-card h2{margin:0 0 6px;font-size:20px}
 .auth-card .auth-sub{color:var(--muted);font-size:13px;margin:0 0 20px;line-height:1.4}
 .auth-card button{width:100%;margin-top:8px}
-.auth-err{color:var(--red);font-size:12px;margin-top:12px;min-height:1.2em}
+.auth-err{color:#ff8a95;font-size:13px;margin-top:12px;min-height:1.2em;line-height:1.35;padding:0 6px}
 .auth-user{font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.auth-locked header,body.auth-locked main,body.auth-locked nav{visibility:hidden;pointer-events:none}
 
@@ -2333,41 +2333,61 @@ async function signInWithGoogle() {
     if (btn) { btn.disabled = false; btn.textContent = '🔐 Continuar con Google'; }
     return;
   }
-  const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
   try {
-    let cred = null;
-    if (isMobile) {
-      // En móvil popup suele fallar → redirect
-      await fbAuth.signInWithRedirect(provider);
-      return; // la página volverá y onAuthStateChanged completará
-    }
+    // Persistencia local: necesaria en Android / PWA
     try {
-      cred = await fbAuth.signInWithPopup(provider);
-    } catch (popErr) {
-      console.warn('popup fail, trying redirect', popErr);
-      if (popErr && (popErr.code === 'auth/popup-blocked' || popErr.code === 'auth/popup-closed-by-user' || isMobile)) {
-        await fbAuth.signInWithRedirect(provider);
+      await fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    } catch (pe) { console.warn('persistence', pe); }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+    const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      || window.navigator.standalone === true;
+
+    // 1) Intentar popup (PC y muchos Android)
+    try {
+      const cred = await fbAuth.signInWithPopup(provider);
+      if (cred && cred.user) {
+        fbUser = cred.user;
+        updateAuthUI();
         return;
       }
-      throw popErr;
-    }
-    const user = cred && cred.user;
-    if (user && FIREBASE_ALLOWED_EMAILS.length) {
-      const ok = FIREBASE_ALLOWED_EMAILS.map(x => x.toLowerCase()).includes((user.email || '').toLowerCase());
-      if (!ok) {
-        await fbAuth.signOut();
-        setAuthError('Cuenta no autorizada: ' + (user.email || ''));
+    } catch (popErr) {
+      console.warn('popup', popErr && popErr.code, popErr);
+      // Si el usuario cerró el popup, no forzar redirect
+      if (popErr && popErr.code === 'auth/popup-closed-by-user') {
+        setAuthError('Inicio cancelado. Vuelve a tocar Continuar con Google.');
+        return;
+      }
+      // Continuar a redirect si popup bloqueado / no soportado / móvil
+      if (!(popErr && (
+        popErr.code === 'auth/popup-blocked' ||
+        popErr.code === 'auth/operation-not-supported-in-this-environment' ||
+        popErr.code === 'auth/cancelled-popup-request' ||
+        isMobile || isStandalone
+      ))) {
+        throw popErr;
       }
     }
+
+    // 2) Redirect (móvil / PWA / popup bloqueado)
+    setAuthError('Redirigiendo a Google… vuelve sola la app.');
+    sessionStorage.setItem('fb_auth_redirect', '1');
+    await fbAuth.signInWithRedirect(provider);
   } catch (e) {
     console.error(e);
-    let msg = e.message || String(e);
-    if (e.code === 'auth/popup-blocked') msg = 'Ventana bloqueada. Reintentando…';
-    if (e.code === 'auth/unauthorized-domain') msg = 'Dominio no autorizado en Firebase Auth (agrega atcboficial.github.io).';
-    if (e.code === 'auth/operation-not-allowed') msg = 'Google Sign-In no habilitado en Firebase Console.';
-    if (e.code === 'auth/network-request-failed') msg = 'Sin conexión. Revisa datos/Wi‑Fi.';
+    let msg = (e && e.message) || String(e);
+    if (e && e.code === 'auth/unauthorized-domain') {
+      msg = 'Dominio no autorizado en Firebase. En Authentication → Settings → Authorized domains agrega: atcboficial.github.io';
+    } else if (e && e.code === 'auth/operation-not-allowed') {
+      msg = 'Google Sign-In no está habilitado en Firebase Authentication.';
+    } else if (e && e.code === 'auth/network-request-failed') {
+      msg = 'Sin conexión. Revisa datos/Wi‑Fi.';
+    } else if (e && e.code === 'auth/internal-error') {
+      msg = 'Error interno de Auth. Revisa que Google esté activo y el dominio autorizado.';
+    }
     setAuthError(msg);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🔐 Continuar con Google'; }
@@ -2514,13 +2534,36 @@ function startFirebaseAuth() {
     return;
   }
   bindFirebaseUI();
-  // Completar login por redirect (móvil)
-  fbAuth.getRedirectResult().then(function(result){
-    if (result && result.user) console.log('[auth] redirect ok', result.user.email);
-  }).catch(function(e){
+  try {
+    fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+  } catch (e) {}
+
+  // Mostrar estado mientras vuelve el redirect de Google (Android)
+  if (sessionStorage.getItem('fb_auth_redirect') === '1') {
+    setAuthError('Completando inicio de sesión con Google…');
+    const btn = document.getElementById('btnGoogleLogin');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Entrando…'; }
+  }
+
+  fbAuth.getRedirectResult().then(function(result) {
+    sessionStorage.removeItem('fb_auth_redirect');
+    if (result && result.user) {
+      fbUser = result.user;
+      updateAuthUI();
+      console.log('[auth] redirect ok', result.user.email);
+    }
+  }).catch(function(e) {
+    sessionStorage.removeItem('fb_auth_redirect');
     console.error('[auth] redirect', e);
-    setAuthError((e && e.message) || 'Error al volver de Google');
+    let msg = (e && e.message) || 'Error al volver de Google';
+    if (e && e.code === 'auth/unauthorized-domain') {
+      msg = 'Dominio no autorizado. En Firebase → Authentication → Authorized domains agrega: atcboficial.github.io';
+    }
+    setAuthError(msg);
+    const btn = document.getElementById('btnGoogleLogin');
+    if (btn) { btn.disabled = false; btn.textContent = '🔐 Continuar con Google'; }
   });
+
   fbAuth.onAuthStateChanged(async (user) => {
     if (user && FIREBASE_ALLOWED_EMAILS.length) {
       const ok = FIREBASE_ALLOWED_EMAILS.map(x => x.toLowerCase()).includes((user.email || '').toLowerCase());
@@ -2535,9 +2578,14 @@ function startFirebaseAuth() {
     const prev = fbUser;
     fbUser = user;
     updateAuthUI();
+    if (user) {
+      sessionStorage.removeItem('fb_auth_redirect');
+      setAuthError('');
+      const btn = document.getElementById('btnGoogleLogin');
+      if (btn) { btn.disabled = false; btn.textContent = '🔐 Continuar con Google'; }
+    }
     if (user && (!prev || prev.uid !== user.uid)) {
       await logSessionAccess(user);
-      // Intentar cargar nube al entrar (si no hay datos locales abiertos)
       try {
         const hasLocal = !!(fileHandle || products.length || invoices.length || clients.length);
         if (!hasLocal) await loadFromFirebase(true);
