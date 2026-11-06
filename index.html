@@ -858,18 +858,15 @@ body.emp-atcb, body.emp-perfumes{
 }
 @keyframes flashHl{
   0%,100%{
-    box-shadow:0 0 0 2px var(--emp), 0 0 0 6px var(--emp-soft), 0 0 28px var(--emp-glow), 0 4px 0 rgba(0,0,0,.35)!important;
-    border-color:var(--emp)!important;
-    background:linear-gradient(180deg,rgba(77,163,255,.18) 0%,#18222e 100%)!important;
+    box-shadow:0 0 0 2px #2ecc71, 0 0 0 7px rgba(46,204,113,.4), 0 0 28px rgba(46,204,113,.45), 0 4px 0 rgba(0,0,0,.35)!important;
+    border-color:#2ecc71!important;
+    background:linear-gradient(180deg,rgba(46,204,113,.25) 0%,#18222e 100%)!important;
   }
   50%{
-    box-shadow:0 0 0 3px #fff, 0 0 0 8px var(--emp), 0 0 36px var(--emp-glow), 0 4px 0 rgba(0,0,0,.35)!important;
-    border-color:#fff!important;
-    background:linear-gradient(180deg,rgba(77,163,255,.28) 0%,#1a2a3d 100%)!important;
+    box-shadow:0 0 0 3px #e8fff0, 0 0 0 9px #2ecc71, 0 0 40px rgba(46,204,113,.6), 0 4px 0 rgba(0,0,0,.35)!important;
+    border-color:#b8f5d0!important;
+    background:linear-gradient(180deg,rgba(46,204,113,.38) 0%,#1a2e24 100%)!important;
   }
-}
-body.emp-perfumes .list-card.flash-hl{
-  background:linear-gradient(180deg,rgba(201,165,116,.22) 0%,#18222e 100%)!important;
 }
 header{
   border-bottom:2px solid var(--emp)!important;
@@ -941,11 +938,15 @@ details.overdue-box, summary.overdue-sec{
   border-color:rgba(255,92,108,.55)!important;
   box-shadow:0 0 14px rgba(255,92,108,.25)!important;
 }
-/* Guiño al guardar / ir: 15s visible */
-.list-card.flash-hl{
+/* Guiño verde 15s (gana sobre vencido rojo mientras dura) */
+.list-card.flash-hl,
+.list-card.overdue-row.flash-hl,
+.overdue-row.flash-hl{
   animation:flashHl 1.5s ease-in-out 10!important; /* ~15s */
-  border-color:var(--emp)!important;
-  z-index:2;
+  border-color:#2ecc71!important;
+  background:linear-gradient(180deg,rgba(46,204,113,.25) 0%,#18222e 100%)!important;
+  box-shadow:0 0 0 2px #2ecc71, 0 0 18px rgba(46,204,113,.5), 0 4px 0 rgba(0,0,0,.35)!important;
+  z-index:5;
   position:relative;
 }
 nav button.active{
@@ -1076,7 +1077,7 @@ header #empresaSelect{
     <details class="collapse" id="homeRegCaja">
       <summary>➕ Registro y caja</summary>
       <div class="body">
-        <p class="hint" style="margin:0 0 10px">Estado actual de cajas. Para registrar movimientos ve a la pestaña <strong>Contab.</strong></p>
+        
         <div class="cont-grid" style="margin-bottom:10px">
           <div class="card" style="margin:0;padding:10px"><div class="label">Electrónica</div><div id="homeCajaElec" class="stat" style="font-size:15px">$ 0,00</div></div>
           <div class="card" style="margin:0;padding:10px"><div class="label">Física</div><div id="homeCajaFis" class="stat" style="font-size:15px">$ 0,00</div></div>
@@ -1095,7 +1096,7 @@ header #empresaSelect{
     <details class="collapse" id="homePend">
       <summary id="homePendTitle">⏳ Facturas y proyectos en ejecución (0: $ 0,00 / $ 0,00 / $ 0,00)</summary>
       <div class="body">
-        <p class="hint" style="margin-top:0;margin-bottom:8px">Más días arriba · +7 días resaltadas</p>
+        
         <div id="pendClients" class="empty">Ninguno</div>
       </div>
     </details>
@@ -1166,7 +1167,7 @@ header #empresaSelect{
           <div style="display:flex;gap:6px;align-items:flex-start">
             <div class="search-wrap" style="flex:1;min-width:0">
               <input id="fProdSearch" placeholder="Buscar / código · pega: código;cant" autocomplete="off">
-              <p class="hint" style="margin:4px 0 0">Pega: Atcb <code>1-0001;5</code> · Perfumes <code>2-0001;30;5</code> · o escanea QR</p>
+              
               <div id="prodDrop" class="dropdown"></div>
             </div>
             <button type="button" id="btnScanQr" class="success" title="Escanear QR del producto" style="flex-shrink:0;padding:8px 12px;white-space:nowrap">📷 QR</button>
@@ -1177,7 +1178,7 @@ header #empresaSelect{
           <input id="fCosto" type="number" min="0" step="1" placeholder="Costo unit." title="Precio de compra (interno)">
           <input id="fPrecio" type="number" min="0" step="1" placeholder="Venta unit." title="Precio de venta al cliente">
         </div>
-        <p class="hint" style="margin:0 0 8px">Costo = lo que te cuesta · Venta = lo que facturas. En PDF/WA solo venta.</p>
+        
         <button type="button" id="btnAddLine" class="success" style="width:100%">➕ Agregar línea</button>
         <div id="lineItems" style="margin-top:12px"></div>
       </div>
@@ -1426,7 +1427,7 @@ header #empresaSelect{
     <div class="card">
       <div class="section-hdr collapsible closed" id="togRes">Componentes comprados</div>
       <div class="collapse-body hidden" id="bodyRes">
-        <p class="hint" style="margin-bottom:6px">Agrega los componentes comprados. Formato pega: <code>1-0001;5</code> (código;cantidad).</p>
+        
         <div class="form-row">
           <div class="search-wrap" style="display:flex;gap:6px;align-items:stretch">
             <input id="pResSearch" placeholder="Buscar / código o pega: codigo;cantidad" autocomplete="off" style="flex:1">
