@@ -1038,7 +1038,7 @@ header #empresaSelect{
   <div class="auth-card">
     <h2>👨‍💼 Luis Jose Bonilla &amp; Empresas</h2>
     <p class="auth-sub">Control multi-empresa · 🧊 AtcbOficial · 🧴 Perfumes L&amp;R<br>Inicia sesión con Google (Firebase).</p>
-    <button type="button" id="btnGoogleLogin">🔐 Continuar con Google</button>
+    <button type="button" id="btnGoogleLogin" onclick="try{signInWithGoogle()}catch(e){var el=document.getElementById('authError');if(el)el.textContent=String(e&&e.message||e)}">🔐 Continuar con Google</button>
     <p class="auth-err" id="authError"></p>
     <p class="hint" style="margin-top:16px">Hosting público · datos solo en tu cuenta Firebase</p>
   </div>
@@ -2303,15 +2303,21 @@ function initFirebase() {
   try {
     if (typeof firebase === 'undefined') {
       console.warn('Firebase SDK no cargó');
+      setAuthError('SDK de Firebase no cargó. ¿Bloqueador de anuncios o sin internet?');
       return false;
     }
-    fbApp = firebase.initializeApp(firebaseConfig);
+    if (firebase.apps && firebase.apps.length) {
+      fbApp = firebase.app();
+    } else {
+      fbApp = firebase.initializeApp(firebaseConfig);
+    }
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
     fbReady = true;
     return true;
   } catch (e) {
     console.error('Firebase init', e);
+    setAuthError('Error Firebase: ' + (e && e.message ? e.message : e));
     return false;
   }
 }
@@ -2321,7 +2327,13 @@ function cloudDocRef() {
 }
 function setAuthError(msg) {
   const el = document.getElementById('authError');
-  if (el) el.textContent = msg || '';
+  if (el) {
+    el.textContent = msg || '';
+    el.style.display = msg ? 'block' : '';
+    el.style.color = '#ff8a95';
+    el.style.fontWeight = '600';
+  }
+  if (msg) console.warn('[auth]', msg);
 }
 function setFbStatus(msg) {
   const el = document.getElementById('fbStatus');
@@ -2590,18 +2602,30 @@ function bindFirebaseUI() {
   }
 }
 function startFirebaseAuth() {
+  // Enlazar botón SIEMPRE (aunque Firebase falle)
+  try { bindFirebaseUI(); } catch (e) { console.warn('bindFirebaseUI', e); }
+  try {
+    var bIn = document.getElementById('btnGoogleLogin');
+    if (bIn && !bIn._fbBound) {
+      bIn._fbBound = true;
+      bIn.addEventListener('click', function(ev) {
+        try { signInWithGoogle(); } catch (err) {
+          setAuthError(String(err && err.message || err));
+        }
+      });
+    }
+  } catch (e) {}
+
   if (!initFirebase()) {
-    setAuthError('No se pudo cargar Firebase. ¿Hay conexión?');
+    setAuthError('No se pudo cargar Firebase. Revisa conexión, bloqueadores o el SDK.');
     document.body.classList.add('auth-locked');
     updateAuthUI();
     return;
   }
-  bindFirebaseUI();
   try {
     fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
   } catch (e) {}
 
-  // Mostrar estado mientras vuelve el redirect de Google (Android)
   if (sessionStorage.getItem('fb_auth_redirect') === '1') {
     setAuthError('Completando inicio de sesión con Google…');
     const btn = document.getElementById('btnGoogleLogin');
