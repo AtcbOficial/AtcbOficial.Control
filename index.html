@@ -268,6 +268,7 @@ nav button.active{color:var(--accent)}
 .dropdown.open{display:block}
 .dropdown div{padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)}
 .dropdown div:hover,.dropdown div:active{background:var(--accent);color:#fff}
+.hdr-money{font-size:12px;font-weight:600;color:var(--accent);margin-left:8px}
 .section-title{font-size:14px;font-weight:700;margin:0 0 6px}
 .form-row{display:grid;gap:6px;margin-bottom:7px}
 .total-box{
@@ -337,7 +338,8 @@ nav button.active{color:var(--accent)}
   background:linear-gradient(180deg,#1e2a38 0%,#1a2430 80%,rgba(26,36,48,0));
   border-bottom:1px solid rgba(77,163,255,.28);
 }
-.edit-panel .section-title{margin-top:0}
+.edit-panel .hdr-money{font-size:12px;font-weight:600;color:var(--accent);margin-left:8px}
+.section-title{margin-top:0}
 .fact-top-row{
   position:sticky;top:2px;z-index:8;
   background:linear-gradient(180deg,var(--card2) 75%,rgba(24,34,46,0));
@@ -456,6 +458,7 @@ nav button.active{color:var(--accent)}
 .caja-inline-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;justify-content:space-between}
 .caja-inline-row .label{flex:1;margin:0;font-size:11px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .caja-inline-row input{flex:0 0 auto;width:140px;max-width:42%;text-align:right}
+.caja-days{display:inline-block;margin-left:6px;font-size:10px;font-weight:600;color:var(--accent);text-transform:none;letter-spacing:0}
 .caja-resumen{display:flex;gap:16px;justify-content:space-around;align-items:flex-start;flex-wrap:wrap;width:100%;padding:4px 4px 0}
 .caja-res-item{flex:1 1 140px;text-align:center;min-width:120px}
 .caja-res-item .label{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
@@ -783,7 +786,7 @@ details.overdue-box[open]{
 .caja-inline-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .caja-inline-row .label{flex:0 0 auto;min-width:140px;margin:0;white-space:nowrap;font-size:12px}
 .caja-inline-row input{flex:1;min-width:0;max-width:180px}
-.caja-resumen{display:flex;gap:12px;justify-content:center;align-items:stretch;flex-wrap:wrap;margin-top:12px;padding:12px 10px;border-top:1px solid var(--border);width:100%}
+.caja-resumen{display:flex;gap:8px;justify-content:center;align-items:stretch;flex-wrap:wrap;margin-top:0;padding:6px 4px 2px;border-top:1px solid var(--border);width:100%}
 .caja-res-item{flex:1 1 140px;text-align:center;min-width:120px}
 .caja-res-item .stat{font-size:15px}
 
@@ -971,6 +974,15 @@ header #empresaSelect{
 #appTitle.catalog-link:active{opacity:.8}
 
 
+
+
+.fx-list{display:flex;flex-direction:column;gap:6px}
+.fx-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:linear-gradient(180deg,#1a2430,#121922);border-radius:10px;border:1px solid var(--border)}
+.fx-emoji{font-size:18px}
+.fx-code{font-weight:700;min-width:42px}
+.fx-name{flex:1;color:var(--muted);font-size:13px}
+.fx-rate{font-weight:700;color:var(--accent)}
+.fx-edit-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
 </style>
 </head>
 <body class="auth-locked">
@@ -993,6 +1005,7 @@ header #empresaSelect{
 #appSplash .sp-dots{position:absolute;inset:0;overflow:hidden;pointer-events:none;opacity:.35}
 #appSplash .sp-dots span{position:absolute;width:6px;height:6px;border-radius:50%;background:#4da3ff;opacity:.5}
 @keyframes spIn{from{transform:scale(.86);opacity:0}to{transform:scale(1);opacity:1}}
+
 </style>
 <div id="appSplash" aria-hidden="true">
   <div class="sp-dots" id="spDots"></div>
@@ -1054,6 +1067,20 @@ header #empresaSelect{
 <main>
   <!-- INICIO -->
   <section id="home" class="view active">
+    
+    <!-- 0) Tasa de cambios -->
+    <details class="collapse" id="homeFxSec" open>
+      <summary>💱 Tasa de cambios</summary>
+      <div class="body">
+        <div id="homeFxList" class="fx-list"></div>
+        <div class="actions" style="margin-top:8px">
+          <button type="button" id="btnFxRefresh" class="success sm">🔄 Actualizar API</button>
+          <button type="button" id="btnFxGoArchivo" class="warn sm">✏️ Editar en Archivo</button>
+        </div>
+        <p class="hint" id="homeFxStatus" style="margin:6px 0 0"></p>
+      </div>
+    </details>
+
     <!-- 1) Análisis del año (resultado + gráfico, como en Contab.) -->
     <details class="collapse" id="homeChartSec">
       <summary>📊 Análisis del año</summary>
@@ -1456,7 +1483,7 @@ header #empresaSelect{
   <!-- GUARDADAS -->
   <section id="guardadas" class="view">
     <div class="card">
-      <div class="section-title">📋 Facturas guardadas</div>
+      <div class="section-title">📋 Facturas guardadas <span id="guardadasMoneyHint" class="hdr-money"></span></div>
       <div class="sticky-search">
         <div class="actions">
           <input id="factSearch" placeholder="Buscar cliente, nº, doc, tel...">
@@ -1530,6 +1557,7 @@ header #empresaSelect{
       <div class="section-title" style="margin:0 0 8px">📦 Stock de productos</div>
       <div class="sticky-search">
         <div class="actions">
+          <div class="section-title" style="margin:0 0 8px">📦 Stock de productos <span id="stockMoneyHint" class="hdr-money"></span></div>
           <input id="stockSearch" placeholder="Filtrar nombre o código...">
           <select id="stockSort" title="Ordenar">
             <option value="name">Nombre A–Z</option>
@@ -1599,7 +1627,8 @@ header #empresaSelect{
           </select>
         </div>
       </div>
-      <div id="insList"></div>
+      <div class="section-title" style="margin:0 0 8px">🔧 Insumos / implementos <span id="insumosMoneyHint" class="hdr-money"></span></div>
+    <div id="insList"></div>
     </div>
     <div class="bottom-spacer"></div>
   </section>
@@ -1747,15 +1776,15 @@ header #empresaSelect{
         <div class="cont-reg-cajas">
           <div class="section-title" style="font-size:13px;margin-bottom:8px">Cierre de cajas</div>
           <div class="caja-inline-row">
-            <label class="label">Caja electrónica (bancos)</label>
+            <label class="label">Caja electrónica (bancos) <span id="cajaElDays" class="caja-days"></span></label>
             <input id="cajaElectronica" type="text" inputmode="decimal" placeholder="0,00" data-money="1">
           </div>
           <div class="caja-inline-row">
-            <label class="label">Caja física (efectivo)</label>
+            <label class="label">Caja física (efectivo) <span id="cajaFiDays" class="caja-days"></span></label>
             <input id="cajaFisica" type="text" inputmode="decimal" placeholder="0,00" data-money="1">
           </div>
           <div class="caja-inline-row">
-            <label class="label">Acciones e inversiones</label>
+            <label class="label">Acciones e inversiones <span id="cajaInvDays" class="caja-days"></span></label>
             <input id="cajaInversiones" type="text" inputmode="decimal" placeholder="0,00" data-money="1">
           </div>
         </div>
@@ -1779,7 +1808,12 @@ header #empresaSelect{
           <div class="card" style="margin:0;padding:10px"><div class="label">Egresos</div><div id="contExpense" class="stat expense">$0</div><div id="contExpenseDetail" class="tot-detail"></div></div>
           <div class="card" style="margin:0;padding:10px"><div class="label">Resultado</div><div id="contBalance" class="stat balance">$0</div><div id="contBalanceDetail" class="tot-detail"></div></div>
         </div>
-        <div class="section-title" style="font-size:13px;margin-bottom:6px">Por mes</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <label class="label" style="margin:0">Por mes · año</label>
+          <select id="contYearSelect" style="flex:1;min-width:140px;max-width:220px;padding:6px 8px;font-size:12px">
+            <option value="current">Año en curso</option>
+          </select>
+        </div>
         <div id="contMonths" style="margin-bottom:14px"></div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
           <label class="label" style="margin:0">Gráfica</label>
@@ -2061,6 +2095,34 @@ header #empresaSelect{
     </details>
 
     <details class="collapse" id="archivoMantenimiento">
+      
+    <details class="collapse" id="fxArchivo">
+      <summary>💱 Tasa de cambios (monedas y API)</summary>
+      <div class="body">
+        <p class="hint">Crea monedas (USD, EUR…), tasa manual en COP y API de respaldo. Si la API falla se usan las tasas editadas.</p>
+        <div class="form-row"><label class="label">URL API (JSON con rates)</label>
+          <input id="fxApiUrl" type="url" placeholder="https://api.frankfurter.app/latest?from=USD"></div>
+        <div class="form-row"><label class="label">Moneda base de la API</label>
+          <input id="fxApiBase" placeholder="USD" style="max-width:120px"></div>
+        <div class="actions" style="margin-bottom:10px">
+          <button type="button" id="btnFxApiSave" class="success">💾 Guardar API</button>
+          <button type="button" id="btnFxApiTest" class="print">🔄 Probar API</button>
+        </div>
+        <div id="fxEditList"></div>
+        <div class="card" style="margin-top:10px;padding:10px">
+          <div class="section-title" style="font-size:13px">➕ Nueva moneda</div>
+          <div class="form-row" style="display:flex;gap:6px;flex-wrap:wrap">
+            <input id="fxNewEmoji" placeholder="💵" style="width:52px">
+            <input id="fxNewCode" placeholder="USD" style="width:70px">
+            <input id="fxNewName" placeholder="Dólar" style="flex:1;min-width:100px">
+            <input id="fxNewRate" type="text" inputmode="decimal" placeholder="Tasa COP" data-money="1" style="width:110px">
+          </div>
+          <button type="button" id="btnFxAdd" class="success">➕ Agregar moneda</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="collapse">
       <summary>⚠️ Mantenimiento</summary>
       <div class="body">
         <p class="sub">Cierre de año y reset. Los cambios se escriben al guardar el JSON.</p>
@@ -3292,7 +3354,10 @@ function payload() {
       cajas: {
         electronica: +contCajas.electronica || 0,
         fisica: +contCajas.fisica || 0,
-        inversiones: +contCajas.inversiones || 0
+        inversiones: +contCajas.inversiones || 0,
+        lastElectronica: contCajas.lastElectronica || '',
+        lastFisica: contCajas.lastFisica || '',
+        lastInversiones: contCajas.lastInversiones || ''
       },
       movimientos: contMovimientos.map(x => {
         const row = {
@@ -3854,6 +3919,7 @@ function show(id) {
   if (id === 'proveedores') renderProveedores();
   if (id === 'guardadas') renderInvoices();
   if (id === 'home') {
+    try { renderHomeFx(); } catch (e) {}
     renderStats();
   }
   if (id === 'factura') {
@@ -3861,6 +3927,7 @@ function show(id) {
   }
   if (id === 'archivo') {
     syncSettingsUI();
+    try { renderFxArchivo(); } catch (e) {}
     try { renderArchivedYearsUI(); updateYearCloseBanner(); } catch (e) {}
   }
   if (id === 'contabilidad') {
@@ -4729,6 +4796,7 @@ function codeSortKey(c) {
   return { empty: 0, n: Number.isFinite(n) ? n : Infinity, t: s.toLowerCase() };
 }
 function renderProducts() {
+  try { updateStockMoneyHint(); } catch (e) {}
   const q = ((stockSearch && stockSearch.value) || '').toLowerCase();
   const sortMode = ((document.getElementById('stockSort') || {}).value) || 'name';
   const rows = products
@@ -6694,6 +6762,7 @@ document.getElementById('tipoModal').onclick = (e) => {
 
 /* ---------- GUARDADAS ---------- */
 function renderInvoices() {
+  try { updateGuardadasMoneyHint(); } catch (e) {}
   const q = (factSearch.value || '').toLowerCase();
   const f = factFilter.value;
   // Solo facturas de la empresa activa (igual que Stock)
@@ -9461,6 +9530,7 @@ function contCajasSum() {
   return (+contCajas.electronica || 0) + (+contCajas.fisica || 0) + (+contCajas.inversiones || 0);
 }
 function updateContCajasUI(resultadoTotal) {
+  try { updateCajaDaysUI(); } catch (e) {}
   // Cuadre: cajas vs resultado ACUMULADO de todos los movimientos (no solo el año)
   if (resultadoTotal == null) {
     resultadoTotal = contTotals(contMovimientos)[2];
@@ -9815,7 +9885,7 @@ function printArchivedYear(year) {
     '</td><td>' + escapeHtml(x.type || '') + '</td><td style="text-align:right">' + money(x.amount) + '</td></tr>'
   ).join('');
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>Resumen ' + y.year +
-    '</title><style>body{font-family:system-ui,sans-serif;padding:24px;color:#111} table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px} th,td{border-bottom:1px solid #ddd;padding:6px 4px;text-align:left} h1{font-size:18px} .m{margin:4px 0}</style></head><body class="auth-locked">' +
+    '</title><style>body{font-family:system-ui,sans-serif;padding:24px;color:#111} table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px} th,td{border-bottom:1px solid #ddd;padding:6px 4px;text-align:left} h1{font-size:18px} .m{margin:4px 0}</style></head><body>' +
     '<h1>Resumen contable ' + y.year + '</h1>' +
     '<p class="m">Ingresos: <strong>' + money(y.ingresos) + '</strong></p>' +
     '<p class="m">Egresos: <strong>' + money(y.egresos) + '</strong></p>' +
@@ -9846,13 +9916,24 @@ function printArchivedYear(year) {
 })();
 
 function refreshContabilidad() {
+  try { fillContYearSelect(); } catch (e) {}
+  const _movBackup = contMovimientos;
+  try {
+    if (typeof contViewYear !== 'undefined' && contViewYear && contViewYear !== 'current' && typeof getContMovimientosForView === 'function') {
+      contMovimientos = getContMovimientosForView();
+    }
+  } catch (e) {}
   try { updateYearCloseBanner(); } catch (e) {}
 
   if (typeof renderHomeContabilidad === 'function') renderHomeContabilidad();
-  const y = new Date().getFullYear();
-  const yearData = contMovimientos.filter(x => (x.date || '').startsWith(String(y)));
+  // Si vemos año archivado, totales del archivo; si no, año en curso
+  let yearData = contMovimientos;
+  if (!contViewYear || contViewYear === 'current') {
+    const y = new Date().getFullYear();
+    yearData = contMovimientos.filter(x => (x.date || '').startsWith(String(y)));
+  }
   const [i, e, b] = contTotals(yearData);
-  const allRes = contTotals(contMovimientos)[2];
+  const allRes = contTotals(contViewYear && contViewYear !== 'current' ? yearData : contMovimientos)[2];
   const elI = document.getElementById('contIncome');
   const elE = document.getElementById('contExpense');
   const elB = document.getElementById('contBalance');
@@ -9867,7 +9948,9 @@ function refreshContabilidad() {
   updateContCajasUI(allRes);
   renderContMonths();
   renderContTable();
+  try { contMovimientos = _movBackup; } catch (e) {}
 }
+
 function editContEntry(id) {
   const x = contMovimientos.find(a => a.id === id);
   if (!x) return;
@@ -10087,6 +10170,7 @@ function waInsObs(id) {
 }
 
 function renderInsumos() {
+  try { updateInsumosMoneyHint(); } catch (e) {}
   const q = ((document.getElementById('insSearch') || {}).value || '').toLowerCase();
   const cat = (document.getElementById('insFilterCat') || {}).value || '';
   let list = (insumos || []).slice();
@@ -10657,7 +10741,303 @@ async function cleanEmbeddedImagesAndSave() {
 try { bindProdImageInputs(); } catch (e) {}
 try {
   document.body.classList.add('auth-locked');
-  startFirebaseAuth();
+  
+/* ===== Contadores días última anotación de cajas ===== */
+function daysSinceIso(iso) {
+  if (!iso) return null;
+  try {
+    const t = new Date(iso + (iso.length <= 10 ? 'T12:00:00' : ''));
+    if (isNaN(t.getTime())) return null;
+    const now = new Date();
+    const a = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    const b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((b - a) / 86400000);
+  } catch (e) { return null; }
+}
+function formatCajaDays(iso) {
+  const d = daysSinceIso(iso);
+  if (d == null) return '· sin anotar';
+  if (d === 0) return '· hoy';
+  if (d === 1) return '· hace 1 día';
+  return '· hace ' + d + ' días';
+}
+function updateCajaDaysUI() {
+  const map = [
+    ['cajaElDays', contCajas.lastElectronica],
+    ['cajaFiDays', contCajas.lastFisica],
+    ['cajaInvDays', contCajas.lastInversiones]
+  ];
+  map.forEach(function (x) {
+    const el = document.getElementById(x[0]);
+    if (el) el.textContent = formatCajaDays(x[1]);
+  });
+}
+const _readContCajasFromInputsOrig = typeof readContCajasFromInputs === 'function' ? readContCajasFromInputs : null;
+function readContCajasFromInputs() {
+  const el = document.getElementById('cajaElectronica');
+  const fi = document.getElementById('cajaFisica');
+  const inv = document.getElementById('cajaInversiones');
+  const today = new Date().toISOString().slice(0, 10);
+  if (el) {
+    const v = parseMoney(el.value);
+    if (v !== (+contCajas.electronica || 0)) contCajas.lastElectronica = today;
+    contCajas.electronica = v;
+  }
+  if (fi) {
+    const v = parseMoney(fi.value);
+    if (v !== (+contCajas.fisica || 0)) contCajas.lastFisica = today;
+    contCajas.fisica = v;
+  }
+  if (inv) {
+    const v = parseMoney(inv.value);
+    if (v !== (+contCajas.inversiones || 0)) contCajas.lastInversiones = today;
+    contCajas.inversiones = v;
+  }
+  updateCajaDaysUI();
+}
+
+/* ===== Headers dinero: guardadas / stock / insumos ===== */
+function updateGuardadasMoneyHint() {
+  const el = document.getElementById('guardadasMoneyHint');
+  if (!el) return;
+  let porCobrar = 0, n = 0;
+  (invoices || []).forEach(function (inv) {
+    if ((inv.empresa || activeEmpresa) !== activeEmpresa && inv.empresa) return;
+    if (inv.tipo === 'cotizacion') return;
+    const s = (typeof saldoPendiente === 'function') ? saldoPendiente(inv) : Math.max(0, (+inv.total || 0) - (typeof totalAbonado === 'function' ? totalAbonado(inv) : 0));
+    if (s > 0.009) { porCobrar += s; n++; }
+  });
+  el.textContent = n ? ('· por cobrar ' + money(porCobrar) + ' (' + n + ')') : '· al día';
+}
+function updateStockMoneyHint() {
+  const el = document.getElementById('stockMoneyHint');
+  if (!el) return;
+  let inv = 0, n = 0;
+  (products || []).forEach(function (p) {
+    if ((p.empresa || activeEmpresa) !== activeEmpresa) return;
+    const st = +p.stock || 0;
+    if (st <= 0) return;
+    const costo = +p.compra || +p.costo || 0;
+    inv += costo * st;
+    n++;
+  });
+  el.textContent = '· invertido ' + money(inv) + (n ? ' (' + n + ' ítems)' : '');
+}
+function updateInsumosMoneyHint() {
+  const el = document.getElementById('insumosMoneyHint');
+  if (!el) return;
+  let inv = 0, n = 0;
+  (insumos || []).forEach(function (p) {
+    const st = +p.stock || +p.cant || 0;
+    const costo = +p.compra || +p.costo || +p.precio || 0;
+    if (st <= 0 && !costo) return;
+    inv += costo * (st || 0);
+    if (st > 0) n++;
+  });
+  el.textContent = '· invertido ' + money(inv) + (n ? ' (' + n + ' ítems)' : '');
+}
+
+/* ===== Año contable (actual o archivado) ===== */
+let contViewYear = 'current';
+function getContMovimientosForView() {
+  if (!contViewYear || contViewYear === 'current') return contMovimientos || [];
+  const y = (archivedYears || []).find(function (a) { return String(a.year) === String(contViewYear); });
+  return y ? (y.movimientos || []) : (contMovimientos || []);
+}
+function fillContYearSelect() {
+  const sel = document.getElementById('contYearSelect');
+  if (!sel) return;
+  const cur = contViewYear || 'current';
+  let html = '<option value="current">Año en curso</option>';
+  (archivedYears || []).slice().sort(function (a, b) { return (+b.year) - (+a.year); }).forEach(function (y) {
+    html += '<option value="' + y.year + '">Archivado ' + y.year + '</option>';
+  });
+  sel.innerHTML = html;
+  sel.value = cur;
+  if (sel.value !== cur) sel.value = 'current';
+}
+function onContYearChange() {
+  const sel = document.getElementById('contYearSelect');
+  contViewYear = sel ? sel.value : 'current';
+  try { refreshContabilidad(); } catch (e) { console.warn(e); }
+}
+
+/* ===== Tasa de cambios ===== */
+function defaultFxSettings() {
+  return {
+    apiUrl: 'https://api.frankfurter.app/latest?from=USD',
+    apiBase: 'USD',
+    rates: [
+      { id: 1, emoji: '💵', code: 'USD', name: 'Dólar', rate: 4200 },
+      { id: 2, emoji: '💶', code: 'EUR', name: 'Euro', rate: 4600 }
+    ]
+  };
+}
+function ensureFx() {
+  if (!settings.fx || typeof settings.fx !== 'object') settings.fx = defaultFxSettings();
+  if (!Array.isArray(settings.fx.rates)) settings.fx.rates = defaultFxSettings().rates;
+  if (!settings.fx.apiUrl) settings.fx.apiUrl = defaultFxSettings().apiUrl;
+  if (!settings.fx.apiBase) settings.fx.apiBase = 'USD';
+  return settings.fx;
+}
+function renderHomeFx() {
+  ensureFx();
+  const box = document.getElementById('homeFxList');
+  if (!box) return;
+  const rates = settings.fx.rates || [];
+  if (!rates.length) {
+    box.innerHTML = '<p class="hint">Sin monedas. Agrégalas en Archivo → Tasa de cambios.</p>';
+    return;
+  }
+  box.innerHTML = rates.map(function (r) {
+    return '<div class="fx-row"><span class="fx-emoji">' + (r.emoji || '💱') + '</span><span class="fx-code">' +
+      escapeHtml(r.code || '') + '</span><span class="fx-name">' + escapeHtml(r.name || '') +
+      '</span><span class="fx-rate">' + money(r.rate || 0) + '</span></div>';
+  }).join('');
+}
+function renderFxArchivo() {
+  ensureFx();
+  const url = document.getElementById('fxApiUrl');
+  const base = document.getElementById('fxApiBase');
+  if (url) url.value = settings.fx.apiUrl || '';
+  if (base) base.value = settings.fx.apiBase || 'USD';
+  const list = document.getElementById('fxEditList');
+  if (!list) return;
+  list.innerHTML = (settings.fx.rates || []).map(function (r, i) {
+    return '<div class="fx-edit-row" data-i="' + i + '">' +
+      '<input class="fx-e-emoji" value="' + escapeHtml(r.emoji || '') + '" style="width:48px">' +
+      '<input class="fx-e-code" value="' + escapeHtml(r.code || '') + '" style="width:64px">' +
+      '<input class="fx-e-name" value="' + escapeHtml(r.name || '') + '" style="flex:1;min-width:80px">' +
+      '<input class="fx-e-rate" type="text" inputmode="decimal" data-money="1" value="' + formatMoneyInput(r.rate || 0) + '" style="width:110px">' +
+      '<button type="button" class="danger sm" onclick="fxDeleteRate(' + i + ')">🗑️</button>' +
+      '</div>';
+  }).join('') || '<p class="hint">Sin monedas aún</p>';
+  try { bindAllMoneyInputs(); } catch (e) {}
+}
+function fxCollectEditList() {
+  ensureFx();
+  const rows = document.querySelectorAll('#fxEditList .fx-edit-row');
+  const out = [];
+  rows.forEach(function (row, i) {
+    out.push({
+      id: (settings.fx.rates[i] && settings.fx.rates[i].id) || (Date.now() + i),
+      emoji: (row.querySelector('.fx-e-emoji') || {}).value || '💱',
+      code: ((row.querySelector('.fx-e-code') || {}).value || '').trim().toUpperCase(),
+      name: ((row.querySelector('.fx-e-name') || {}).value || '').trim(),
+      rate: parseMoney((row.querySelector('.fx-e-rate') || {}).value)
+    });
+  });
+  settings.fx.rates = out.filter(function (r) { return r.code; });
+}
+function fxDeleteRate(i) {
+  ensureFx();
+  fxCollectEditList();
+  settings.fx.rates.splice(i, 1);
+  renderFxArchivo();
+  renderHomeFx();
+  try { autoSave(); } catch (e) {}
+}
+function fxAddRate() {
+  ensureFx();
+  fxCollectEditList();
+  const code = ((document.getElementById('fxNewCode') || {}).value || '').trim().toUpperCase();
+  if (!code) return toast('Código requerido (USD, EUR…)');
+  settings.fx.rates.push({
+    id: Date.now(),
+    emoji: ((document.getElementById('fxNewEmoji') || {}).value || '💱').trim() || '💱',
+    code: code,
+    name: ((document.getElementById('fxNewName') || {}).value || code).trim(),
+    rate: parseMoney((document.getElementById('fxNewRate') || {}).value)
+  });
+  ['fxNewEmoji','fxNewCode','fxNewName','fxNewRate'].forEach(function (id) {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderFxArchivo();
+  renderHomeFx();
+  try { autoSave(); } catch (e) {}
+  toast('Moneda agregada');
+}
+async function fxFetchApi(silent) {
+  ensureFx();
+  const status = document.getElementById('homeFxStatus');
+  const apiUrl = settings.fx.apiUrl || defaultFxSettings().apiUrl;
+  try {
+    if (status) status.textContent = 'Consultando API…';
+    const res = await fetch(apiUrl, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const ratesObj = data.rates || data.conversion_rates || {};
+    // Frankfurter: from USD rates.COP is COP per 1 USD
+    // If API base is USD and we want COP per foreign unit:
+    const base = (settings.fx.apiBase || data.base || 'USD').toUpperCase();
+    let updated = 0;
+    (settings.fx.rates || []).forEach(function (r) {
+      const code = (r.code || '').toUpperCase();
+      if (!code) return;
+      if (base === 'USD' && code === 'USD' && ratesObj.COP) {
+        r.rate = +ratesObj.COP;
+        updated++;
+      } else if (ratesObj[code] && ratesObj.COP && base === 'USD') {
+        // EUR rate in USD terms -> COP = rates.COP / rates.EUR? 
+        // frankfurter from USD: rates.EUR = EUR per 1 USD, rates.COP = COP per 1 USD
+        // COP per 1 EUR = rates.COP / rates.EUR
+        if (code !== 'USD' && +ratesObj[code]) {
+          r.rate = Math.round((+ratesObj.COP / +ratesObj[code]) * 100) / 100;
+          updated++;
+        }
+      } else if (ratesObj.COP && code === base) {
+        r.rate = +ratesObj.COP; updated++;
+      }
+    });
+    if (!updated && ratesObj.COP) {
+      // at least set USD if present
+      const usd = (settings.fx.rates || []).find(function (r) { return (r.code || '').toUpperCase() === 'USD'; });
+      if (usd) { usd.rate = +ratesObj.COP; updated = 1; }
+    }
+    renderHomeFx();
+    renderFxArchivo();
+    try { autoSave(); } catch (e) {}
+    const msg = updated ? ('API OK · ' + updated + ' tasa(s) · ' + new Date().toLocaleString()) : 'API respondió pero no hubo tasas coincidentes (se mantienen manuales)';
+    if (status) status.textContent = msg;
+    if (!silent) toast(msg);
+    return true;
+  } catch (e) {
+    const msg = 'API falló · se usan tasas manuales. ' + (e.message || e);
+    if (status) status.textContent = msg;
+    if (!silent) toast(msg);
+    return false;
+  }
+}
+function bindFxUI() {
+  const b1 = document.getElementById('btnFxRefresh');
+  const b2 = document.getElementById('btnFxGoArchivo');
+  const b3 = document.getElementById('btnFxApiSave');
+  const b4 = document.getElementById('btnFxApiTest');
+  const b5 = document.getElementById('btnFxAdd');
+  if (b1) b1.onclick = function () { fxFetchApi(false); };
+  if (b2) b2.onclick = function () { show('archivo'); try { document.getElementById('fxArchivo').open = true; } catch (e) {} };
+  if (b3) b3.onclick = function () {
+    ensureFx();
+    settings.fx.apiUrl = ((document.getElementById('fxApiUrl') || {}).value || '').trim();
+    settings.fx.apiBase = ((document.getElementById('fxApiBase') || {}).value || 'USD').trim().toUpperCase();
+    fxCollectEditList();
+    try { autoSave(); } catch (e) {}
+    toast('API y tasas guardadas');
+    renderHomeFx();
+  };
+  if (b4) b4.onclick = function () {
+    ensureFx();
+    settings.fx.apiUrl = ((document.getElementById('fxApiUrl') || {}).value || '').trim();
+    settings.fx.apiBase = ((document.getElementById('fxApiBase') || {}).value || 'USD').trim().toUpperCase();
+    fxFetchApi(false);
+  };
+  if (b5) b5.onclick = fxAddRate;
+  const ys = document.getElementById('contYearSelect');
+  if (ys) ys.onchange = onContYearChange;
+}
+
+try{bindFxUI();renderHomeFx();renderFxArchivo();}catch(e){console.warn(e)}
+startFirebaseAuth();
 } catch (e) { console.error('Firebase start', e); }
 
 try { renderArchivedYearsUI(); updateYearCloseBanner(); } catch (e) {}
