@@ -451,8 +451,8 @@ nav button.active{color:var(--accent)}
 
 /* Contab: Registro | Cajas en 2 columnas en pantalla ancha */
 .cont-reg-body{display:grid;grid-template-columns:1fr;gap:14px}
-.cont-reg-cajas{border-top:1px solid var(--border);padding-top:12px;margin-top:0}
-.cont-reg-resumen-wrap{grid-column:1/-1;border-top:1px solid var(--border);padding-top:10px;margin-top:4px}
+.cont-reg-cajas{border-top:0;padding-top:0;margin-top:0}
+.cont-reg-resumen-wrap{grid-column:1/-1;border-top:1px solid var(--border);padding-top:4px;margin-top:0;min-height:0}
 .caja-inline-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;justify-content:space-between}
 .caja-inline-row .label{flex:1;margin:0;font-size:11px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .caja-inline-row input{flex:0 0 auto;width:140px;max-width:42%;text-align:right}
@@ -475,7 +475,8 @@ nav button.active{color:var(--accent)}
     border-left:1px solid var(--border);
     padding-left:20px;
   }
-  .cont-reg-resumen-wrap{grid-column:1 / -1}
+  .cont-reg-resumen-wrap{grid-column:1 / -1;border-top:0;padding-top:0;margin-top:-8px}
+  .cont-reg-cajas{border-left:1px solid var(--border);padding-left:20px}
 }
 @media (min-width: 960px) {
   #contabilidad #contRegistro{
@@ -971,6 +972,8 @@ header #empresaSelect{
 #appTitle.catalog-link:active{opacity:.8}
 
 
+
+.mini-money-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 10px}.mini-money-summary .money-tile,.exchange-grid .money-tile{background:rgba(8,20,31,.65);border:1px solid var(--border);border-radius:9px;padding:7px 9px;min-width:0}.money-tile .label{font-size:10px}.money-tile strong{display:block;font-size:14px;color:var(--accent);overflow-wrap:anywhere}.exchange-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.exchange-grid .money-tile strong{font-size:16px}.rate-config-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--border)}.rate-config-row small{display:block;color:var(--muted);overflow-wrap:anywhere}@media(max-width:520px){.mini-money-summary{grid-template-columns:1fr 1fr}.mini-money-summary .money-tile:last-child{grid-column:1/-1}}
 </style>
 </head>
 <body class="auth-locked">
@@ -1054,6 +1057,7 @@ header #empresaSelect{
 <main>
   <!-- INICIO -->
   <section id="home" class="view active">
+    <details class="collapse" id="exchangeRatesModule" open><summary>💱 Tasa de Cambios</summary><div class="body"><div id="exchangeRatesDisplay" class="exchange-grid"><div class="hint">Cargando tasas…</div></div><div class="hint" style="margin-top:6px">Tasas informativas. Puedes editar monedas, valor manual y API desde Archivo → Tasa de Cambios.</div></div></details>
     <!-- 1) Análisis del año (resultado + gráfico, como en Contab.) -->
     <details class="collapse" id="homeChartSec">
       <summary>📊 Análisis del año</summary>
@@ -1097,7 +1101,7 @@ header #empresaSelect{
       <summary id="homePendTitle">⏳ Facturas y proyectos en ejecución (0: $ 0,00 / $ 0,00 / $ 0,00)</summary>
       <div class="body">
         
-        <div id="pendClients" class="empty">Ninguno</div>
+        <div id="pendClients" class="empty">Ninguno</div><div id="receivableSummary" class="mini-money-summary"></div>
       </div>
     </details>
 
@@ -1527,7 +1531,7 @@ header #empresaSelect{
         <button type="button" id="btnExportCatalogOpen" class="sm success" title="Exportar a catálogo">📤</button>
         <button type="button" id="btnNewProd" class="sm success">➕ Nuevo</button>
       </div>
-      <div class="section-title" style="margin:0 0 8px">📦 Stock de productos</div>
+      <div class="section-title" style="margin:0 0 8px">📦 Stock de productos</div><div id="stockMoneySummary" class="mini-money-summary"></div>
       <div class="sticky-search">
         <div class="actions">
           <input id="stockSearch" placeholder="Filtrar nombre o código...">
@@ -1584,7 +1588,7 @@ header #empresaSelect{
       <div class="sticky-btns">
         <button type="button" id="btnNewIns" class="sm success">➕ Nuevo</button>
       </div>
-      <div class="section-title" style="margin:0 0 8px">🧪 Insumos / Implementos</div>
+      <div class="section-title" style="margin:0 0 8px">🧪 Insumos / Implementos</div><div id="insMoneySummary" class="mini-money-summary"></div>
       <div class="sticky-search">
         <div class="actions" style="grid-template-columns:1fr auto auto;gap:6px">
           <input id="insSearch" placeholder="Buscar nombre o código...">
@@ -1779,7 +1783,7 @@ header #empresaSelect{
           <div class="card" style="margin:0;padding:10px"><div class="label">Egresos</div><div id="contExpense" class="stat expense">$0</div><div id="contExpenseDetail" class="tot-detail"></div></div>
           <div class="card" style="margin:0;padding:10px"><div class="label">Resultado</div><div id="contBalance" class="stat balance">$0</div><div id="contBalanceDetail" class="tot-detail"></div></div>
         </div>
-        <div class="section-title" style="font-size:13px;margin-bottom:6px">Por mes</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><label class="section-title" style="font-size:13px;margin:0">Resumen por año</label><select id="contYearSelect" style="max-width:150px;padding:6px 8px"></select></div><div id="archivedYearPanel" style="display:none;margin-bottom:12px"></div>
         <div id="contMonths" style="margin-bottom:14px"></div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
           <label class="label" style="margin:0">Gráfica</label>
@@ -2060,6 +2064,7 @@ header #empresaSelect{
       </div>
     </details>
 
+    <details class="collapse" id="archivoTasas"><summary>💱 Configurar Tasa de Cambios</summary><div class="body"><p class="hint">Crea, edita o elimina monedas. La API puede usar <code>{base}</code> como moneda base. Si falla, se muestra el último valor manual guardado.</p><div id="ratesConfigList"></div><div class="grid2" style="margin-top:10px"><input id="rateCode" placeholder="Moneda (USD, EUR…)"><input id="rateName" placeholder="Nombre (Dólar, Euro…)"><input id="rateEmoji" placeholder="Emoji 💵"><input id="rateManual" type="number" step="0.0001" placeholder="Valor manual en COP"><input id="rateApi" placeholder="API URL con {base}"></div><div class="actions" style="margin-top:8px"><button type="button" class="success" id="rateSave">💾 Guardar moneda</button><button type="button" class="secondary" id="rateCancel">Cancelar</button><button type="button" class="secondary" id="rateRefresh">🔄 Actualizar API</button></div></div></details>
     <details class="collapse" id="archivoMantenimiento">
       <summary>⚠️ Mantenimiento</summary>
       <div class="body">
@@ -3289,6 +3294,7 @@ function payload() {
     clients, proveedores, invoices, insumos,
     counters: { nextProdId, nextCliId, nextProvId, nextInvId, nextNumero, nextInsId },
     contabilidad: {
+      cajasFecha: (contCajasFecha || {electronica:"",fisica:"",inversiones:""}),
       cajas: {
         electronica: +contCajas.electronica || 0,
         fisica: +contCajas.fisica || 0,
@@ -3527,6 +3533,7 @@ function loadFromObj(obj) {
   nextInsId  = ctr.nextInsId  || (insumos.reduce((m,x)=>Math.max(m,x.id||0),0)+1);
   // Contabilidad personal (única / compartida)
   const ct = obj.contabilidad || {};
+  contCajasFecha = ct.cajasFecha || {electronica:"",fisica:"",inversiones:""};
   contCajas = {
     electronica: +(ct.cajas && ct.cajas.electronica) || 0,
     fisica: +(ct.cajas && ct.cajas.fisica) || 0,
@@ -10675,5 +10682,45 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+
+<script>
+/* ATCB enhancements: valuations, caja age, archived-year selector and editable FX */
+let contCajasFecha = {electronica:'',fisica:'',inversiones:''};
+const ATCB_RATE_KEY='atcb_exchange_rates_v1';
+let atcbRates=JSON.parse(localStorage.getItem(ATCB_RATE_KEY)||'null')||[
+ {code:'USD',name:'Dólar estadounidense',emoji:'💵',manual:0,api:'https://open.er-api.com/v6/latest/USD',field:'COP'},
+ {code:'EUR',name:'Euro',emoji:'💶',manual:0,api:'https://open.er-api.com/v6/latest/EUR',field:'COP'}
+];
+let rateEditingCode='';
+function saveRates(){localStorage.setItem(ATCB_RATE_KEY,JSON.stringify(atcbRates));}
+function rateFmt(v){return Number(v||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:4});}
+function renderRateCards(){const el=document.getElementById('exchangeRatesDisplay');if(!el)return;el.innerHTML=atcbRates.map(r=>`<div class="money-tile"><div class="label">${r.emoji||'💱'} ${escapeHtml(r.code)} · ${escapeHtml(r.name)}</div><strong>${r.value?rateFmt(r.value):rateFmt(r.manual)} COP</strong><small>${r.updated?'API · '+escapeHtml(r.updated):'Valor manual / sin actualizar'}</small></div>`).join('')||'<div class="hint">No hay monedas configuradas.</div>';}
+function renderRateConfig(){const el=document.getElementById('ratesConfigList');if(!el)return;el.innerHTML=atcbRates.map(r=>`<div class="rate-config-row"><div><strong>${r.emoji||'💱'} ${escapeHtml(r.code)} — ${escapeHtml(r.name)}</strong><small>Manual: ${rateFmt(r.manual)} COP · API: ${escapeHtml(r.api||'No configurada')}</small></div><div class="row-actions"><button class="sm secondary" onclick="editRate('${encodeURIComponent(r.code)}')">✏️</button><button class="sm danger" onclick="deleteRate('${encodeURIComponent(r.code)}')">🗑️</button></div></div>`).join('');}
+function editRate(code){const r=atcbRates.find(x=>x.code===decodeURIComponent(code));if(!r)return;rateEditingCode=r.code;rateCode.value=r.code;rateName.value=r.name;rateEmoji.value=r.emoji||'';rateManual.value=r.manual||'';rateApi.value=r.api||'';}
+function deleteRate(code){const c=decodeURIComponent(code);if(!confirm('¿Eliminar la moneda '+c+'?'))return;atcbRates=atcbRates.filter(r=>r.code!==c);saveRates();renderRateConfig();renderRateCards();}
+async function refreshRates(){for(const r of atcbRates){if(!r.api)continue;try{const url=r.api.replaceAll('{base}',encodeURIComponent(r.code));const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);const data=await res.json();let v=data?.rates?.[r.field||'COP'];if(!v&&data?.conversion_rates)v=data.conversion_rates[r.field||'COP'];if(!v&&data?.data)v=data.data[r.field||'COP'];if(!Number.isFinite(+v)||+v<=0)throw Error('Respuesta sin tasa COP');r.value=+v;r.updated=new Date().toLocaleString('es-CO');}catch(e){r.value=+r.manual||0;r.error=String(e.message||e);}}saveRates();renderRateCards();}
+function renderMoneySummaries(){
+ const insEl=document.getElementById('insMoneySummary');if(insEl){const rows=(insumos||[]).slice();let value=rows.reduce((a,i)=>a+(+i.stock||0)*(+i.precio||0),0);insEl.innerHTML=`<div class="money-tile"><span class="label">Unidades / gramos</span><strong>${rows.reduce((a,i)=>a+(+i.stock||0),0).toLocaleString('es-CO')}</strong></div><div class="money-tile"><span class="label">Inversión estimada</span><strong>${money(value)}</strong></div><div class="money-tile"><span class="label">Referencias</span><strong>${rows.length}</strong></div>`;}
+ const st=document.getElementById('stockMoneySummary');if(st){const rows=(products||[]).filter(p=>(p.empresa||EMPRESA_ATCB)===activeEmpresa);let units=0,value=0;rows.forEach(p=>{const q=+p.stock||0;units+=q;const caps=getProductCaps(p);let cost=+p.compra||0;const keys=Object.keys(caps||{});if(keys.length)cost=keys.reduce((sum,k)=>sum+(+caps[k].compra||0),0)/keys.length;value+=q*cost;});st.innerHTML=`<div class="money-tile"><span class="label">Unidades en stock</span><strong>${units.toLocaleString('es-CO')}</strong></div><div class="money-tile"><span class="label">Costo invertido</span><strong>${money(value)}</strong></div><div class="money-tile"><span class="label">Referencias</span><strong>${rows.length}</strong></div>`;}
+ const rc=document.getElementById('receivableSummary');if(rc){const rows=(invoices||[]).filter(x=>(x.empresa||EMPRESA_ATCB)===activeEmpresa&&x.tipo!=='cobrada'&&x.tipo!=='cotizacion');const pending=rows.reduce((a,x)=>a+Math.max(0,+saldoPendiente(x)||0),0);rc.innerHTML=`<div class="money-tile"><span class="label">Pendiente por cobrar</span><strong>${money(pending)}</strong></div><div class="money-tile"><span class="label">Documentos abiertos</span><strong>${rows.length}</strong></div><div class="money-tile"><span class="label">Cotizaciones / proyectos</span><strong>${rows.filter(x=>x.tipo==='cotizacion'||x.isProyecto).length}</strong></div>`;}
+}
+function cajaAgeLabel(key){const d=contCajasFecha?.[key];if(!d)return 'Sin anotación registrada';const days=Math.max(0,Math.floor((Date.now()-new Date(d+'T00:00:00').getTime())/86400000));return `Última anotación: ${fmtDate(d)} · hace ${days} día(s)`;}
+function addCajaAgeLabels(){[['cajaElectronica','electronica'],['cajaFisica','fisica'],['cajaInversiones','inversiones']].forEach(([id,key])=>{const input=document.getElementById(id);if(!input)return;let el=document.getElementById('age-'+key);if(!el){el=document.createElement('div');el.id='age-'+key;el.className='hint';el.style.cssText='text-align:right;font-size:10px;margin:-5px 0 7px';input.parentElement.insertAdjacentElement('afterend',el);}el.textContent='🕒 '+cajaAgeLabel(key);});}
+function setupYearSelector(){const sel=document.getElementById('contYearSelect');if(!sel)return;const years=[new Date().getFullYear(),...(archivedYears||[]).map(x=>+x.year)].filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>b-a);const old=sel.value;sel.innerHTML=years.map(y=>`<option value="${y}">${y}${y===new Date().getFullYear()?' (actual)':' (archivado)'}</option>`).join('');sel.value=years.includes(+old)?old:String(new Date().getFullYear());sel.onchange=()=>showSelectedYear(+sel.value);showSelectedYear(+sel.value);}
+function showSelectedYear(year){const panel=document.getElementById('archivedYearPanel');const isCurrent=year===new Date().getFullYear();if(isCurrent){if(panel)panel.style.display='none';const title=document.querySelector('#contAnalisis .section-title');if(title)title.textContent='Resumen por mes · '+year;try{refreshContabilidad();}catch(e){}return;}const y=getArchivedYear(year);if(!y||!panel)return;const movs=y.movimientos||[];const totals=contTotals(movs);const months=Array.from({length:12},(_,i)=>{const m=String(i+1).padStart(2,'0'),a=movs.filter(x=>(x.date||'').slice(5,7)===m);const [inc,exp,res]=contTotals(a);return {m,inc,exp,res};});const names=['ene.','feb.','mar.','abr.','may.','jun.','jul.','ago.','sep.','oct.','nov.','dic.'];panel.style.display='block';panel.innerHTML=`<div class="cont-grid"><div class="card"><div class="label">Ingresos ${year}</div><div class="stat income">${money(y.ingresos)}</div></div><div class="card"><div class="label">Egresos ${year}</div><div class="stat expense">${money(y.egresos)}</div></div><div class="card"><div class="label">Resultado ${year}</div><div class="stat balance">${money(y.resultado)}</div></div></div><div class="section-title" style="margin:12px 0 6px">Por mes · ${year}</div><div style="overflow:auto"><table><thead><tr><th>Mes</th><th>Ingresos</th><th>Egresos</th><th>Resultado</th></tr></thead><tbody>${months.map(x=>`<tr><td>${names[+x.m-1]}</td><td class="income">${money(x.inc)}</td><td class="expense">${money(x.exp)}</td><td class="${x.res>=0?'income':'expense'}">${money(x.res)}</td></tr>`).join('')}</tbody></table></div><div class="section-title" style="margin:12px 0 6px">📈 Gráfica dinámica · ${year}</div><div class="chartbox"><canvas id="archivedYearChart" height="220"></canvas></div><div class="section-title" style="margin:12px 0 6px">📋 Libro diario · ${movs.length} movimientos</div><div style="overflow:auto;max-height:420px"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Tipo</th><th>Monto</th></tr></thead><tbody>${movs.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${escapeHtml(x.concept||'')}</td><td>${escapeHtml(x.type||'')}</td><td>${money(x.amount)}</td></tr>`).join('')}</tbody></table></div><button class="sm secondary" style="margin-top:8px" onclick="viewArchivedYear(${year})">Abrir libro diario completo</button>`;const cv=document.getElementById('archivedYearChart');if(cv){const ctx=cv.getContext('2d'),w=cv.width=cv.clientWidth*devicePixelRatio,h=cv.height=220*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);const max=Math.max(1,...months.flatMap(x=>[x.inc,x.exp]));const bw=(cv.clientWidth-36)/12/2;months.forEach((x,i)=>{const x0=18+i*bw*2;const hi=x.inc/max*165,he=x.exp/max*165;ctx.fillStyle='#21c982';ctx.fillRect(x0,180-hi,bw-2,hi);ctx.fillStyle='#ff5968';ctx.fillRect(x0+bw,180-he,bw-2,he);ctx.fillStyle='#9aa9b8';ctx.font='10px sans-serif';ctx.fillText(names[i],x0-2,198);});}}
+function bindAtcbEnhancements(){
+ ['cajaElectronica','cajaFisica','cajaInversiones'].forEach((id,i)=>{const el=document.getElementById(id);if(!el)return;const key=['electronica','fisica','inversiones'][i];el.addEventListener('change',()=>{contCajasFecha[key]=today();addCajaAgeLabels();autoSave();});});
+ const save=document.getElementById('rateSave');if(save)save.onclick=()=>{const code=rateCode.value.trim().toUpperCase();if(!code)return toast('Indica el código de moneda');const r={code,name:rateName.value.trim()||code,emoji:rateEmoji.value.trim()||'💱',manual:+rateManual.value||0,api:rateApi.value.trim(),field:'COP'};const ix=atcbRates.findIndex(x=>x.code===(rateEditingCode||code));if(ix>=0)atcbRates[ix]=r;else atcbRates.push(r);rateEditingCode='';['rateCode','rateName','rateEmoji','rateManual','rateApi'].forEach(id=>document.getElementById(id).value='');saveRates();renderRateConfig();renderRateCards();};
+ const cancel=document.getElementById('rateCancel');if(cancel)cancel.onclick=()=>{rateEditingCode='';['rateCode','rateName','rateEmoji','rateManual','rateApi'].forEach(id=>document.getElementById(id).value='');};const refresh=document.getElementById('rateRefresh');if(refresh)refresh.onclick=refreshRates;
+ const sel=document.getElementById('contYearSelect');if(sel)sel.addEventListener('focus',setupYearSelector);
+ const oldRefresh=window.refreshContabilidad;if(typeof oldRefresh==='function'&&!oldRefresh._atcbWrapped){window.refreshContabilidad=function(){oldRefresh.apply(this,arguments);setupYearSelector();addCajaAgeLabels();};window.refreshContabilidad._atcbWrapped=true;}
+ const oldIns=window.renderInsumos;if(typeof oldIns==='function'&&!oldIns._atcbWrapped){window.renderInsumos=function(){oldIns.apply(this,arguments);renderMoneySummaries();};window.renderInsumos._atcbWrapped=true;}
+ const oldProd=window.renderProducts;if(typeof oldProd==='function'&&!oldProd._atcbWrapped){window.renderProducts=function(){oldProd.apply(this,arguments);renderMoneySummaries();};window.renderProducts._atcbWrapped=true;}
+ const oldInv=window.renderInvoices;if(typeof oldInv==='function'&&!oldInv._atcbWrapped){window.renderInvoices=function(){oldInv.apply(this,arguments);renderMoneySummaries();};window.renderInvoices._atcbWrapped=true;}
+ renderRateConfig();renderRateCards();renderMoneySummaries();addCajaAgeLabels();setupYearSelector();refreshRates();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindAtcbEnhancements);else bindAtcbEnhancements();
+</script>
+
 </body>
 </html>
