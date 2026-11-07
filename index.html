@@ -59,9 +59,6 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --bg:#0b0f14;--card:#121922;--card2:#18222e;--text:#edf3f8;--muted:#91a0af;
@@ -2281,6 +2278,9 @@ header #empresaSelect{
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
 /* ========== FIREBASE (Auth + Firestore) ========== */
 const firebaseConfig = {
@@ -2312,12 +2312,17 @@ function initFirebase() {
       fbApp = firebase.initializeApp(firebaseConfig);
     }
     fbAuth = firebase.auth();
-    fbDb = firebase.firestore();
+    try {
+      fbDb = firebase.firestore();
+    } catch (eFs) {
+      console.warn('Firestore no disponible aún', eFs);
+      fbDb = null;
+    }
     fbReady = true;
-    return true;
+    return !!fbAuth;
   } catch (e) {
     console.error('Firebase init', e);
-    setAuthError('Error Firebase: ' + (e && e.message ? e.message : e));
+    try { setAuthError('Error Firebase: ' + (e && e.message ? e.message : e)); } catch (e2) {}
     return false;
   }
 }
@@ -2404,9 +2409,19 @@ async function signInWithGoogle() {
   const btn = document.getElementById('btnGoogleLogin');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Conectando…'; }
   if (!fbAuth) {
-    setAuthError('Firebase no inicializado. Revisa conexión y SDK.');
-    if (btn) { btn.disabled = false; btn.textContent = '🔐 Continuar con Google'; }
-    return;
+    try {
+      if (!initFirebase()) {
+        var diag = 'firebase=' + (typeof firebase);
+        if (typeof firebase !== 'undefined') diag += ' apps=' + (firebase.apps ? firebase.apps.length : '?');
+        setAuthError('Firebase no inicializado. ' + diag + '. ¿Bloqueador o sin red?');
+        if (btn) { btn.disabled = false; btn.textContent = '🔐 Continuar con Google'; }
+        return;
+      }
+    } catch (e0) {
+      setAuthError('Init error: ' + (e0 && e0.message ? e0.message : e0));
+      if (btn) { btn.disabled = false; btn.textContent = '🔐 Continuar con Google'; }
+      return;
+    }
   }
   try {
     // Persistencia local: necesaria en Android / PWA
@@ -11061,7 +11076,17 @@ function bindFxUI() {
 try {
   document.body.classList.add('auth-locked');
   try { bindFxUI(); renderHomeFx(); renderFxArchivo(); } catch (e) { console.warn(e); }
-  startFirebaseAuth();
+  function bootAuth(attempt) {
+    attempt = attempt || 0;
+    if (typeof firebase === 'undefined' && attempt < 25) {
+      return setTimeout(function(){ bootAuth(attempt + 1); }, 120);
+    }
+    try { startFirebaseAuth(); } catch (e) {
+      console.error('Firebase start', e);
+      try { setAuthError(String(e && e.message || e)); } catch (e2) {}
+    }
+  }
+  bootAuth(0);
 } catch (e) { console.error('Firebase start', e); }
 
 try { renderArchivedYearsUI(); updateYearCloseBanner(); } catch (e) {}
